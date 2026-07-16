@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ForgeBot Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#070b12;color:#fff;min-height:100vh}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:36px;width:100%;max-width:380px}
+.login-card h1{font-size:22px;font-weight:900;color:#25D366;margin-bottom:4px}
+.login-card p{font-size:14px;color:rgba(255,255,255,.4);margin-bottom:24px}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.4);margin-bottom:5px}
+.fg input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:11px 13px;color:#fff;font-size:14px;outline:none}
+.fg input:focus{border-color:#25D366}
+.btn-g{width:100%;background:#25D366;color:#000;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;margin-top:6px}
+.err{color:#f87171;font-size:13px;margin-top:10px;display:none}
+
+/* SHELL */
+.shell{display:none;min-height:100vh}
+nav{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid rgba(255,255,255,.06);background:#0a0f1a}
+.logo{font-size:18px;font-weight:900;color:#25D366}.logo span{color:#fff}
+.nav-r{display:flex;gap:10px;align-items:center}
+.nbtn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer;color:#fff}
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 53px)}
+.sidebar{border-right:1px solid rgba(255,255,255,.06);padding:16px 10px;background:#080d17}
+.si{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.5);margin-bottom:3px;transition:.15s}
+.si:hover,.si.on{background:rgba(37,211,102,.1);color:#25D366}
+.si-ico{font-size:16px;width:20px;text-align:center}
+.main{padding:24px;overflow-y:auto}
+.pg{display:none}.pg.on{display:block}
+.ptitle{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px}
+.psub{font-size:13px;color:rgba(255,255,255,.35);margin-bottom:20px}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.sc{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px}
+.sl{font-size:11px;color:rgba(255,255,255,.35);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.sv{font-size:26px;font-weight:900;color:#25D366}
+.sv.p{color:#a89fff}
+
+/* TABLE */
+.card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:13px;overflow:hidden;margin-bottom:18px}
+.ch{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between}
+.ch h3{font-size:14px;font-weight:700}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:.4px;padding:9px 15px;text-align:left;font-weight:700}
+td{padding:11px 15px;font-size:13px;border-top:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.65)}
+.badge{display:inline-block;padding:3px 8px;border-radius:100px;font-size:11px;font-weight:700}
+.ba{background:rgba(37,211,102,.15);color:#25D366}
+.bp{background:rgba(255,167,38,.12);color:#ffa726}
+.bd{background:rgba(248,113,113,.12);color:#f87171}
+.bc{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+.action-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;margin-right:4px}
+.action-btn:hover{background:rgba(37,211,102,.15);border-color:rgba(37,211,102,.3);color:#25D366}
+.action-btn.red:hover{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:#f87171}
+.empty{text-align:center;padding:36px;color:rgba(255,255,255,.2);font-size:13px}
+.loading{text-align:center;padding:36px;color:rgba(255,255,255,.2);font-size:13px}
+
+/* CLIENT DETAIL PANEL */
+.detail-panel{position:fixed;right:0;top:0;width:480px;height:100vh;background:#0d1520;border-left:1px solid rgba(255,255,255,.1);z-index:50;overflow-y:auto;padding:24px;transform:translateX(100%);transition:.25s}
+.detail-panel.open{transform:translateX(0)}
+.dp-close{background:none;border:none;color:rgba(255,255,255,.4);font-size:20px;cursor:pointer;float:right}
+.dp-name{font-size:20px;font-weight:800;margin-bottom:4px;margin-top:8px}
+.dp-email{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:20px}
+.dp-section{margin-bottom:20px}
+.dp-section h4{font-size:12px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px}
+.info-row .label{color:rgba(255,255,255,.4)}
+.info-row .val{color:#fff;font-weight:600}
+.dp-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.dp-actions button{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid}
+.btn-connect{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.3);color:#25D366}
+.btn-disconnect{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:#f87171}
+.btn-activate{background:rgba(168,159,255,.1);border-color:rgba(168,159,255,.3);color:#a89fff}
+
+/* FLOW PANEL inside detail */
+.mini-list{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;overflow:hidden;margin-top:8px}
+.mini-row{padding:10px 14px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,.6)}
+.mini-row:last-child{border-bottom:none}
+.mini-kw{font-size:11px;color:rgba(255,255,255,.3);margin-top:2px}
+
+/* FORM */
+.fg2{margin-bottom:12px}
+.fg2 label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.35);margin-bottom:4px}
+.fg2 input,.fg2 select,.fg2 textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#fff;font-size:13px;outline:none;font-family:inherit}
+.fg2 input:focus,.fg2 select:focus,.fg2 textarea:focus{border-color:#25D366}
+.fg2 select option{background:#0d1520}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <h1>ForgeBot</h1>
+    <p>Admin Panel — TheFavsForge</p>
+    <div class="fg"><label>Email</label><input type="email" id="aEmail" placeholder="admin@email.com"/></div>
+    <div class="fg"><label>Password</label><input type="password" id="aPass" placeholder="Your admin password"/></div>
+    <button class="btn-g" onclick="doLogin()">Sign In</button>
+    <div class="err" id="loginErr">Invalid credentials</div>
+  </div>
+</div>
+
+<!-- SHELL -->
+<div class="shell" id="shell">
+  <nav>
+    <div class="logo">Forge<span>Bot</span> <span style="font-size:11px;color:rgba(255,255,255,.3);font-weight:400">Admin</span></div>
+    <div class="nav-r">
+      <button class="nbtn" onclick="loadAll()">↻ Refresh</button>
+      <button class="nbtn" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="si on" onclick="showPg('clients',this)"><div class="si-ico">👥</div>Clients</div>
+      <div class="si" onclick="showPg('payments',this)"><div class="si-ico">💰</div>Payments</div>
+      <div class="si" onclick="showPg('broadcasts',this)"><div class="si-ico">📢</div>Broadcast</div>
+    </div>
+    <div class="main">
+
+      <!-- CLIENTS -->
+      <div class="pg on" id="pg-clients">
+        <div class="ptitle">All Clients</div>
+        <div class="psub">Every business signed up to ForgeBot</div>
+        <div class="stats">
+          <div class="sc"><div class="sl">Total</div><div class="sv" id="sTot">—</div></div>
+          <div class="sc"><div class="sl">Active</div><div class="sv" id="sAct">—</div></div>
+          <div class="sc"><div class="sl">Connected</div><div class="sv" id="sCon">—</div></div>
+          <div class="sc"><div class="sl">Paused</div><div class="sv p" id="sPau">—</div></div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>Client List</h3></div>
+          <div id="clientTable"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div class="pg" id="pg-payments">
+        <div class="ptitle">Payments</div>
+        <div class="psub">Overview of client subscription status</div>
+        <div class="card">
+          <div class="ch"><h3>Subscription Status</h3></div>
+          <div id="payTable"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- BROADCAST -->
+      <div class="pg" id="pg-broadcasts">
+        <div class="ptitle">Broadcast</div>
+        <div class="psub">Send a message on behalf of a client</div>
+        <div class="card" style="padding:20px">
+          <div class="fg2">
+            <label>Select Client</label>
+            <select id="bcClient"><option value="">Loading clients...</option></select>
+          </div>
+          <div class="fg2"><label>Message</label><textarea id="bcMsg" rows="4" placeholder="Type broadcast message..."></textarea></div>
+          <div class="fg2"><label>Phone Numbers (one per line, with country code)</label><textarea id="bcNums" rows="5" placeholder="+2348012345678&#10;+2349012345678"></textarea></div>
+          <button class="btn-g" style="width:auto;padding:10px 24px;margin-top:4px" onclick="sendBroadcast()">📢 Send</button>
+          <div id="bcResult" style="margin-top:12px;font-size:13px;color:#25D366;display:none"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT DETAIL PANEL -->
+<div class="detail-panel" id="detailPanel">
+  <button class="dp-close" onclick="closeDetail()">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+let CREDS = null;
+let allClients = [];
+
+function headers() {
+  return { 'Content-Type':'application/json', email: CREDS.email, password: CREDS.pass };
+}
+
+async function doLogin() {
+  const email = document.getElementById('aEmail').value.trim();
+  const pass = document.getElementById('aPass').value;
+  CREDS = { email, pass };
+  const r = await fetch('/api/admin/clients', { headers: headers() });
+  if (r.status === 401) {
+    document.getElementById('loginErr').style.display = 'block'; CREDS = null; return;
+  }
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('shell').style.display = 'block';
+  loadAll();
+}
+
+function doLogout() { CREDS = null; location.reload(); }
+
+function showPg(id, el) {
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.si').forEach(s=>s.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  el.classList.add('on');
+}
+
+async function loadAll() {
+  const r = await fetch('/api/admin/clients', { headers: headers() });
+  allClients = await r.json();
+
+  // Stats
+  document.getElementById('sTot').textContent = allClients.length;
+  document.getElementById('sAct').textContent = allClients.filter(c=>c.status==='active').length;
+  document.getElementById('sCon').textContent = allClients.filter(c=>c.whatsapp_status==='connected').length;
+  document.getElementById('sPau').textContent = allClients.filter(c=>c.status==='paused').length;
+
+  renderClients(allClients);
+  renderPayments(allClients);
+  populateBcSelect(allClients);
+}
+
+function statusBadge(s) {
+  const map = { active:'ba', pending:'bp', paused:'bd', cancelled:'bc' };
+  return `<span class="badge ${map[s]||'bc'}">${s}</span>`;
+}
+function waBadge(s) {
+  if (s==='connected') return '<span class="badge ba">🟢 Connected</span>';
+  if (s==='connecting') return '<span class="badge bp">⏳ Connecting</span>';
+  return '<span class="badge bc">⚫ Off</span>';
+}
+
+function renderClients(clients) {
+  const el = document.getElementById('clientTable');
+  if (!clients.length) { el.innerHTML='<div class="empty">No clients yet</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Business</th><th>WhatsApp</th><th>Status</th><th>Bot</th><th>Paid</th><th></th></tr></thead>
+    <tbody>
+    ${clients.map(c=>`<tr>
+      <td><div style="font-weight:700">${c.business_name}</div><div style="font-size:11px;color:rgba(255,255,255,.3)">${c.email}</div></td>
+      <td style="font-size:12px">${c.whatsapp_number}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>${waBadge(c.whatsapp_status)}</td>
+      <td>${c.setup_paid?'<span style="color:#25D366">✅</span>':'<span style="color:#f87171">❌</span>'}</td>
+      <td><button class="action-btn" onclick="openDetail('${c.id}')">View</button></td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderPayments(clients) {
+  const el = document.getElementById('payTable');
+  if (!clients.length) { el.innerHTML='<div class="empty">No clients</div>'; return; }
+  el.innerHTML = `<table>
+    <thead><tr><th>Business</th><th>Country</th><th>Setup Paid</th><th>Subscription</th><th>Status</th></tr></thead>
+    <tbody>
+    ${clients.map(c=>`<tr>
+      <td><div style="font-weight:700">${c.business_name}</div><div style="font-size:11px;color:rgba(255,255,255,.3)">${c.email}</div></td>
+      <td style="font-size:12px">${c.country||'—'}</td>
+      <td>${c.setup_paid?'<span style="color:#25D366">Paid</span>':'<span style="color:#f87171">Pending</span>'}</td>
+      <td>${c.subscription_active?'<span style="color:#25D366">Active</span>':'<span style="color:#f87171">Inactive</span>'}</td>
+      <td>${statusBadge(c.status)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function populateBcSelect(clients) {
+  const sel = document.getElementById('bcClient');
+  sel.innerHTML = '<option value="">— Select a client —</option>' +
+    clients.filter(c=>c.whatsapp_status==='connected').map(c=>`<option value="${c.id}">${c.business_name}</option>`).join('');
+}
+
+async function openDetail(id) {
+  const client = allClients.find(c=>c.id===id);
+  if (!client) return;
+
+  const flows = await fetch(`/api/admin/clients/${id}/flows`, { headers: headers() }).then(r=>r.json());
+  const posts = await fetch(`/api/admin/clients/${id}/status-posts`, { headers: headers() }).then(r=>r.json());
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="dp-name">${client.business_name}</div>
+    <div class="dp-email">${client.email} · ${client.country}</div>
+
+    <div class="dp-section">
+      <h4>Account Info</h4>
+      <div class="info-row"><span class="label">Owner</span><span class="val">${client.full_name}</span></div>
+      <div class="info-row"><span class="label">WhatsApp</span><span class="val">${client.whatsapp_number}</span></div>
+      <div class="info-row"><span class="label">Type</span><span class="val">${client.business_type||'general'}</span></div>
+      <div class="info-row"><span class="label">Status</span><span class="val">${client.status}</span></div>
+      <div class="info-row"><span class="label">Bot</span><span class="val">${client.whatsapp_status}</span></div>
+      <div class="info-row"><span class="label">Setup paid</span><span class="val">${client.setup_paid?'Yes':'No'}</span></div>
+      <div class="info-row"><span class="label">Subscription</span><span class="val">${client.subscription_active?'Active':'Inactive'}</span></div>
+      <div class="info-row"><span class="label">Joined</span><span class="val">${new Date(client.created_at).toLocaleDateString()}</span></div>
+    </div>
+
+    <div class="dp-actions">
+      <button class="btn-connect" onclick="connectClient('${id}')">🔗 Connect</button>
+      <button class="btn-disconnect" onclick="disconnectClient('${id}')">✂️ Disconnect</button>
+      <button class="btn-activate" onclick="toggleSub('${id}', ${!client.subscription_active})">${client.subscription_active?'⏸ Pause':'▶ Activate'}</button>
+    </div>
+
+    <div class="dp-section" style="margin-top:20px">
+      <h4>Auto-Reply Flows (${flows.length})</h4>
+      ${flows.length ? `<div class="mini-list">${flows.map(f=>`<div class="mini-row"><div><div>${f.flow_name}</div><div class="mini-kw">${f.keywords}</div></div><span class="badge ${f.active?'ba':'bc'}">${f.response_type}</span></div>`).join('')}</div>` : '<div style="font-size:13px;color:rgba(255,255,255,.25)">No flows set</div>'}
+    </div>
+
+    <div class="dp-section">
+      <h4>Status Posts (${posts.length})</h4>
+      ${posts.length ? `<div class="mini-list">${posts.map(p=>`<div class="mini-row"><div>${p.post_time} — ${p.caption?p.caption.substring(0,40)+'...':'(auto)'}</div><span class="badge ${p.active?'ba':'bc'}">${p.repeat_daily?'daily':'once'}</span></div>`).join('')}</div>` : '<div style="font-size:13px;color:rgba(255,255,255,.25)">No posts scheduled</div>'}
+    </div>
+  `;
+
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); }
+
+async function connectClient(id) {
+  await fetch(`/api/admin/clients/${id}/connect`, { method:'POST', headers: headers() });
+  alert('Session start initiated! QR will appear when client reconnects.');
+  loadAll();
+}
+
+async function disconnectClient(id) {
+  if (!confirm('Disconnect this client?')) return;
+  await fetch(`/api/admin/clients/${id}/disconnect`, { method:'POST', headers: headers() });
+  loadAll(); closeDetail();
+}
+
+async function toggleSub(id, active) {
+  await fetch(`/api/admin/clients/${id}`, {
+    method:'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ subscription_active: active, status: active ? 'active' : 'paused' })
+  });
+  loadAll(); closeDetail();
+}
+
+async function sendBroadcast() {
+  const clientId = document.getElementById('bcClient').value;
+  const message = document.getElementById('bcMsg').value.trim();
+  const nums = document.getElementById('bcNums').value.trim().split('\n').filter(n=>n.trim());
+  if (!clientId || !message || !nums.length) return alert('Fill all fields');
+  const r = await fetch(`/api/admin/clients/${clientId}/broadcast`, {
+    method:'POST', headers: headers(), body: JSON.stringify({ message, numbers: nums })
+  });
+  const res = await r.json();
+  const el = document.getElementById('bcResult');
+  el.textContent = `✅ Sent to ${res.sent} of ${res.total} contacts.`;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>

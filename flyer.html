@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WhatsApp Automation Flyer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #080808;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 20px;
+  }
+
+  /* ── Perfect square card ── */
+  .card {
+    width: 620px;
+    height: 620px;
+    background: #0a0d14;
+    border-radius: 26px;
+    border: 1px solid rgba(37,211,102,0.15);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 22px;
+    gap: 11px;
+  }
+
+  /* glows */
+  .g1 { position:absolute; width:280px; height:280px; background:radial-gradient(circle,rgba(37,211,102,.14) 0%,transparent 65%); top:-90px; right:-90px; border-radius:50%; pointer-events:none; }
+  .g2 { position:absolute; width:220px; height:220px; background:radial-gradient(circle,rgba(124,111,255,.09) 0%,transparent 65%); bottom:-70px; left:-70px; border-radius:50%; pointer-events:none; }
+  .dots { position:absolute; inset:0; background-image:radial-gradient(rgba(255,255,255,.035) 1px,transparent 1px); background-size:22px 22px; pointer-events:none; }
+
+  /* everything sits above the glows */
+  .card > *:not(.g1):not(.g2):not(.dots) { position:relative; z-index:2; }
+
+  /* ── Row 1: badge ── */
+  .badge {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(37,211,102,.10); border:1px solid rgba(37,211,102,.28);
+    border-radius:100px; padding:5px 13px; width:fit-content;
+  }
+  .bdot { width:7px; height:7px; background:#25D366; border-radius:50%; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+  .badge span { font-size:10.5px; font-weight:700; color:#25D366; letter-spacing:.7px; text-transform:uppercase; }
+
+  /* ── Row 2: headline ── */
+  .headline { font-size:28px; font-weight:900; line-height:1.1; color:#fff; letter-spacing:-1px; }
+  .headline .g { color:#25D366; }
+  .headline .p { color:#a89fff; }
+  .sub { font-size:11px; color:rgba(255,255,255,.4); margin-top:4px; font-weight:500; }
+
+  /* ── Row 3: value prop ── */
+  .vp {
+    background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:14px; overflow:hidden;
+    flex-shrink:0;
+  }
+  .vp-grid { display:grid; grid-template-columns:1fr 28px 1fr; }
+
+  .vp-side { padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
+  .vp-side.bad  { background:rgba(220,60,60,.05); }
+  .vp-side.good { background:rgba(37,211,102,.05); }
+
+  .vp-top { display:flex; align-items:center; gap:6px; margin-bottom:2px; }
+  .vp-emoji { font-size:18px; }
+  .vp-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
+  .vp-label.r { color:#f87171; }
+  .vp-label.g { color:#25D366; }
+
+  .vp-item { display:flex; align-items:flex-start; gap:5px; font-size:11px; color:rgba(255,255,255,.62); line-height:1.35; }
+  .vi { font-size:11px; flex-shrink:0; }
+
+  .vp-div { display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.03); }
+  .vs { background:#25D366; color:#000; font-size:9px; font-weight:900; border-radius:100px; padding:3px 6px; writing-mode:vertical-rl; }
+
+  /* ── Row 4: chat + features ── */
+  .mid { display:grid; grid-template-columns:1.15fr .85fr; gap:10px; flex:1; min-height:0; }
+
+  .chat { background:#111827; border-radius:12px; border:1px solid rgba(255,255,255,.06); padding:10px; display:flex; flex-direction:column; }
+  .ch { display:flex; align-items:center; gap:7px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.05); margin-bottom:8px; }
+  .av { width:26px; height:26px; background:linear-gradient(135deg,#25D366,#128C7E); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+  .an { font-size:11px; font-weight:700; color:#fff; }
+  .as { font-size:9.5px; color:#25D366; }
+
+  .bw { display:flex; margin-bottom:5px; }
+  .bw.r { justify-content:flex-end; }
+  .b { max-width:90%; padding:7px 10px; border-radius:11px; font-size:11px; line-height:1.4; }
+  .b.in  { background:#1f2937; color:rgba(255,255,255,.8); border-bottom-left-radius:3px; }
+  .b.out { background:#054d2e; color:#dcfce7; border-bottom-right-radius:3px; }
+  .b .t  { font-size:8.5px; opacity:.4; display:block; margin-top:2px; }
+
+  .tr { display:flex; justify-content:flex-end; margin-bottom:5px; }
+  .typ { background:#054d2e; border-radius:11px; border-bottom-right-radius:3px; padding:7px 11px; display:flex; align-items:center; gap:3px; }
+  .d { width:4px; height:4px; background:#25D366; border-radius:50%; animation:bop 1s infinite; }
+  .d:nth-child(2){animation-delay:.15s} .d:nth-child(3){animation-delay:.3s}
+  @keyframes bop{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-4px);opacity:1}}
+
+  .feats { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-content:start; }
+  .feat { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); border-radius:10px; padding:10px 9px; display:flex; flex-direction:column; gap:4px; }
+  .fi { font-size:17px; }
+  .fl { font-size:10.5px; font-weight:600; color:rgba(255,255,255,.7); line-height:1.3; }
+
+  /* ── Row 5: pricing ── */
+  .pricing {
+    background:linear-gradient(135deg,rgba(37,211,102,.13),rgba(37,211,102,.04));
+    border:1px solid rgba(37,211,102,.25); border-radius:14px;
+    padding:13px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    flex-shrink:0;
+  }
+  .pl { flex:1; }
+  .plabel { font-size:9.5px; font-weight:700; color:rgba(255,255,255,.3); text-transform:uppercase; letter-spacing:.7px; margin-bottom:4px; }
+  .pold { font-size:16px; font-weight:800; color:rgba(255,255,255,.22); text-decoration:line-through; text-decoration-color:#f87171; text-decoration-thickness:2px; }
+  .pnew { font-size:26px; font-weight:900; color:#25D366; letter-spacing:-1px; line-height:1.1; }
+  .pusd { font-size:11.5px; color:rgba(255,255,255,.35); font-weight:600; margin-bottom:6px; }
+  .monthly { display:flex; align-items:center; gap:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.07); margin-top:4px; }
+  .mpill { background:rgba(168,159,255,.15); border:1px solid rgba(168,159,255,.25); border-radius:100px; padding:3px 9px; font-size:10.5px; font-weight:700; color:#a89fff; }
+  .mlabel { font-size:10.5px; color:rgba(255,255,255,.35); }
+
+  .pr { display:flex; flex-direction:column; align-items:flex-end; gap:7px; }
+  .cta-btn { background:#25D366; color:#000; font-size:12px; font-weight:800; padding:11px 16px; border-radius:11px; text-align:center; line-height:1.35; white-space:nowrap; }
+  .scarcity { font-size:10px; color:rgba(255,255,255,.3); font-weight:600; text-align:center; }
+
+  /* hint below card */
+  .hint { color:#222; font-size:11px; margin-top:14px; font-family:-apple-system,sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="g1"></div><div class="g2"></div><div class="dots"></div>
+
+  <!-- Badge -->
+  <div class="badge">
+    <div class="bdot"></div>
+    <span>WhatsApp Automation · Africa / International</span>
+  </div>
+
+  <!-- Headline -->
+  <div>
+    <div class="headline">Your Business <span class="g">Never Misses</span> a <span class="p">Customer.</span></div>
+    <div class="sub">Auto-replies · Daily status posts · Customer broadcasts · 24/7</div>
+  </div>
+
+  <!-- Value Prop -->
+  <div class="vp">
+    <div class="vp-grid">
+
+      <div class="vp-side bad">
+        <div class="vp-top"><div class="vp-emoji">😩</div><div class="vp-label r">Old Way</div></div>
+        <div class="vp-item"><span class="vi">💸</span> Paying ₦50k–₦100k/month to someone to reply messages</div>
+        <div class="vp-item"><span class="vi">😴</span> They sleep — customers wait, sales are lost</div>
+        <div class="vp-item"><span class="vi">😰</span> Heavy stress on your shoulders every day</div>
+      </div>
+
+      <div class="vp-div"><div class="vs">VS</div></div>
+
+      <div class="vp-side good">
+        <div class="vp-top"><div class="vp-emoji">😌</div><div class="vp-label g">With the Bot</div></div>
+        <div class="vp-item"><span class="vi">✅</span> ₦10,000/month — bot handles it all for you</div>
+        <div class="vp-item"><span class="vi">⚡</span> Replies in 2 seconds, even at 3am</div>
+        <div class="vp-item"><span class="vi">🙌</span> Burden lifted — you focus on your business</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Chat + Features -->
+  <div class="mid">
+
+    <div class="chat">
+      <div class="ch">
+        <div class="av">👗</div>
+        <div><div class="an">Adaeze's Fashion</div><div class="as">● online now</div></div>
+      </div>
+      <div class="bw">
+        <div class="b in">How much is the big wig? 🙏<span class="t">2:47 AM</span></div>
+      </div>
+      <div class="tr"><div class="typ"><div class="d"></div><div class="d"></div><div class="d"></div></div></div>
+      <div class="bw r">
+        <div class="b out">Hi! 👋 Our big units go for ₦35k–₦55k. Want pictures? 😊<span class="t">2:47 AM ✓✓</span></div>
+      </div>
+    </div>
+
+    <div class="feats">
+      <div class="feat"><div class="fi">🤖</div><div class="fl">Replies 24/7</div></div>
+      <div class="feat"><div class="fi">📸</div><div class="fl">Auto status posts</div></div>
+      <div class="feat"><div class="fi">📢</div><div class="fl">Customer broadcasts</div></div>
+      <div class="feat"><div class="fi">🇳🇬</div><div class="fl">Understands Pidgin</div></div>
+    </div>
+
+  </div>
+
+  <!-- Pricing -->
+  <div class="pricing">
+    <div class="pl">
+      <div class="plabel">One-time setup fee</div>
+      <div class="pold">₦50,000</div>
+      <div class="pnew">₦30,000</div>
+      <div class="pusd">$45 USD · Limited discount</div>
+      <div class="monthly">
+        <div class="mpill">₦10,000 / month</div>
+        <div class="mlabel">Bot keeps running for you</div>
+      </div>
+    </div>
+    <div class="pr">
+      <div class="cta-btn">WhatsApp<br/>Me Now 👇</div>
+      <div class="scarcity">🔥 3 slots left this week</div>
+    </div>
+  </div>
+
+</div>
+
+<p class="hint">Open in browser → screenshot the card → post to your story or feed</p>
+
+</body>
+</html>

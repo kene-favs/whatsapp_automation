@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ForgeBot — Partner Brief</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#f8f9fa;color:#1a1a2e;line-height:1.6}
+
+.cover{background:linear-gradient(135deg,#0a0d14 0%,#0d2137 50%,#0a2e1a 100%);color:#fff;padding:80px 60px;min-height:380px;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;top:-100px;right:-100px;width:500px;height:500px;background:radial-gradient(circle,rgba(37,211,102,.15) 0%,transparent 65%);border-radius:50%}
+.cover::after{content:'';position:absolute;bottom:-80px;left:-80px;width:400px;height:400px;background:radial-gradient(circle,rgba(100,100,255,.08) 0%,transparent 65%);border-radius:50%}
+.cover-inner{position:relative;z-index:2;max-width:900px;margin:0 auto}
+.brand{font-size:13px;font-weight:700;color:rgba(37,211,102,.8);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.cover h1{font-size:52px;font-weight:900;line-height:1.1;letter-spacing:-2px;margin-bottom:16px}
+.cover h1 .g{color:#25D366}
+.cover p.tagline{font-size:18px;color:rgba(255,255,255,.6);margin-bottom:40px;max-width:600px}
+.cover-stats{display:flex;gap:40px;flex-wrap:wrap}
+.cstat{border-left:3px solid #25D366;padding-left:16px}
+.cstat-val{font-size:32px;font-weight:900;color:#25D366}
+.cstat-label{font-size:13px;color:rgba(255,255,255,.45);margin-top:2px}
+.confidential{margin-top:40px;font-size:12px;color:rgba(255,255,255,.25);letter-spacing:1px;text-transform:uppercase}
+
+.container{max-width:900px;margin:0 auto;padding:60px 40px}
+
+/* SECTION */
+.section{margin-bottom:56px}
+.section-badge{display:inline-block;background:rgba(37,211,102,.1);color:#2E7D32;border:1px solid rgba(37,211,102,.25);border-radius:100px;padding:4px 14px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+.section h2{font-size:30px;font-weight:800;color:#1a1a2e;letter-spacing:-1px;margin-bottom:6px}
+.section .lead{font-size:16px;color:#555;margin-bottom:24px;line-height:1.7}
+
+/* HOW IT WORKS */
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0}
+.flow-step{padding:24px;position:relative;border-top:3px solid #e8f5e9}
+.flow-step.active{border-top-color:#25D366;background:#f8fff8}
+.step-num{font-size:36px;font-weight:900;color:#e8f5e9;line-height:1;margin-bottom:8px}
+.flow-step.active .step-num{color:#25D366}
+.step-icon{font-size:24px;margin-bottom:8px}
+.step-title{font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+.step-desc{font-size:12.5px;color:#777;line-height:1.5}
+.flow-arrow{display:flex;align-items:center;justify-content:center;font-size:20px;color:#ccc;padding-top:40px}
+
+/* MONEY TABLE */
+.money-table{width:100%;border-collapse:collapse;margin-top:16px}
+.money-table th{background:#1a1a2e;color:#fff;padding:12px 16px;font-size:12px;font-weight:700;text-align:left;letter-spacing:.5px;text-transform:uppercase}
+.money-table td{padding:14px 16px;font-size:14px;border-bottom:1px solid #f0f0f0}
+.money-table tr:nth-child(even) td{background:#fafafa}
+.money-table tr.highlight td{background:#e8f5e9;font-weight:700;color:#1a2e1a}
+.money-table tr.milestone td{background:#1a2e1a;color:#fff}
+.money-table tr.milestone .big{font-size:18px;color:#25D366;font-weight:900}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.tag.green{background:#e8f5e9;color:#2E7D32}
+.tag.blue{background:#e3f2fd;color:#1565C0}
+.tag.gold{background:#fff8e1;color:#e65100}
+
+/* OPPORTUNITY BOX */
+.opp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+.opp-card{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:24px;border-left:4px solid #25D366}
+.opp-card h4{font-size:16px;font-weight:800;margin-bottom:8px;color:#1a1a2e}
+.opp-card p{font-size:13.5px;color:#666;line-height:1.6}
+.opp-card .big-num{font-size:36px;font-weight:900;color:#25D366;line-height:1;margin-bottom:4px}
+
+/* ROLES BOX */
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+.role-card{border-radius:16px;padding:28px;color:#fff}
+.role-card.tech{background:linear-gradient(135deg,#1a2e44,#0d2137)}
+.role-card.marketing{background:linear-gradient(135deg,#1a2e1a,#0a2000)}
+.role-card h3{font-size:18px;font-weight:800;margin-bottom:4px}
+.role-card .subtitle{font-size:12px;opacity:.6;margin-bottom:16px;text-transform:uppercase;letter-spacing:.5px}
+.role-card ul{list-style:none;padding:0}
+.role-card ul li{font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-start;gap:8px}
+.role-card ul li::before{content:'→';opacity:.5;flex-shrink:0}
+
+/* PROJECTION CHART */
+.proj-bar{margin:6px 0}
+.proj-label{font-size:12px;color:#888;margin-bottom:4px;display:flex;justify-content:space-between}
+.proj-track{background:#f0f0f0;border-radius:100px;height:28px;position:relative;overflow:hidden}
+.proj-fill{background:linear-gradient(90deg,#25D366,#1a7a3a);height:100%;border-radius:100px;display:flex;align-items:center;padding-left:10px;min-width:80px;transition:.3s}
+.proj-fill span{font-size:12px;font-weight:700;color:#fff}
+.proj-fill.over{background:linear-gradient(90deg,#1a2e44,#25D366)}
+
+/* QUOTE */
+.quote-box{background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-left:4px solid #25D366;padding:24px 28px;border-radius:0 12px 12px 0;margin:24px 0}
+.quote-box p{font-size:16px;font-style:italic;color:#2E7D32;font-weight:600;line-height:1.6}
+.quote-box .author{margin-top:10px;font-size:12px;color:#888;font-style:normal}
+
+/* FOOTER */
+.doc-footer{background:#1a1a2e;color:#fff;padding:40px 60px;margin-top:60px}
+.doc-footer .footer-inner{max-width:900px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.doc-footer .brand-text{font-size:22px;font-weight:900;color:#25D366}
+.doc-footer .brand-text span{color:#fff}
+.doc-footer p{font-size:12px;color:rgba(255,255,255,.3)}
+
+/* SPLIT */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}
+.split-box{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:24px}
+.split-box h4{font-size:15px;font-weight:800;margin-bottom:12px;color:#1a1a2e}
+
+@media(max-width:600px){
+  .opp-grid,.roles,.split{grid-template-columns:1fr}
+  .cover h1{font-size:34px}
+  .container{padding:40px 20px}
+}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-inner">
+    <div class="brand">TheFavsForge · Confidential Partner Brief</div>
+    <h1>The Bot That Runs<br/>Nigerian Business <span class="g">While You Sleep.</span></h1>
+    <p class="tagline">ForgeBot automates WhatsApp for Nigerian SMEs — replies customers, posts daily status, and keeps businesses running 24/7. No stress. No hiring. Just results.</p>
+    <div class="cover-stats">
+      <div class="cstat">
+        <div class="cstat-val">₦30K</div>
+        <div class="cstat-label">One-time setup per client</div>
+      </div>
+      <div class="cstat">
+        <div class="cstat-val">₦10K</div>
+        <div class="cstat-label">Recurring every month</div>
+      </div>
+      <div class="cstat">
+        <div class="cstat-val">₦1M+</div>
+        <div class="cstat-label">Monthly target at 100 clients</div>
+      </div>
+      <div class="cstat">
+        <div class="cstat-val">~Zero</div>
+        <div class="cstat-label">Monthly operating cost</div>
+      </div>
+    </div>
+    <div class="confidential">Confidential — For Partners Only · July 2026</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- THE PROBLEM -->
+  <div class="section">
+    <div class="section-badge">The Problem</div>
+    <h2>Nigerian SMEs Are Losing Money Every Day</h2>
+    <p class="lead">Every day, thousands of Nigerian business owners — salons, food vendors, fashion stores, cosmetics sellers — are losing customers because nobody is answering their WhatsApp. They can't afford to hire someone. They can't be on their phone 24/7. Customers message at 2am, nobody replies, they go somewhere else. Sales lost. Business suffering.</p>
+
+    <div class="opp-grid">
+      <div class="opp-card">
+        <div class="big-num">₦50K–₦100K</div>
+        <h4>What they pay a human</h4>
+        <p>Many businesses pay a person ₦50k–₦100k every month just to reply messages and post stories. And that person still sleeps, gets sick, and takes breaks.</p>
+      </div>
+      <div class="opp-card" style="border-left-color:#1565C0">
+        <div class="big-num" style="color:#1565C0">3am</div>
+        <h4>When customers message</h4>
+        <p>Customers don't wait for business hours. They message when they feel like it — midnight, early morning, weekends. Every unanswered message is a missed sale.</p>
+      </div>
+      <div class="opp-card" style="border-left-color:#e65100">
+        <div class="big-num" style="color:#e65100">90%</div>
+        <h4>Of SMEs aren't consistent</h4>
+        <p>9 out of 10 Nigerian business owners know they should be posting to their WhatsApp Status daily. Almost none of them actually do it consistently.</p>
+      </div>
+      <div class="opp-card" style="border-left-color:#6a1b9a">
+        <div class="big-num" style="color:#6a1b9a">Millions</div>
+        <h4>Of businesses. One solution.</h4>
+        <p>Nigeria has over 37 million small businesses. Almost all of them use WhatsApp to sell. We don't need all of them — just a few thousand is life-changing money.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE SOLUTION -->
+  <div class="section">
+    <div class="section-badge">The Solution</div>
+    <h2>ForgeBot — Their Business on Autopilot</h2>
+    <p class="lead">ForgeBot connects to a business owner's WhatsApp and works for them 24/7. It replies customers automatically, posts their products to Status every single day, and sends broadcast messages to all their contacts — all without the owner lifting a finger.</p>
+
+    <div class="flow">
+      <div class="flow-step active">
+        <div class="step-num">01</div>
+        <div class="step-icon">📝</div>
+        <div class="step-title">Client Signs Up</div>
+        <div class="step-desc">Business owner visits our website, fills in their business details and product info. Takes 3 minutes.</div>
+      </div>
+      <div class="flow-step active">
+        <div class="step-num">02</div>
+        <div class="step-icon">💳</div>
+        <div class="step-title">Pays Setup Fee</div>
+        <div class="step-desc">Pays ₦30,000 one-time setup fee via Paystack (card, transfer, USSD). Or $45 via Stripe for international clients.</div>
+      </div>
+      <div class="flow-step active">
+        <div class="step-num">03</div>
+        <div class="step-icon">📱</div>
+        <div class="step-title">Scans QR Code</div>
+        <div class="step-desc">A QR code immediately appears on screen. They scan it with their WhatsApp — same as linking devices. Done in 30 seconds.</div>
+      </div>
+      <div class="flow-step active">
+        <div class="step-num">04</div>
+        <div class="step-icon">🤖</div>
+        <div class="step-title">Bot Goes Live</div>
+        <div class="step-desc">From that moment, the bot is working. Replies customers, posts Status daily, sends broadcasts. 24/7. ₦10,000 charged every month automatically.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW THE BOT WORKS -->
+  <div class="section">
+    <div class="section-badge">Bot Capabilities</div>
+    <h2>What the Bot Actually Does</h2>
+    <p class="lead">When a customer sends a message, the bot reads it, understands what they want, and replies like a human. It even understands Nigerian Pidgin. Here's what it handles:</p>
+
+    <div class="split">
+      <div class="split-box">
+        <h4>🤖 Auto-Replies (24/7)</h4>
+        <ul style="list-style:none;padding:0">
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Customer asks price → Bot replies with prices</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Customer asks about availability → Bot checks and responds</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">"How far?" / "Abeg how much?" → Bot understands Pidgin</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Delivery questions → Bot gives delivery info</li>
+          <li style="padding:6px 0;font-size:13px;color:#555">Payment questions → Bot shares payment details</li>
+        </ul>
+      </div>
+      <div class="split-box">
+        <h4>📸 Daily Status Posts</h4>
+        <ul style="list-style:none;padding:0">
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Posts product images to WhatsApp Status every day</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Writes its own captions — no input needed from owner</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Different caption every day — never repeats</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Posts at whatever time is set (e.g. 9am daily)</li>
+          <li style="padding:6px 0;font-size:13px;color:#555">Salon, food, fashion, cosmetics — all supported</li>
+        </ul>
+      </div>
+      <div class="split-box">
+        <h4>📢 Customer Broadcasts</h4>
+        <ul style="list-style:none;padding:0">
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Send a message to ALL their customers at once</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Announce sales, new products, promotions</li>
+          <li style="padding:6px 0;font-size:13px;color:#555">Done from their dashboard — one click</li>
+        </ul>
+      </div>
+      <div class="split-box">
+        <h4>🎛️ Client Dashboard</h4>
+        <ul style="list-style:none;padding:0">
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Client logs in to update their own products/prices</li>
+          <li style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#555">Add or change auto-reply messages anytime</li>
+          <li style="padding:6px 0;font-size:13px;color:#555">Schedule status posts, view broadcast history</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE MONEY -->
+  <div class="section">
+    <div class="section-badge">The Numbers</div>
+    <h2>How We Make Money — And How Much</h2>
+    <p class="lead">Every client generates two income streams: a one-time setup payment when they join, and a recurring monthly payment for as long as they stay. The recurring income is the real power — it compounds every month as we add new clients.</p>
+
+    <div class="quote-box">
+      <p>"Once a client is set up, they keep paying ₦10,000 every month automatically. We don't have to sell to them again. Our job is to keep adding new clients — the income keeps stacking."</p>
+      <div class="author">— ForgeBot Revenue Model</div>
+    </div>
+
+    <table class="money-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>New Clients</th>
+          <th>Total Active</th>
+          <th>Setup Revenue</th>
+          <th>Monthly Recurring</th>
+          <th>Total That Month</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Month 1</strong> <span class="tag green">Launch</span></td>
+          <td>5</td>
+          <td>5</td>
+          <td>₦150,000</td>
+          <td>₦50,000</td>
+          <td><strong>₦200,000</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Month 2</strong></td>
+          <td>10</td>
+          <td>15</td>
+          <td>₦300,000</td>
+          <td>₦150,000</td>
+          <td><strong>₦450,000</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Month 3</strong></td>
+          <td>15</td>
+          <td>30</td>
+          <td>₦450,000</td>
+          <td>₦300,000</td>
+          <td><strong>₦750,000</strong></td>
+        </tr>
+        <tr class="highlight">
+          <td><strong>Month 4</strong> <span class="tag gold">₦1M Club</span></td>
+          <td>25</td>
+          <td>55</td>
+          <td>₦750,000</td>
+          <td>₦550,000</td>
+          <td><strong style="color:#2E7D32;font-size:16px">₦1,300,000</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Month 5</strong></td>
+          <td>25</td>
+          <td>80</td>
+          <td>₦750,000</td>
+          <td>₦800,000</td>
+          <td><strong>₦1,550,000</strong></td>
+        </tr>
+        <tr class="highlight">
+          <td><strong>Month 6</strong> <span class="tag green">Target</span></td>
+          <td>20</td>
+          <td>100</td>
+          <td>₦600,000</td>
+          <td>₦1,000,000</td>
+          <td><strong style="color:#2E7D32;font-size:16px">₦1,600,000</strong></td>
+        </tr>
+        <tr class="milestone">
+          <td colspan="2"><strong>Month 12 (1 Year)</strong></td>
+          <td><strong style="color:#25D366">300+ clients</strong></td>
+          <td><strong style="color:#25D366">₦1.5M–₦2M</strong></td>
+          <td class="big">₦3M+/month</td>
+          <td class="big">₦3M–₦5M/month</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:12px;color:#999;margin-top:10px">*Assumes average 90% monthly retention. Setup fees are one-time; recurring stacks every month.</p>
+  </div>
+
+  <!-- COST TO RUN -->
+  <div class="section">
+    <div class="section-badge">Operating Costs</div>
+    <h2>What It Costs to Run This</h2>
+    <p class="lead">This is the most important part: our costs are nearly zero. There's no inventory. No staff to pay. No office. No physical product. We built software once — and it serves hundreds of clients without extra cost.</p>
+
+    <div class="opp-grid">
+      <div class="opp-card" style="border-left-color:#1a1a2e">
+        <div class="big-num" style="color:#1a1a2e">~$5</div>
+        <h4>Monthly Server Cost</h4>
+        <p>Railway hosting runs on a low-cost plan. Supabase free tier handles hundreds of clients. Total tech infrastructure: under $10/month.</p>
+      </div>
+      <div class="opp-card" style="border-left-color:#1a1a2e">
+        <div class="big-num" style="color:#1a1a2e">1.5%</div>
+        <h4>Paystack Transaction Fee</h4>
+        <p>On ₦30,000 = ₦450 fee per client. On ₦10,000/month = ₦150 fee. Very small. Everything else is our money.</p>
+      </div>
+    </div>
+
+    <div class="quote-box" style="margin-top:24px">
+      <p>"At 100 clients — ₦1,000,000/month income — our total monthly costs are roughly ₦15,000. That means our profit margin is above 98%. This is not a normal business. Software scales differently."</p>
+    </div>
+  </div>
+
+  <!-- ROLES -->
+  <div class="section">
+    <div class="section-badge">Partnership Structure</div>
+    <h2>Who Does What</h2>
+    <p class="lead">This is a true partnership. One person builds and maintains the technology. One person sells and markets. Both share the rewards equally. Neither can succeed without the other.</p>
+
+    <div class="roles">
+      <div class="role-card tech">
+        <h3>🛠️ Tech Partner</h3>
+        <div class="subtitle">Builds · Maintains · Supports</div>
+        <ul>
+          <li>Built and manages the entire ForgeBot platform</li>
+          <li>Sets up each new client's bot after payment</li>
+          <li>Fixes technical issues and updates the system</li>
+          <li>Manages server, database, and payment systems</li>
+          <li>Adds new features as the business grows</li>
+          <li>Admin panel — monitors all clients</li>
+        </ul>
+      </div>
+      <div class="role-card marketing">
+        <h3>📣 Marketing Partner</h3>
+        <div class="subtitle">Sells · Grows · Represents</div>
+        <ul>
+          <li>Creates awareness — Instagram, TikTok, WhatsApp</li>
+          <li>Directly contacts business owners and closes deals</li>
+          <li>Posts flyers, testimonials, and success stories</li>
+          <li>Handles first-response client communication</li>
+          <li>Collects client information and passes to tech partner</li>
+          <li>Builds referral networks and repeat sales</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:24px">
+      <div class="split-box" style="border-left:4px solid #25D366">
+        <h4>💰 Revenue Split (Suggested)</h4>
+        <p style="font-size:13.5px;color:#555;line-height:1.7">
+          50/50 split on all income — both setup fees and monthly recurring. Clean, simple, fair. Every naira that comes in is split equally. No confusion, no argument.
+          <br/><br/>
+          At ₦1.6M/month (Month 6): <strong style="color:#2E7D32">₦800,000 each per month.</strong>
+        </p>
+      </div>
+      <div class="split-box" style="border-left:4px solid #1565C0">
+        <h4>🤝 What Makes This Work</h4>
+        <p style="font-size:13.5px;color:#555;line-height:1.7">
+          The product is already built. The payment system works. The bot is live. All that's needed is <strong>clients</strong>. The faster we bring clients in, the faster the monthly income compounds. Every month we wait is money left on the table.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 MONTH VISUAL -->
+  <div class="section">
+    <div class="section-badge">6-Month Roadmap</div>
+    <h2>Where We'll Be in 6 Months</h2>
+    <p class="lead">This is a realistic picture — not a fantasy. The numbers are based on getting 5 to 25 new clients per month through direct outreach, referrals, and social media. One serious salesperson can achieve this.</p>
+
+    <div style="margin:24px 0">
+      <div class="proj-bar">
+        <div class="proj-label"><span>Month 1 — 5 clients</span><span style="color:#25D366;font-weight:700">₦200,000</span></div>
+        <div class="proj-track"><div class="proj-fill" style="width:12%"><span>₦200K</span></div></div>
+      </div>
+      <div class="proj-bar" style="margin-top:12px">
+        <div class="proj-label"><span>Month 2 — 15 clients</span><span style="color:#25D366;font-weight:700">₦450,000</span></div>
+        <div class="proj-track"><div class="proj-fill" style="width:28%"><span>₦450K</span></div></div>
+      </div>
+      <div class="proj-bar" style="margin-top:12px">
+        <div class="proj-label"><span>Month 3 — 30 clients</span><span style="color:#25D366;font-weight:700">₦750,000</span></div>
+        <div class="proj-track"><div class="proj-fill" style="width:47%"><span>₦750K</span></div></div>
+      </div>
+      <div class="proj-bar" style="margin-top:12px">
+        <div class="proj-label"><span>Month 4 — 55 clients 🔥</span><span style="color:#2E7D32;font-weight:900">₦1,300,000</span></div>
+        <div class="proj-track"><div class="proj-fill over" style="width:81%"><span>₦1.3M — WE CROSS ₦1M!</span></div></div>
+      </div>
+      <div class="proj-bar" style="margin-top:12px">
+        <div class="proj-label"><span>Month 5 — 80 clients</span><span style="color:#2E7D32;font-weight:900">₦1,550,000</span></div>
+        <div class="proj-track"><div class="proj-fill over" style="width:97%"><span>₦1.55M</span></div></div>
+      </div>
+      <div class="proj-bar" style="margin-top:12px">
+        <div class="proj-label"><span>Month 6 — 100 clients 🎯</span><span style="color:#2E7D32;font-weight:900">₦1,600,000</span></div>
+        <div class="proj-track"><div class="proj-fill over" style="width:100%"><span>₦1.6M — TARGET HIT</span></div></div>
+      </div>
+    </div>
+
+    <div class="quote-box">
+      <p>"100 clients in 6 months is roughly 4–5 new clients per week. That's one flyer going viral. That's 10 DMs a day. That's showing a salon owner that their competitor is already using this. It's a sales game — and the product sells itself."</p>
+    </div>
+  </div>
+
+  <!-- WHY IT WORKS -->
+  <div class="section">
+    <div class="section-badge">Why This Works</div>
+    <h2>This Is Not a Gamble. Here's Why.</h2>
+    <p class="lead">Most businesses fail because they have high costs, slow growth, or a product nobody wants. ForgeBot is different on all three.</p>
+
+    <div class="opp-grid">
+      <div class="opp-card">
+        <div class="step-icon" style="font-size:32px;margin-bottom:8px">✅</div>
+        <h4>Problem is Real & Painful</h4>
+        <p>Every single SME owner we talk to has experienced losing a customer because they didn't reply fast enough. The pain is real. They're already paying for this problem.</p>
+      </div>
+      <div class="opp-card">
+        <div class="step-icon" style="font-size:32px;margin-bottom:8px">✅</div>
+        <h4>Price is a No-Brainer</h4>
+        <p>₦10,000/month is less than most people's Airtime spend. For a business making ₦200k–₦2M/month, this is a rounding error — but the impact is massive.</p>
+      </div>
+      <div class="opp-card">
+        <div class="step-icon" style="font-size:32px;margin-bottom:8px">✅</div>
+        <h4>They See Results Immediately</h4>
+        <p>Within 24 hours of connecting, they're getting replies sent to customers, status posted, inquiries answered. No waiting. No maybe. Results on day one.</p>
+      </div>
+      <div class="opp-card">
+        <div class="step-icon" style="font-size:32px;margin-bottom:8px">✅</div>
+        <h4>Clients Don't Leave</h4>
+        <p>Once their bot is running and their customers are used to fast replies, they can't go back. The monthly payment becomes a utility — like electricity. They won't cancel.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINAL CALL -->
+  <div class="section" style="text-align:center;padding:40px;background:linear-gradient(135deg,#0a0d14,#0a2e1a);border-radius:20px;color:#fff">
+    <div style="font-size:48px;margin-bottom:16px">🚀</div>
+    <h2 style="color:#fff;font-size:32px;margin-bottom:12px">The Wealthy Life Is Already Here.</h2>
+    <p style="color:rgba(255,255,255,.6);font-size:16px;max-width:600px;margin:0 auto 24px;line-height:1.7">We didn't build a dream. We built a product. A working, tested, automated income machine. The only thing standing between where we are and ₦1M/month is 100 clients. Let's go get them.</p>
+    <div style="display:inline-block;background:#25D366;color:#000;padding:16px 36px;border-radius:12px;font-weight:900;font-size:18px">ForgeBot — Your Business, on Autopilot.</div>
+    <p style="color:rgba(255,255,255,.3);font-size:12px;margin-top:20px">Powered by TheFavsForge · Built in Nigeria, for Africa and the World</p>
+  </div>
+
+</div>
+
+<div class="doc-footer">
+  <div class="footer-inner">
+    <div>
+      <div class="brand-text">Forge<span>Bot</span></div>
+      <p>A TheFavsForge Product · Confidential Partner Document</p>
+    </div>
+    <p style="text-align:right">This document is for partner use only.<br/>Not for public distribution.</p>
+  </div>
+</div>
+
+</body>
+</html>

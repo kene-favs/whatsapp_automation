@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ForgeBot Dashboard</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
+  :root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
+  header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
+  header .logo span{color:#fff}
+  .status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
+  .status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
+  nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
+  nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
+  nav button.active{color:var(--green);border-bottom-color:var(--green)}
+  .container{max-width:900px;margin:0 auto;padding:28px 20px}
+  .section{display:none}
+  .section.active{display:block}
+  h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+  label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
+  input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
+  input:focus,textarea:focus,select:focus{border-color:var(--blue)}
+  textarea{min-height:80px;resize:vertical}
+  .btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
+  .btn-green{background:var(--green);color:#000}
+  .btn-green:hover{background:#16a34a}
+  .btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
+  .btn-blue{background:var(--blue);color:#fff}
+  .btn-gray{background:#374151;color:#e2e8f0}
+  .row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
+  .row .grow{flex:1}
+  .flow-item,.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
+  .flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
+  .msg{padding:10px 14px;border-radius:6px;font-size:.85rem;margin-bottom:12px;display:none}
+  .msg.show{display:block}
+  .msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
+  .msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+  .broadcast-log{font-size:.8rem;color:#64748b;padding:6px 0;border-bottom:1px solid var(--border)}
+  .coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:22px;margin-bottom:16px;text-align:center}
+  .coming-soon .cs-icon{font-size:2.4rem;margin-bottom:8px}
+  .coming-soon h3{color:var(--purple);font-size:1rem;margin-bottom:6px}
+  .coming-soon p{font-size:.82rem;color:#94a3b8;max-width:420px;margin:0 auto 12px}
+  .cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px}
+  .feat-card{background:var(--card);border-radius:10px;padding:18px;margin-bottom:14px}
+  .notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
+  .notif-box b{color:#fff}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Forge<span>Bot</span></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span id="waBadge" class="status-badge disc">&#9679; Disconnected</span>
+    <button class="btn btn-gray" onclick="logout()" style="padding:6px 14px;font-size:.8rem">Logout</button>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
+  <button onclick="switchTab('status',this)">Status Posts</button>
+  <button onclick="switchTab('broadcast',this)">Broadcast</button>
+  <button onclick="switchTab('features',this)">Features</button>
+  <button onclick="switchTab('settings',this)">Settings</button>
+</nav>
+
+<div class="container">
+
+  <!-- AUTO-REPLIES -->
+  <div id="tab-replies" class="section active">
+    <h2>Auto-Reply Rules</h2>
+    <div id="msgReplies" class="msg"></div>
+    <div class="card">
+      <div class="row">
+        <div class="grow">
+          <label>Keywords (comma separated)</label>
+          <input id="newKw" placeholder="e.g. price, how much, cost"/>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Reply Message</label>
+        <textarea id="newResp" placeholder="Type the reply your bot will send..."></textarea>
+      </div>
+      <button class="btn btn-green" onclick="addFlow()">+ Add Rule</button>
+    </div>
+    <div id="flowList"></div>
+  </div>
+
+  <!-- STATUS POSTS -->
+  <div id="tab-status" class="section">
+    <h2>WhatsApp Status Scheduler</h2>
+    <div id="msgStatus" class="msg"></div>
+    <div class="card">
+      <div style="margin-bottom:12px">
+        <label>Image URL (direct link)</label>
+        <input id="spMedia" placeholder="https://i.imgur.com/yourimage.jpg"/>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Caption (optional - leave blank for auto caption)</label>
+        <textarea id="spCaption" placeholder="Optional custom caption..."></textarea>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label>Post Time (24hr e.g. 09:00)</label>
+          <input id="spTime" placeholder="09:00"/>
+        </div>
+        <div class="grow">
+          <label>Days (Mon,Wed,Fri etc)</label>
+          <input id="spDays" placeholder="Mon,Wed,Fri"/>
+        </div>
+      </div>
+      <button class="btn btn-green" onclick="addStatusPost()">+ Schedule Post</button>
+    </div>
+    <div id="postList"></div>
+  </div>
+
+  <!-- BROADCAST -->
+  <div id="tab-broadcast" class="section">
+    <h2>Send Broadcast</h2>
+    <div id="msgBroadcast" class="msg"></div>
+    <div class="card">
+      <div style="margin-bottom:12px">
+        <label>Message to send to all recent contacts</label>
+        <textarea id="bcMsg" placeholder="Type your broadcast message..."></textarea>
+      </div>
+      <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
+    </div>
+    <h2 style="margin-top:8px">Recent Broadcasts</h2>
+    <div id="broadcastLog"></div>
+  </div>
+
+  <!-- FEATURES -->
+  <div id="tab-features" class="section">
+    <h2>Bot Features</h2>
+
+    <div class="feat-card" style="border:1px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.4rem">&#127908;</span>
+        <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
+        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+      </div>
+      <p style="font-size:.83rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot automatically transcribes and replies in English text. Powered by OpenAI Whisper.</p>
+    </div>
+
+    <div class="feat-card" style="border:1px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.4rem">&#128176;</span>
+        <span style="font-weight:700;color:var(--green)">Payment Confirmation Alerts</span>
+        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+      </div>
+      <p style="font-size:.83rem;color:#94a3b8">When a customer says they have paid, your bot alerts you on your personal WhatsApp. Reply <b style="color:#fff">1</b> to confirm, <b style="color:#fff">2</b> to ask them wait, <b style="color:#fff">3</b> if not received. Bot messages the customer automatically.</p>
+      <p style="font-size:.78rem;color:var(--orange);margin-top:8px">Set your notification number in the Settings tab.</p>
+    </div>
+
+    <div class="feat-card" style="border:1px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.4rem">&#128588;</span>
+        <span style="font-weight:700;color:var(--green)">Human Handoff Detection</span>
+        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+      </div>
+      <p style="font-size:.83rem;color:#94a3b8">When a customer asks to speak to a real person, the bot tells them to hold on, pauses itself for 30 minutes, and alerts you immediately on your personal WhatsApp.</p>
+    </div>
+
+    <div class="coming-soon">
+      <div class="cs-icon">&#128274;</div>
+      <h3>Fake Payment Receipt Detection</h3>
+      <p>Our AI will automatically scan payment screenshots sent by customers and verify if they are real or edited. No more fake alerts fooling your business.</p>
+      <div class="cs-badge">COMING SOON</div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="tab-settings" class="section">
+    <h2>Settings</h2>
+    <div id="msgSettings" class="msg"></div>
+
+    <div class="card">
+      <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--green)">Your Notification Number</h3>
+      <div class="notif-box">
+        This is your <b>personal WhatsApp number</b> where the bot sends you all alerts: payment claims, human handoff requests, and other notifications. Enter it in international format without the + sign.
+      </div>
+      <label>WhatsApp Number (e.g. 2348012345678)</label>
+      <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:12px"/>
+      <button class="btn btn-green" onclick="saveNotifNumber()">Save Number</button>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">Fallback Message</h3>
+      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">Sent when a customer message does not match any auto-reply rule.</p>
+      <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
+      <button class="btn btn-green" style="margin-top:12px" onclick="saveFallback()">Save Fallback</button>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">WhatsApp Connection</h3>
+      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">If your bot disconnects, click below to reconnect. Open the link on a computer to scan the QR code with your phone.</p>
+      <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('forgebot_token');
+if (!TOKEN) {
+  const t = new URLSearchParams(window.location.search).get('token');
+  if (t) { TOKEN = t; localStorage.setItem('forgebot_token', t); }
+  else window.location.href = '/';
+}
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function showMsg(id, text, type) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg show ' + type;
+  setTimeout(function(){ el.classList.remove('show'); }, 4000);
+}
+
+function logout() {
+  localStorage.removeItem('forgebot_token');
+  window.location.href = '/';
+}
+
+function reconnectWA() {
+  window.open('/onboard?token=' + TOKEN, '_blank');
+}
+
+async function loadAll() {
+  await loadFlows();
+  await loadStatusPosts();
+  await loadBroadcastLogs();
+  pollWaStatus();
+}
+
+async function pollWaStatus() {
+  try {
+    var r = await fetch(API+'/api/client/me', { headers: H });
+    if (r.ok) {
+      var c = await r.json();
+      var badge = document.getElementById('waBadge');
+      if (c.whatsapp_status === 'connected') {
+        badge.textContent = 'Connected';
+        badge.className = 'status-badge';
+      } else {
+        badge.textContent = 'Disconnected';
+        badge.className = 'status-badge disc';
+      }
+      if (c.notification_number) document.getElementById('notifNumber').value = c.notification_number;
+      if (c.fallback_message) document.getElementById('fallbackMsg').value = c.fallback_message;
+    }
+  } catch(e) {}
+  setTimeout(pollWaStatus, 10000);
+}
+
+async function loadFlows() {
+  var r = await fetch(API+'/api/client/flows', { headers: H });
+  var flows = await r.json();
+  var el = document.getElementById('flowList');
+  if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return; }
+  el.innerHTML = flows.map(function(f) {
+    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">' + f.keywords + '</div><div class="flow-resp">' + f.response + '</div></div><button class="btn btn-red" onclick="deleteFlow('' + f.id + '')">Delete</button></div>';
+  }).join('');
+}
+
+async function addFlow() {
+  var kw = document.getElementById('newKw').value.trim();
+  var resp = document.getElementById('newResp').value.trim();
+  if (!kw || !resp) { showMsg('msgReplies','Please fill in keywords and reply.','err'); return; }
+  var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:resp}) });
+  if (r.ok) { document.getElementById('newKw').value=''; document.getElementById('newResp').value=''; showMsg('msgReplies','Rule added!','ok'); loadFlows(); }
+  else showMsg('msgReplies','Failed to add rule.','err');
+}
+
+async function deleteFlow(id) {
+  if (!confirm('Delete this rule?')) return;
+  var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgReplies','Rule deleted.','ok'); loadFlows(); }
+}
+
+async function loadStatusPosts() {
+  var r = await fetch(API+'/api/client/status-posts', { headers: H });
+  var posts = await r.json();
+  var el = document.getElementById('postList');
+  if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
+  el.innerHTML = posts.map(function(p) {
+    return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">' + (p.caption || '(auto caption)') + '</div><div style="font-size:.78rem;color:#64748b">' + p.scheduled_time + ' - ' + p.scheduled_days + '</div></div><button class="btn btn-red" onclick="deletePost('' + p.id + '')">Delete</button></div>';
+  }).join('');
+}
+
+async function addStatusPost() {
+  var mediaUrl = document.getElementById('spMedia').value.trim();
+  var caption = document.getElementById('spCaption').value.trim();
+  var scheduledTime = document.getElementById('spTime').value.trim();
+  var scheduledDays = document.getElementById('spDays').value.trim();
+  if (!mediaUrl || !scheduledTime || !scheduledDays) { showMsg('msgStatus','Please fill media URL, time and days.','err'); return; }
+  var r = await fetch(API+'/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({mediaUrl:mediaUrl,caption:caption,scheduledTime:scheduledTime,scheduledDays:scheduledDays}) });
+  if (r.ok) {
+    document.getElementById('spMedia').value=''; document.getElementById('spCaption').value=''; document.getElementById('spTime').value=''; document.getElementById('spDays').value='';
+    showMsg('msgStatus','Post scheduled!','ok'); loadStatusPosts();
+  } else showMsg('msgStatus','Failed to schedule.','err');
+}
+
+async function deletePost(id) {
+  if (!confirm('Delete this scheduled post?')) return;
+  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgStatus','Post deleted.','ok'); loadStatusPosts(); }
+}
+
+async function loadBroadcastLogs() {
+  var r = await fetch(API+'/api/client/broadcasts', { headers: H });
+  var logs = await r.json();
+  var el = document.getElementById('broadcastLog');
+  if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
+  el.innerHTML = logs.map(function(l) {
+    return '<div class="broadcast-log">' + new Date(l.created_at).toLocaleString() + ' - ' + l.recipients + ' recipients - "' + l.message.slice(0,60) + '..."</div>';
+  }).join('');
+}
+
+async function sendBroadcast() {
+  var message = document.getElementById('bcMsg').value.trim();
+  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
+  if (!confirm('Send this to all recent contacts?')) return;
+  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message:message}) });
+  if (r.ok) { document.getElementById('bcMsg').value=''; showMsg('msgBroadcast','Broadcast sent!','ok'); loadBroadcastLogs(); }
+  else showMsg('msgBroadcast','Failed to send.','err');
+}
+
+async function saveNotifNumber() {
+  var num = document.getElementById('notifNumber').value.trim().replace(/\D/g,'');
+  if (!num) { showMsg('msgSettings','Please enter a valid number.','err'); return; }
+  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({notification_number:num}) });
+  if (r.ok) showMsg('msgSettings','Notification number saved!','ok');
+  else showMsg('msgSettings','Save failed.','err');
+}
+
+async function saveFallback() {
+  var msg = document.getElementById('fallbackMsg').value.trim();
+  if (!msg) { showMsg('msgSettings','Please type a fallback message.','err'); return; }
+  var r = await fetch(API+'/api/client/fallback', { method:'PUT', headers:H, body:JSON.stringify({fallback_message:msg}) });
+  if (r.ok) showMsg('msgSettings','Fallback saved!','ok');
+  else showMsg('msgSettings','Save failed.','err');
+}
+
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ForgeBot — Connect Your WhatsApp</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:40px 36px;width:100%;max-width:460px;text-align:center}
+.logo{font-size:20px;font-weight:900;color:#25D366;margin-bottom:30px;letter-spacing:-1px}
+.logo span{color:#fff}
+h1{font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:8px}
+p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:28px}
+.qr-box{width:220px;height:220px;margin:0 auto 24px;border-radius:14px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.03);position:relative;overflow:hidden}
+.qr-box img{width:210px;height:210px;border-radius:10px}
+.qr-box canvas{width:210px;height:210px}
+.spinner{width:40px;height:40px;border:3px solid rgba(37,211,102,.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:100px;font-size:13px;font-weight:700;margin-bottom:20px}
+.status-badge.waiting{background:rgba(255,167,38,.1);border:1px solid rgba(255,167,38,.3);color:#ffa726}
+.status-badge.scanning{background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25D366}
+.status-badge.connected{background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);color:#25D366}
+.status-badge.error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#f87171}
+.sdot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.steps{text-align:left;margin-top:24px;display:none}
+.steps h3{font-size:13px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.step-item{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
+.step-num{width:24px;height:24px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0}
+.step-text{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5}
+.success-msg{display:none;text-align:center}
+.success-msg .big{font-size:56px;margin-bottom:16px}
+.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
+.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
+.btn{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">Forge<span>Bot</span></div>
+
+  <div id="mainContent">
+    <h1>Connect Your WhatsApp</h1>
+    <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
+
+    <div class="status-badge waiting" id="statusBadge">
+      <div class="sdot"></div>
+      <span id="statusText">Generating QR code...</span>
+    </div>
+
+    <div class="qr-box" id="qrBox">
+      <div class="spinner" id="spinner"></div>
+      <img id="qrImage" style="display:none" src="" alt="QR Code"/>
+    </div>
+
+    <div class="steps" id="stepsGuide">
+      <h3>How to scan</h3>
+      <div class="step-item"><div class="step-num">1</div><div class="step-text">Open WhatsApp on your phone</div></div>
+      <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the three dots (⋮) → Linked Devices</div></div>
+      <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap "Link a Device" and point your camera at the QR code above</div></div>
+      <div class="step-item"><div class="step-num">4</div><div class="step-text">Your bot goes live automatically!</div></div>
+    </div>
+  </div>
+
+  <div class="success-msg" id="successMsg">
+    <div class="big">🎉</div>
+    <h2>Your Bot is Live!</h2>
+    <p>WhatsApp connected successfully. Your bot is now replying customers, posting status, and running 24/7.</p>
+    <a href="/dashboard" class="btn">Go to My Dashboard →</a>
+  </div>
+</div>
+
+<script>
+// QR library
+const script = document.createElement('script');
+script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
+document.head.appendChild(script);
+
+const token = localStorage.getItem('forgebot_token');
+if (!token) { window.location.href = '/'; }
+
+function setStatus(type, text) {
+  const badge = document.getElementById('statusBadge');
+  badge.className = 'status-badge ' + type;
+  document.getElementById('statusText').textContent = text;
+}
+
+let sse;
+function connectSSE() {
+  sse = new EventSource(`/api/client/qr-stream?token=${token}`);
+
+  sse.addEventListener('qr', (e) => {
+    const { qr } = JSON.parse(e.data);
+    const spinner = document.getElementById('spinner');
+    const qrBox = document.getElementById('qrBox');
+
+    spinner.style.display = 'none';
+    qrBox.innerHTML = '<canvas id="qrCanvas"></canvas>';
+    document.getElementById('stepsGuide').style.display = 'block';
+
+    script.onload = () => renderQR(qr);
+    if (window.QRCode) renderQR(qr);
+
+    setStatus('scanning', 'Ready to scan — point your WhatsApp camera here');
+  });
+
+  sse.addEventListener('connected', (e) => {
+    sse.close();
+    setStatus('connected', 'Connected!');
+    setTimeout(() => {
+      document.getElementById('mainContent').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+    }, 1000);
+  });
+
+  sse.addEventListener('disconnected', (e) => {
+    setStatus('error', 'Disconnected — reconnecting...');
+    setTimeout(connectSSE, 4000);
+  });
+
+  sse.onerror = () => {
+    setStatus('error', 'Connection lost — retrying...');
+    sse.close();
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+function renderQR(text) {
+  const canvas = document.getElementById('qrCanvas');
+  if (!canvas || !window.QRCode) return;
+  QRCode.toCanvas(canvas, text, { width: 210, margin: 1, color: { dark: '#000', light: '#fff' } });
+}
+
+connectSSE();
+</script>
+</body>
+</html>
