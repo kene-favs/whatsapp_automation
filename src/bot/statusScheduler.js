@@ -63,7 +63,7 @@ function startScheduler() {
       const today = days[now.getDay()];
       const todayDate = now.toISOString().split('T')[0];
 
-      const duePosts = await db.getDueStatusPosts(timeStr, today);
+      const duePosts = await db.getDueStatusPosts(timeStr, todayDate);
 
       for (const post of duePosts) {
         if (post.last_posted_date === todayDate) continue; // already posted today
