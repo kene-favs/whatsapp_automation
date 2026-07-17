@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ForgeBot Flyer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 24px;
+  }
+
+  /* ── SQUARE CARD ── */
+  .card {
+    width: 700px;
+    height: 700px;
+    background: #0a0d14;
+    border-radius: 26px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* blobs */
+  .b { position: absolute; border-radius: 50%; pointer-events: none; }
+  .b1 { width: 380px; height: 380px; background: radial-gradient(circle, rgba(37,211,102,0.17) 0%, transparent 68%); top: -120px; right: -120px; }
+  .b2 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(124,111,255,0.12) 0%, transparent 68%); bottom: -80px; left: -80px; }
+  .b3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(37,211,102,0.07) 0%, transparent 68%); bottom: 60px; right: 40px; }
+
+  /* grid overlay */
+  .gr {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 34px 34px;
+    pointer-events: none;
+  }
+
+  /* top glow */
+  .glow { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #25D366 40%, #25D366 60%, transparent); }
+
+  /* ── TWO-COLUMN LAYOUT ── */
+  .layout {
+    position: relative; z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: 100%;
+  }
+
+  /* LEFT COLUMN */
+  .left {
+    padding: 22px 18px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .left-top { display: flex; flex-direction: column; }
+
+  /* badge */
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(37,211,102,0.10); border: 1px solid rgba(37,211,102,0.28);
+    border-radius: 100px; padding: 4px 11px; width: fit-content;
+    margin-bottom: 10px;
+  }
+  .bdot { width: 6px; height: 6px; background: #25D366; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.5)} }
+  .badge span { font-size: 9.5px; font-weight: 700; color: #25D366; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* headline */
+  .hl { font-size: 33px; font-weight: 900; line-height: 1.04; color: #fff; letter-spacing: -1.2px; margin-bottom: 7px; }
+  .hl .g { color: #25D366; }
+  .hl .p { color: #a89fff; }
+  .sub { font-size: 10.5px; color: rgba(255,255,255,0.42); line-height: 1.5; margin-bottom: 9px; }
+
+  /* status pills */
+  .pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pill { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); border-radius: 100px; padding: 3px 8px; font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 4px; }
+  .pill .dg { width: 5px; height: 5px; background: #25D366; border-radius: 50%; }
+
+  /* chat */
+  .chat { background: #111827; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; display: flex; flex-direction: column; }
+  .ch { display: flex; align-items: center; gap: 7px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .av { width: 24px; height: 24px; background: linear-gradient(135deg,#25D366,#128C7E); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .cn { font-size: 10.5px; font-weight: 700; color: #fff; }
+  .cs { font-size: 9px; color: #25D366; }
+  .br { display: flex; margin-bottom: 4px; }
+  .br.r { justify-content: flex-end; }
+  .bb { max-width: 86%; padding: 5px 9px; border-radius: 9px; font-size: 10px; line-height: 1.4; }
+  .bb.cu { background: #1f2937; color: rgba(255,255,255,.8); border-bottom-left-radius: 2px; }
+  .bb.bo { background: #054d2e; color: #dcfce7; border-bottom-right-radius: 2px; text-align: right; }
+  .bb .t { font-size: 8px; opacity: .42; display: block; margin-top: 2px; }
+  .typ { display: flex; align-items: center; gap: 3px; padding: 6px 9px; background: #054d2e; border-radius: 9px; border-bottom-right-radius: 2px; width: fit-content; margin-left: auto; margin-bottom: 4px; }
+  .dot { width: 4px; height: 4px; background: #25D366; border-radius: 50%; animation: bop 1s infinite; }
+  .dot:nth-child(2){animation-delay:.15s} .dot:nth-child(3){animation-delay:.3s}
+  @keyframes bop { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-3px);opacity:1} }
+
+  /* cta */
+  .cta { background: linear-gradient(135deg, rgba(37,211,102,0.14), rgba(37,211,102,0.04)); border: 1px solid rgba(37,211,102,0.24); border-radius: 12px; padding: 11px 13px; display: flex; align-items: center; justify-content: space-between; }
+  .price { font-size: 22px; font-weight: 900; color: #25D366; letter-spacing: -.5px; }
+  .price-sub { font-size: 9.5px; color: rgba(255,255,255,.36); margin-top: 2px; }
+  .cta-btn { background: #25D366; color: #000; font-size: 11px; font-weight: 800; padding: 10px 14px; border-radius: 9px; text-align: center; line-height: 1.35; }
+
+  /* RIGHT COLUMN */
+  .right {
+    padding: 20px 22px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .right-top { display: flex; flex-direction: column; }
+
+  /* logo top-right */
+  .logo { font-size: 14px; font-weight: 900; color: #25D366; margin-bottom: 8px; }
+  .logo span { color: rgba(255,255,255,.5); }
+  .logo em { font-style: normal; font-size: 9px; font-weight: 500; color: rgba(255,255,255,.28); display: block; margin-top: 1px; letter-spacing: .3px; }
+
+  /* section label */
+  .slbl { font-size: 9px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.25); margin-bottom: 5px; }
+
+  /* feature grid */
+  .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
+  .fc { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; padding: 5px 8px; }
+  .fi { font-size: 13px; margin-bottom: 2px; }
+  .fn { font-size: 10px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .fd { font-size: 8.5px; color: rgba(255,255,255,.36); margin-top: 1px; line-height: 1.25; }
+
+  /* early adopter */
+  .ea {
+    background: linear-gradient(135deg, rgba(168,159,255,0.10), rgba(37,211,102,0.06));
+    border: 1.5px solid rgba(168,159,255,0.30);
+    border-radius: 12px;
+    padding: 9px 12px;
+  }
+  .ea-top { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+  .ea-chip { background: #a89fff; color: #0a0d14; font-size: 8px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; padding: 2px 7px; border-radius: 100px; white-space: nowrap; }
+  .ea-title { font-size: 10.5px; font-weight: 800; color: #fff; margin-bottom: 1px; line-height: 1.25; }
+  .ea-sub { font-size: 8.5px; color: rgba(255,255,255,.35); margin-bottom: 6px; line-height: 1.35; }
+  .ea-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .ei { background: rgba(255,255,255,0.06); border: 1px solid rgba(168,159,255,0.15); border-radius: 8px; padding: 6px 8px; display: flex; align-items: center; gap: 6px; }
+  .ei-ic { font-size: 15px; flex-shrink: 0; line-height: 1; }
+  .ei-tx { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.75); line-height: 1.25; }
+
+  .hint { color: #333; font-size: 11px; text-align: center; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="b b1"></div>
+  <div class="b b2"></div>
+  <div class="b b3"></div>
+  <div class="gr"></div>
+  <div class="glow"></div>
+
+  <div class="layout">
+
+    <!-- LEFT -->
+    <div class="left">
+      <div class="left-top">
+        <div class="badge"><div class="bdot"></div><span>WhatsApp Automation · 24/7</span></div>
+        <div class="hl">Your<br/>Business<br/><span class="g">Never</span><br/><span class="p">Sleeps</span> Again.</div>
+        <div class="sub">Your WhatsApp replies customers, posts status &amp; sends promos — automatically.</div>
+        <div class="pills">
+          <div class="pill"><span class="dg"></span>Auto-Replies</div>
+          <div class="pill"><span class="dg"></span>Status Posts</div>
+          <div class="pill"><span class="dg"></span>Voice Notes</div>
+          <div class="pill"><span class="dg"></span>Payment Alerts</div>
+        </div>
+      </div>
+
+      <div class="chat">
+        <div class="ch">
+          <div class="av">👩‍🍳</div>
+          <div><div class="cn">Adaeze's Kitchen</div><div class="cs">● ForgeBot Online</div></div>
+        </div>
+        <div class="br"><div class="bb cu">How much is jollof rice? 🙏<span class="t">2:14 AM</span></div></div>
+        <div class="br r"><div class="typ"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
+        <div class="br r"><div class="bb bo">Hi! 👋 Jollof rice = ₦2,500/plate 🍛<br/>Add chicken for ₦1,000.<br/>Order now? 😊<span class="t">2:14 AM ✓✓</span></div></div>
+        <div class="br" style="margin-top:4px"><div class="bb cu">I don send the money o 🙏<span class="t">2:18 AM</span></div></div>
+        <div class="br r"><div class="bb bo">✅ Payment alert sent to owner!<br/>Confirmation coming soon.<span class="t">2:18 AM ✓✓</span></div></div>
+      </div>
+
+      <div class="cta">
+        <div><div class="price">₦30,000</div><div class="price-sub">Setup · +₦10,000/month</div></div>
+        <div class="cta-btn">WhatsApp<br/>Me Now 👇</div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right">
+      <div class="right-top">
+        <div class="logo">ForgeBot <span>·</span> <em>by TheFavsForge</em></div>
+        <div class="slbl">What's Included</div>
+        <div class="fg">
+          <div class="fc"><div class="fi">🤖</div><div class="fn">24/7 Auto-Replies</div><div class="fd">Replies price, delivery &amp; availability instantly</div></div>
+          <div class="fc"><div class="fi">🎙️</div><div class="fn">Voice Note Replies</div><div class="fd">Yoruba, Pidgin, Igbo &amp; Hausa transcribed</div></div>
+          <div class="fc"><div class="fi">💰</div><div class="fn">Payment Alerts</div><div class="fd">Reply 1/2/3 to confirm, wait or decline</div></div>
+          <div class="fc"><div class="fi">📸</div><div class="fn">Status Scheduler</div><div class="fd">Auto-posts your products daily</div></div>
+          <div class="fc"><div class="fi">👤</div><div class="fn">Human Handoff</div><div class="fd">Bot pauses &amp; alerts you when needed</div></div>
+          <div class="fc"><div class="fi">😂</div><div class="fn">Weekly Memes</div><div class="fd">Nigerian jokes posted every Sunday</div></div>
+        </div>
+      </div>
+
+      <div class="ea">
+        <div class="ea-top"><div class="ea-chip">🎁 Early Adopters Only</div></div>
+        <div class="ea-title">Join now — get all future upgrades FREE forever</div>
+        <div class="ea-sub">4 features coming soon. Founding members pay nothing extra.</div>
+        <div class="ea-grid">
+          <div class="ei"><div class="ei-ic">🧾</div><div class="ei-tx">Fake Receipt Detection</div></div>
+          <div class="ei"><div class="ei-ic">📱</div><div class="ei-tx">Social Media Bot</div></div>
+          <div class="ei"><div class="ei-ic">🚨</div><div class="ei-tx">Fraud Blacklist</div></div>
+          <div class="ei"><div class="ei-ic">🎬</div><div class="ei-tx">AI Video Creator</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="hint">Screenshot the card above · 680×680 square</p>
+
+</body>
+</html>
