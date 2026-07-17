@@ -33,7 +33,7 @@ header{background:#111827;border-bottom:1px solid var(--border);padding:16px 32p
 .feat-icon{font-size:1.8rem;margin-bottom:10px}
 .feat h3{font-size:1rem;margin-bottom:6px;color:#f1f5f9}
 .feat p{font-size:.84rem;color:#64748b}
-.pricing{padding:60px 20px;max-width:700px;margin:0 auto;text-align:center}
+.pricing{padding:60px 20px;max-width:780px;margin:0 auto;text-align:center}
 .pricing h2{font-size:1.8rem;font-weight:700;margin-bottom:40px}
 .price-cards{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .price-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px;text-align:center}
@@ -44,7 +44,21 @@ header{background:#111827;border-bottom:1px solid var(--border);padding:16px 32p
 .price-feats{text-align:left;font-size:.82rem;color:#94a3b8;margin-bottom:20px}
 .price-feats li{margin-bottom:6px;list-style:none;padding-left:16px;position:relative}
 .price-feats li::before{content:"✓";position:absolute;left:0;color:var(--green)}
+.price-feats li.early::before{content:"🎁";position:absolute;left:0}
 .price-card .btn-primary{width:100%;font-size:.9rem;padding:11px}
+.early-adopter-box{background:linear-gradient(135deg,#0d1526,#111827);border:2px solid #22c55e;border-radius:14px;padding:28px;margin-top:28px;text-align:center}
+.early-adopter-box h3{font-size:1.1rem;font-weight:700;color:#22c55e;margin-bottom:6px}
+.early-adopter-box p{font-size:.84rem;color:#94a3b8;margin-bottom:20px}
+.early-mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.early-mini-card{border-radius:10px;padding:14px 12px;text-align:center}
+.early-mini-card .mini-icon{font-size:1.5rem;margin-bottom:6px}
+.early-mini-card h4{font-size:.8rem;font-weight:700;margin-bottom:4px}
+.early-mini-card p{font-size:.72rem;color:#94a3b8;line-height:1.4}
+.mini-purple{background:#1e1033;border:1px solid #7c3aed}.mini-purple h4{color:#a78bfa}
+.mini-orange{background:#1a0f00;border:1px solid #f97316}.mini-orange h4{color:#fb923c}
+.mini-red{background:#1a0505;border:1px solid #ef4444}.mini-red h4{color:#f87171}
+.mini-green{background:#0a1a0d;border:1px solid #22c55e}.mini-green h4{color:#4ade80}
+.early-tag{display:inline-block;background:#22c55e;color:#000;font-size:.7rem;font-weight:800;padding:3px 8px;border-radius:4px;margin-bottom:12px;letter-spacing:.5px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center;padding:20px}
 .overlay.open{display:flex}
 .modal{background:#111827;border:1px solid var(--border);border-radius:14px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
@@ -132,6 +146,7 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
         <li>Payment alerts</li>
         <li>Voice transcription</li>
         <li>Status scheduler</li>
+        <li class="early" style="color:#22c55e;font-weight:600">Early adopter &mdash; get all upcoming features FREE</li>
       </ul>
       <div style="font-size:.82rem;color:#22c55e;margin-bottom:12px">+ &#8358;10,000/month</div>
       <button class="btn-primary" onclick="openSignup()">Get Started</button>
@@ -149,6 +164,34 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
       </ul>
       <div style="font-size:.82rem;color:#22c55e;margin-bottom:12px">+ $10/month</div>
       <button class="btn-primary" onclick="openSignup()">Get Started</button>
+    </div>
+  </div>
+
+  <div class="early-adopter-box">
+    <div class="early-tag">EARLY ADOPTER BENEFIT</div>
+    <h3>Join now and unlock every future upgrade &mdash; for free</h3>
+    <p>These 4 powerful upgrades are coming to ForgeBot soon. As a founding member, you get them all at no extra cost, forever.</p>
+    <div class="early-mini-grid">
+      <div class="early-mini-card mini-purple">
+        <div class="mini-icon">🧾</div>
+        <h4>Fake Receipt Detection</h4>
+        <p>AI scans payment screenshots for fraud before you confirm orders</p>
+      </div>
+      <div class="early-mini-card mini-orange">
+        <div class="mini-icon">📱</div>
+        <h4>Social Media Bot</h4>
+        <p>Auto-reply DMs on Instagram, TikTok &amp; Facebook &mdash; same bot, extended reach</p>
+      </div>
+      <div class="early-mini-card mini-red">
+        <div class="mini-icon">🚨</div>
+        <h4>Community Fraud Blacklist</h4>
+        <p>Flag bad customers. 5+ reports from other businesses triggers a network-wide warning</p>
+      </div>
+      <div class="early-mini-card mini-green">
+        <div class="mini-icon">🎬</div>
+        <h4>AI Video Creator</h4>
+        <p>Auto-generate and post product videos to your WhatsApp Status &amp; social media</p>
+      </div>
     </div>
   </div>
 </div>

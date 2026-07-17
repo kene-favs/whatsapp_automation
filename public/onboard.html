@@ -33,6 +33,14 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
 .success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
 .btn{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
+.mobile-notice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:22px;text-align:left;display:none}
+.mobile-notice .mn-title{font-size:13px;font-weight:800;color:#60a5fa;margin-bottom:8px}
+.mobile-notice .mn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
+.mobile-notice .mn-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.mobile-notice .mn-text{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5}
+.mobile-notice .mn-text b{color:#93c5fd}
+.qr-tip{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.5}
+.expire-note{font-size:12px;color:#ffa726;margin-top:8px;display:none}
 </style>
 </head>
 <body>
@@ -43,6 +51,16 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
   <div id="mainContent">
     <h1>Connect Your WhatsApp</h1>
     <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
+
+    <!-- Mobile notice — shown only on phones -->
+    <div class="mobile-notice" id="mobileNotice">
+      <div class="mn-title">&#128242; Using your phone? Read this first</div>
+      <div class="mn-row"><div class="mn-icon">&#128073;</div><div class="mn-text">The QR code on this screen must be <b>scanned by your WhatsApp</b> — but WhatsApp cannot scan a QR code on the same phone it is installed on.</div></div>
+      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 1:</b> Open this link on a <b>laptop or computer</b>, then scan with your phone.</div></div>
+      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 2:</b> Send this link to a <b>friend or family member's phone</b>. Open it on their phone, then scan with your WhatsApp.</div></div>
+      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 3:</b> Open this link on a <b>tablet</b> and scan with your phone.</div></div>
+      <div class="mn-row"><div class="mn-icon">&#128736;</div><div class="mn-text"><b>Cyber café:</b> You can also go to a cyber café, open this link on their computer, and scan from there.</div></div>
+    </div>
 
     <div class="status-badge waiting" id="statusBadge">
       <div class="sdot"></div>
@@ -56,10 +74,12 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 
     <div class="steps" id="stepsGuide">
       <h3>How to scan</h3>
-      <div class="step-item"><div class="step-num">1</div><div class="step-text">Open WhatsApp on your phone</div></div>
-      <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the three dots (⋮) → Linked Devices</div></div>
-      <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap "Link a Device" and point your camera at the QR code above</div></div>
-      <div class="step-item"><div class="step-num">4</div><div class="step-text">Your bot goes live automatically!</div></div>
+      <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <b style="color:#fff">WhatsApp</b> on the phone you want the bot to run on</div></div>
+      <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the <b style="color:#fff">three dots menu (⋮)</b> at the top right → tap <b style="color:#fff">Linked Devices</b></div></div>
+      <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> → point your phone camera at the QR code on this screen</div></div>
+      <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically &#127881;</div></div>
+      <div class="expire-note" id="expireNote">&#9203; QR code refreshes every 30 seconds &mdash; a new one loads automatically if it expires.</div>
+      <p class="qr-tip">&#128161; The QR code must be shown on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it. If you are on your phone now, see the blue box above.</p>
     </div>
   </div>
 
@@ -133,6 +153,17 @@ function renderQR(text) {
 }
 
 connectSSE();
+
+// Show mobile notice if user is on a phone
+if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+  document.getElementById('mobileNotice').style.display = 'block';
+}
+
+// Show expire note after 25 seconds to reassure user QR will refresh
+setTimeout(function() {
+  var note = document.getElementById('expireNote');
+  if (note) note.style.display = 'block';
+}, 25000);
 </script>
 </body>
 </html>
