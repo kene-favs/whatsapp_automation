@@ -2,1189 +2,1026 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
-<link rel="manifest" href="/manifest.json"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="ForgeBot"/>
-<meta name="theme-color" content="#22c55e"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
-:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
-
+:root{
+  --green:#22c55e;--blue:#3b82f6;--red:#ef4444;
+  --orange:#f59e0b;--purple:#a855f7;
+  --card:#111827;--border:#1e2d3d;--bg2:#0d1526
+}
 /* ── Header ── */
-header{background:#111827;border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.logo{font-size:1.2rem;font-weight:700;color:var(--green)}
-.logo span{color:#fff}
+header{background:#111827;border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.logo{font-size:1.25rem;font-weight:700;color:var(--green)}.logo span{color:#fff}
 .hdr-right{display:flex;align-items:center;gap:10px}
-.status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:600}
-.status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
-.notif-bell{background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;position:relative;padding:4px}
-.notif-bell .badge{position:absolute;top:0;right:0;width:8px;height:8px;background:var(--red);border-radius:50%;display:none}
-.notif-bell .badge.show{display:block}
-.btn-sm{padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600}
+.wa-badge{padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600;border:1px solid var(--green);background:#14532d;color:var(--green)}
+.wa-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
+.btn{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-size:.83rem;font-weight:600;transition:.15s}
+.btn-green{background:var(--green);color:#000}.btn-green:hover{background:#16a34a}
+.btn-red{background:var(--red);color:#fff}
+.btn-blue{background:var(--blue);color:#fff}
 .btn-gray{background:#374151;color:#e2e8f0}
-.btn-gray:hover{background:#4b5563}
-
-/* ── Incomplete setup banner ── */
-#setupBanner{background:#1a1200;border-bottom:1px solid var(--orange);padding:10px 20px;display:none;align-items:center;justify-content:space-between;gap:12px}
-#setupBanner.show{display:flex}
-#setupBanner p{font-size:.82rem;color:#fbbf24}
-#setupBanner button{background:var(--orange);color:#000;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap}
-
+.btn-sm{padding:5px 12px;font-size:.77rem}
+.btn-outline{background:transparent;border:1px solid var(--border);color:#94a3b8}
+/* ── Trial banner ── */
+#trialBanner{display:none;background:linear-gradient(90deg,#1a0533,#0d1a2e);border-bottom:1px solid var(--purple);padding:10px 20px;text-align:center;font-size:.83rem}
+#trialBanner span{color:var(--purple);font-weight:700}
+#trialBanner a{color:var(--green);text-decoration:none;font-weight:600}
+#trialBanner.expired{background:linear-gradient(90deg,#2d0000,#1a0000);border-color:var(--red)}
+#trialBanner.expired span{color:var(--red)}
 /* ── Nav ── */
-nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 16px;overflow-x:auto;scrollbar-width:none}
-nav::-webkit-scrollbar{display:none}
-nav button{background:none;border:none;color:#64748b;padding:12px 14px;cursor:pointer;font-size:.82rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:5px}
+nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 16px;overflow-x:auto;gap:2px}
+nav button{background:none;border:none;color:#94a3b8;padding:12px 16px;cursor:pointer;font-size:.83rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s}
 nav button.active{color:var(--green);border-bottom-color:var(--green)}
-nav button .n-badge{background:var(--red);color:#fff;font-size:.65rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
-nav button .n-badge.show{display:inline-block}
-
-.container{max-width:920px;margin:0 auto;padding:22px 16px 60px}
-.section{display:none}
-.section.active{display:block}
+nav button:hover:not(.active){color:#e2e8f0}
+/* ── Main ── */
+.container{max-width:860px;margin:0 auto;padding:24px 16px}
+.section{display:none}.section.active{display:block}
 h2{font-size:1.05rem;font-weight:600;margin-bottom:16px;color:#f1f5f9}
-h3{font-size:.9rem;font-weight:600;color:#f1f5f9}
-
+h3{font-size:.92rem;font-weight:600;margin-bottom:10px}
 /* ── Cards ── */
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px}
-label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px}
-input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:8px 12px;font-size:.86rem;outline:none}
+/* ── Form elements ── */
+label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px;margin-top:10px}
+label:first-child{margin-top:0}
+input,textarea,select{width:100%;background:var(--bg2);border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:8px 11px;font-size:.85rem;outline:none}
 input:focus,textarea:focus,select:focus{border-color:var(--blue)}
 textarea{min-height:75px;resize:vertical}
-.row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap}
-.grow{flex:1;min-width:140px}
-
-/* ── Buttons ── */
-.btn{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-size:.84rem;font-weight:600;transition:.2s}
-.btn-green{background:var(--green);color:#000}
-.btn-green:hover{background:#16a34a}
-.btn-red{background:var(--red);color:#fff;padding:4px 10px;font-size:.76rem}
-.btn-blue{background:var(--blue);color:#fff}
-.btn-orange{background:var(--orange);color:#000}
-
-/* ── Messages ── */
-.msg{padding:9px 13px;border-radius:6px;font-size:.83rem;margin-bottom:10px;display:none}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.row .grow{flex:1;min-width:140px}
+/* ── Toast messages ── */
+.msg{padding:9px 13px;border-radius:6px;font-size:.83rem;margin-bottom:12px;display:none}
 .msg.show{display:block}
 .msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
 .msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
-
-/* ── Products / Services list items ── */
-.item-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
-.item-img{width:44px;height:44px;border-radius:7px;object-fit:cover;background:#1e2d3d;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#374151;font-size:1.2rem;overflow:hidden}
-.item-img img{width:100%;height:100%;object-fit:cover}
-.item-info{flex:1;min-width:0}
-.item-name{font-size:.88rem;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item-price{font-size:.82rem;color:var(--green);font-weight:600}
-.item-desc{font-size:.76rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.toggle-stock{background:none;border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:.72rem;cursor:pointer;color:#94a3b8}
-.toggle-stock.in{border-color:var(--green);color:var(--green)}
-.toggle-stock.out{border-color:var(--red);color:var(--red)}
-
-/* ── Orders ── */
-.order-card{background:#0d1526;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
-.order-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
-.order-customer{font-size:.9rem;font-weight:700;color:#f1f5f9}
-.order-time{font-size:.74rem;color:#64748b}
-.order-status{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px}
-.status-pending{background:#451a03;color:var(--orange);border:1px solid var(--orange)}
-.status-accepted{background:#0d2137;color:var(--blue);border:1px solid var(--blue)}
-.status-delivery{background:#0d1f3c;color:#60a5fa;border:1px solid #60a5fa}
-.status-delivered,.status-completed{background:#14532d;color:var(--green);border:1px solid var(--green)}
-.status-cancelled{background:#450a0a;color:var(--red);border:1px solid var(--red)}
-.order-items{font-size:.82rem;color:#94a3b8;margin-bottom:8px;padding:8px;background:#111827;border-radius:6px}
-.order-items b{color:#f1f5f9}
-.order-total{font-size:.9rem;font-weight:700;color:var(--green);margin-bottom:8px}
-.order-address{font-size:.78rem;color:#64748b;margin-bottom:10px}
-.order-receipt{margin-bottom:10px}
-.order-receipt img{width:100%;max-height:160px;object-fit:cover;border-radius:7px;border:1px solid var(--border);cursor:pointer}
-.receipt-pending{font-size:.78rem;color:#64748b;font-style:italic}
-.order-btns{display:flex;gap:8px;flex-wrap:wrap}
-.order-btns .btn{font-size:.78rem;padding:6px 12px}
-
-/* ── Leads / Price Inquiries ── */
-.lead-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.lead-info{flex:1}
-.lead-name{font-size:.86rem;font-weight:600;color:#f1f5f9}
-.lead-product{font-size:.8rem;color:var(--green)}
-.lead-time{font-size:.72rem;color:#64748b}
-
-/* ── Customers ── */
-.customer-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px}
-.cust-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--blue));display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#000;flex-shrink:0}
-.cust-info{flex:1}
-.cust-name{font-size:.86rem;font-weight:600;color:#f1f5f9}
-.cust-meta{font-size:.74rem;color:#64748b}
-.cust-orders{font-size:.78rem;color:var(--green);font-weight:600}
-
-/* ── Status posts ── */
-.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.post-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;background:#1e2d3d;flex-shrink:0}
-.post-info{flex:1;min-width:0}
-.post-caption{font-size:.84rem;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.post-schedule{font-size:.74rem;color:#64748b;margin-top:2px}
-
-/* ── Auto-Replies ── */
-.flow-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
-.flow-resp{font-size:.8rem;color:#94a3b8;margin-top:3px}
-
-/* ── Broadcast log ── */
-.bc-row{font-size:.8rem;color:#64748b;padding:7px 0;border-bottom:1px solid var(--border)}
-
-/* ── Settings ── */
-.notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:11px 13px;font-size:.81rem;color:#93c5fd;margin-bottom:12px}
+/* ── List items ── */
+.list-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.list-item .item-body{flex:1;min-width:0}
+.item-title{font-size:.87rem;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-sub{font-size:.78rem;color:#64748b;margin-top:2px}
+.item-badge{font-size:.72rem;padding:2px 8px;border-radius:12px;font-weight:600;display:inline-block;margin-top:4px}
+.badge-green{background:#14532d;color:var(--green)}
+.badge-red{background:#450a0a;color:var(--red)}
+.badge-blue{background:#1e3a5f;color:#60a5fa}
+.badge-orange{background:#3d1f00;color:var(--orange)}
+/* ── Media grid ── */
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:10px}
+.media-thumb{background:var(--bg2);border:1px solid var(--border);border-radius:6px;aspect-ratio:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:default}
+.media-thumb img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+.media-thumb .del-media{position:absolute;top:3px;right:3px;background:rgba(239,68,68,.85);border:none;border-radius:4px;color:#fff;font-size:.7rem;padding:2px 5px;cursor:pointer;display:none}
+.media-thumb:hover .del-media{display:block}
+/* ── Feature cards ── */
+.feat-card{border:1px solid var(--green);border-radius:10px;padding:16px;margin-bottom:12px}
+.feat-live{background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:8px}
+.feat-soon{background:var(--purple);color:#fff;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:8px}
+/* ── Notification box ── */
+.notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:7px;padding:11px 14px;font-size:.8rem;color:#93c5fd;margin-bottom:12px}
 .notif-box b{color:#fff}
-.section-sep{height:1px;background:var(--border);margin:20px 0}
-.lock-note{font-size:.74rem;color:#64748b;margin-top:4px}
-
-/* ── Coming soon ── */
-.coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:20px;margin-bottom:14px;text-align:center}
-.coming-soon .cs-icon{font-size:2.2rem;margin-bottom:7px}
-.coming-soon h3{color:var(--purple);font-size:.95rem;margin-bottom:5px}
-.coming-soon p{font-size:.8rem;color:#94a3b8;max-width:400px;margin:0 auto 10px}
-.cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:.5px}
-
-/* ── Upload button ── */
-.upload-label{display:inline-flex;align-items:center;gap:7px;background:#1e2d3d;border:1px dashed #374151;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:.82rem;color:#94a3b8;transition:.2s;width:100%;justify-content:center;margin-bottom:8px}
-.upload-label:hover{border-color:var(--blue);color:var(--blue)}
-.upload-label input{display:none}
-.preview-img{width:100%;max-height:140px;object-fit:cover;border-radius:7px;border:1px solid var(--border);margin-bottom:8px;display:none}
-
-/* ── PWA Overlay ── */
-#pwa-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px}
-#pwa-overlay.show{display:flex}
-#pwa-card{background:#111827;border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:350px;width:100%;text-align:center;animation:slideUp .35s ease}
-@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
-.pwa-logo{font-size:2rem;font-weight:900;color:var(--green);margin-bottom:4px}
-.pwa-logo span{color:#fff}
-.pwa-tag{font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:100px;padding:3px 10px;display:inline-block;margin-bottom:16px}
-#pwa-card h2{font-size:1.1rem;font-weight:800;color:#f1f5f9;margin-bottom:7px;line-height:1.3}
-#pwa-card p{font-size:.82rem;color:#64748b;margin-bottom:20px;line-height:1.5}
-.pwa-install-btn{width:100%;background:var(--green);color:#000;border:none;border-radius:10px;padding:13px;font-size:.92rem;font-weight:800;cursor:pointer;margin-bottom:8px}
-.pwa-snooze{background:none;border:none;color:#374151;font-size:.74rem;cursor:pointer;text-decoration:underline}
-.ios-steps{text-align:left;margin-bottom:18px}
-.ios-step{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
-.step-num{width:24px;height:24px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--green);flex-shrink:0;margin-top:1px}
-.step-txt{font-size:.81rem;color:#94a3b8;line-height:1.4}
-.step-txt strong{color:#f1f5f9}
-.bounce{animation:bounce .8s infinite alternate;display:inline-block;margin-left:3px}
-@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-5px)}}
-.pwa-done-btn{width:100%;background:var(--green);color:#000;border:none;border-radius:10px;padding:13px;font-size:.92rem;font-weight:800;cursor:pointer}
-#ios-section{display:none}
-
-/* ── Push permission card ── */
-#pushCard{display:none;background:#0d1a2e;border:1px solid var(--green);border-radius:14px;padding:20px;margin-bottom:20px;text-align:center}
-#pushCard.show{display:block}
-#pushCard h3{color:var(--green);font-size:1rem;margin-bottom:6px}
-#pushCard p{font-size:.82rem;color:#94a3b8;margin-bottom:16px;line-height:1.5}
-#pushCard .btn-green{padding:11px 24px;font-size:.9rem}
-#pushCard .dismiss{background:none;border:none;color:#374151;font-size:.74rem;cursor:pointer;margin-top:8px;text-decoration:underline;display:block;margin-left:auto;margin-right:auto}
+/* ── Upload area ── */
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:.15s;margin-top:10px}
+.upload-zone:hover{border-color:var(--blue);background:rgba(59,130,246,.04)}
+.upload-zone p{font-size:.8rem;color:#64748b;margin-top:6px}
+/* ── Listing detail panel ── */
+#listingDetail{display:none}
+#listingDetail.open{display:block}
+.back-btn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.83rem;margin-bottom:14px;display:flex;align-items:center;gap:5px}
+.back-btn:hover{color:#e2e8f0}
+/* ── Occupation banner ── */
+.occ-banner{background:linear-gradient(90deg,#0d1a2e,#111827);border:1px solid var(--blue);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.occ-banner .occ-icon{font-size:1.6rem}
+.occ-banner .occ-name{font-size:.9rem;font-weight:600;color:#60a5fa}
+.occ-banner .occ-sub{font-size:.77rem;color:#94a3b8;margin-top:2px}
+/* ── Broadcast log ── */
+.bc-log{font-size:.79rem;color:#64748b;padding:5px 0;border-bottom:1px solid var(--border)}
+/* ── Divider ── */
+.divider{height:1px;background:var(--border);margin:18px 0}
 </style>
 </head>
 <body>
 
-<!-- ── PWA Install Overlay ── -->
-<div id="pwa-overlay">
-  <div id="pwa-card">
-    <div class="pwa-logo">Forge<span>Bot</span></div>
-    <div class="pwa-tag">Quick Access</div>
-    <h2>Add ForgeBot to your Home Screen</h2>
-    <p>Open your dashboard in one tap — no browser, no links, just click and go.</p>
-    <div id="android-section">
-      <button class="pwa-install-btn" id="pwa-install-btn">📲 &nbsp;Add to Home Screen</button><br/>
-      <button class="pwa-snooze" id="pwa-snooze-btn">Remind me in 10 minutes</button>
-    </div>
-    <div id="ios-section">
-      <div class="ios-steps">
-        <div class="ios-step"><div class="step-num">1</div><div class="step-txt">Tap the <strong>Share</strong> button at the bottom <span class="bounce">⬆️</span></div></div>
-        <div class="ios-step"><div class="step-num">2</div><div class="step-txt">Tap <strong>"Add to Home Screen"</strong></div></div>
-        <div class="ios-step"><div class="step-num">3</div><div class="step-txt">Tap <strong>"Add"</strong> in the top right corner</div></div>
-      </div>
-      <button class="pwa-done-btn" id="pwa-done-btn">✅ &nbsp;I've Added It!</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Header ── -->
+<!-- Header -->
 <header>
   <div class="logo">Forge<span>Bot</span></div>
   <div class="hdr-right">
-    <button class="notif-bell" id="notifBell" onclick="switchTab('notifications',document.querySelector('[data-tab=notifications]'))" title="Notifications">
-      🔔<span class="badge" id="notifDot"></span>
-    </button>
-    <span id="waBadge" class="status-badge disc">⬤ Disconnected</span>
-    <button class="btn-sm btn-gray" onclick="logout()">Logout</button>
+    <span id="waBadge" class="wa-badge disc">&#9679; Disconnected</span>
+    <button class="btn btn-gray btn-sm" onclick="logout()">Logout</button>
   </div>
 </header>
 
-<!-- ── Incomplete setup banner ── -->
-<div id="setupBanner">
-  <p>⚠️ Your bot isn't fully set up yet. Some settings are missing — complete them so your bot works perfectly.</p>
-  <button onclick="switchTab('settings',document.querySelector('[data-tab=settings]'))">Go to Settings</button>
+<!-- Partner trial banner -->
+<div id="trialBanner">
+  <span id="trialMsg"></span> &nbsp;|&nbsp;
+  <a href="#" onclick="alert('To upgrade, contact ForgeBot support.')">Pay &#8358;30,000 to upgrade &#8594;</a>
 </div>
 
-<!-- ── Push permission card (shown after PWA install) ── -->
-
-<!-- ── Navigation ── -->
+<!-- Navigation tabs (dynamic based on occupation) -->
 <nav id="mainNav">
-  <button class="active" data-tab="products"  onclick="switchTab('products',this)">📦 <span id="navProdLabel">Products</span></button>
-  <button data-tab="orders"         onclick="switchTab('orders',this)">🛒 Orders <span class="n-badge" id="ordersBadge"></span></button>
-  <button data-tab="inquiries"      onclick="switchTab('inquiries',this)">👁 Inquiries <span class="n-badge" id="inquiriesBadge"></span></button>
-  <button data-tab="customers"      onclick="switchTab('customers',this)">👥 Customers</button>
-  <button data-tab="broadcast"      onclick="switchTab('broadcast',this)">📣 Broadcast</button>
-  <button data-tab="status"         onclick="switchTab('status',this)">🖼 Status</button>
-  <button data-tab="autoreplies"    onclick="switchTab('autoreplies',this)">⚡ Auto-Replies</button>
-  <button data-tab="features"       onclick="switchTab('features',this)">✨ Features</button>
-  <button data-tab="notifications"  onclick="switchTab('notifications',this)">🔔 Notifications</button>
-  <button data-tab="settings"       onclick="switchTab('settings',this)">⚙️ Settings</button>
+  <button id="navOverview"  class="active" onclick="switchTab('overview',this)">Overview</button>
+  <button id="navListings"  onclick="switchTab('listings',this)">Listings</button>
+  <button id="navReplies"   onclick="switchTab('replies',this)">Auto-Replies</button>
+  <button id="navFaq"       onclick="switchTab('faq',this)">FAQ</button>
+  <button id="navStatus"    onclick="switchTab('status',this)">Status Posts</button>
+  <button id="navBroadcast" onclick="switchTab('broadcast',this)">Broadcast</button>
+  <button id="navFeatures"  onclick="switchTab('features',this)">Features</button>
+  <button id="navSettings"  onclick="switchTab('settings',this)">Settings</button>
 </nav>
 
 <div class="container">
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- PRODUCTS / SERVICES                                      -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-products" class="section active">
-    <div id="msgProducts" class="msg"></div>
+<!-- ═══════════ OVERVIEW ═══════════ -->
+<div id="tab-overview" class="section active">
+  <div id="occBanner" class="occ-banner" style="display:none">
+    <div class="occ-icon" id="occIcon"></div>
+    <div>
+      <div class="occ-name" id="occName"></div>
+      <div class="occ-sub" id="occSub"></div>
+    </div>
+  </div>
+  <h2>Quick Overview</h2>
+  <div class="row" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div class="card" style="flex:1;min-width:130px;text-align:center;padding:14px">
+      <div style="font-size:1.8rem;font-weight:700;color:var(--green)" id="statListings">—</div>
+      <div style="font-size:.78rem;color:#64748b;margin-top:4px" id="statListingsLabel">Listings</div>
+    </div>
+    <div class="card" style="flex:1;min-width:130px;text-align:center;padding:14px">
+      <div style="font-size:1.8rem;font-weight:700;color:var(--blue)" id="statFaq">—</div>
+      <div style="font-size:.78rem;color:#64748b;margin-top:4px">FAQ Answers</div>
+    </div>
+    <div class="card" style="flex:1;min-width:130px;text-align:center;padding:14px">
+      <div style="font-size:1.8rem;font-weight:700;color:var(--orange)" id="statFlows">—</div>
+      <div style="font-size:.78rem;color:#64748b;margin-top:4px">Auto-Reply Rules</div>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--blue);background:#0a0f1e">
+    <p style="font-size:.83rem;color:#93c5fd;line-height:1.7">
+      <b style="color:#fff">&#128161; Quick tips:</b><br>
+      1. Add your <b style="color:#fff">listings</b> with keywords so the bot knows what you sell.<br>
+      2. Add <b style="color:#fff">FAQ answers</b> for questions customers ask all the time.<br>
+      3. Upload <b style="color:#fff">photos/videos</b> to each listing — the bot sends them on request.<br>
+      4. Turn on <b style="color:#fff">Lead Qualification</b> in Settings to automatically qualify leads.
+    </p>
+  </div>
+</div>
 
-    <!-- Add item form -->
-    <div class="card">
-      <h3 id="addItemTitle" style="margin-bottom:14px">Add Product</h3>
+<!-- ═══════════ LISTINGS ═══════════ -->
+<div id="tab-listings" class="section">
 
-      <label class="upload-label" id="uploadLabel">
-        <input type="file" id="itemImageFile" accept="image/*" onchange="previewImage(this,'itemPreview','uploadLabel')"/>
-        📷 &nbsp;Tap to upload product photo
-      </label>
-      <img id="itemPreview" class="preview-img"/>
+  <!-- Listing list view -->
+  <div id="listingsList">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 id="listingsHeading">My Listings</h2>
+      <button class="btn btn-green btn-sm" onclick="showNewListingForm()">+ Add New</button>
+    </div>
+    <div id="msgListings" class="msg"></div>
 
+    <!-- New listing form (hidden by default) -->
+    <div id="newListingForm" class="card" style="display:none">
+      <h3>Add New Listing</h3>
+      <label>Name <span style="color:var(--red)">*</span></label>
+      <input id="nlName" placeholder="e.g. 3-Bedroom Flat in Lekki Phase 1"/>
       <div class="row">
         <div class="grow">
-          <label>Name <span style="color:var(--red)">*</span></label>
-          <input id="itemName" placeholder="e.g. Ankara Maxi Dress"/>
+          <label>Price / Price Label</label>
+          <input id="nlPrice" placeholder="e.g. &#8358;15,000,000 (negotiable)"/>
         </div>
-        <div class="grow">
-          <label>Price (₦) <span style="color:var(--red)">*</span></label>
-          <input id="itemPrice" type="number" placeholder="e.g. 5000"/>
+        <div class="grow" id="nlLocationRow">
+          <label>Location / Area</label>
+          <input id="nlLocation" placeholder="e.g. Lekki Phase 1, Lagos"/>
         </div>
       </div>
-
-      <!-- Service-only: duration -->
-      <div id="durationField" style="display:none;margin-bottom:10px">
-        <label>Session Duration</label>
-        <input id="itemDuration" placeholder="e.g. 60 minutes"/>
+      <label>Category</label>
+      <input id="nlCategory" placeholder="e.g. land, residential, wedding, gold-package"/>
+      <label>Keywords <span style="color:var(--red)">*</span> <span style="color:#64748b;font-size:.75rem">(comma-separated — these are how the bot finds this listing)</span></label>
+      <input id="nlKeywords" placeholder="e.g. lekki,3 bedroom,3bed,flat in lekki,lekki flat"/>
+      <label>Description</label>
+      <textarea id="nlDesc" placeholder="Describe this listing in detail..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-green" onclick="saveListing()">Save Listing</button>
+        <button class="btn btn-gray" onclick="hideNewListingForm()">Cancel</button>
       </div>
-
-      <div style="margin-bottom:10px">
-        <label>Description <span style="color:#374151;font-size:.75rem">(optional but recommended)</span></label>
-        <textarea id="itemDesc" placeholder="e.g. Available in red, blue and yellow. Sizes S, M, L, XL."></textarea>
-      </div>
-      <button class="btn btn-green" id="addItemBtn" onclick="addItem()">+ Add</button>
     </div>
 
-    <div id="itemList"></div>
+    <div id="listingItems"></div>
   </div>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- ORDERS                                                   -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-orders" class="section">
-    <h2>Orders</h2>
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-sm btn-gray" onclick="filterOrders('all')"    id="fo-all">All</button>
-      <button class="btn btn-sm" style="background:#451a03;color:var(--orange)" onclick="filterOrders('pending')"   id="fo-pending">Pending</button>
-      <button class="btn btn-sm btn-blue"  onclick="filterOrders('accepted')"  id="fo-accepted">Accepted</button>
-      <button class="btn btn-sm" style="background:#14532d;color:var(--green)" onclick="filterOrders('delivered')"  id="fo-delivered">Completed</button>
-    </div>
-    <div id="orderList"><p style="color:#64748b;font-size:.85rem">No orders yet.</p></div>
-  </div>
+  <!-- Listing detail / media view -->
+  <div id="listingDetail">
+    <button class="back-btn" onclick="closeListingDetail()">&#8592; Back to listings</button>
+    <h2 id="detailListingName" style="margin-bottom:4px"></h2>
+    <p id="detailListingMeta" style="font-size:.8rem;color:#64748b;margin-bottom:16px"></p>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- PRICE INQUIRIES / LEADS                                  -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-inquiries" class="section">
-    <h2>Price Inquiries — Leads</h2>
-    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px">Customers who asked about your products or services but haven't ordered yet. You can broadcast to them.</p>
-    <button class="btn btn-green" style="margin-bottom:14px" onclick="broadcastToLeads()">📣 Broadcast to All Leads</button>
-    <div id="leadList"><p style="color:#64748b;font-size:.85rem">No inquiries yet.</p></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- CUSTOMERS                                                -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-customers" class="section">
-    <h2>Your Customers</h2>
-    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px">Everyone who has ever chatted with your bot. Use broadcasts to reconnect with them.</p>
-    <div id="customerList"><p style="color:#64748b;font-size:.85rem">No customers yet.</p></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- BROADCAST                                                -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-broadcast" class="section">
-    <h2>Send Broadcast</h2>
-    <div id="msgBroadcast" class="msg"></div>
     <div class="card">
-      <div style="margin-bottom:10px">
-        <label>Send to</label>
-        <select id="bcTarget">
-          <option value="all">All customers</option>
-          <option value="inquiries">Price inquiry leads only</option>
-          <option value="ordered">Customers who have ordered</option>
-        </select>
-      </div>
-      <div style="margin-bottom:10px">
-        <label>Message</label>
-        <textarea id="bcMsg" placeholder="Type your message..."></textarea>
-      </div>
-      <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
-    </div>
-    <h2 style="margin-top:4px">Sent Broadcasts</h2>
-    <div id="broadcastLog"></div>
-  </div>
+      <h3>Media Files</h3>
+      <p style="font-size:.8rem;color:#94a3b8;margin-bottom:12px">When a customer asks for photos, videos, or documents about this listing, the bot sends these files — one by one, in order.</p>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- STATUS POSTS                                             -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-status" class="section">
-    <h2>WhatsApp Status Scheduler</h2>
-    <div id="msgStatus" class="msg"></div>
-    <div class="card">
-      <label class="upload-label">
-        <input type="file" id="statusImageFile" accept="image/*" onchange="previewImage(this,'statusPreview',null)"/>
-        📷 &nbsp;Upload status image
-      </label>
-      <img id="statusPreview" class="preview-img"/>
-      <div style="margin-bottom:10px">
-        <label>Caption <span style="color:#374151;font-size:.75rem">(optional)</span></label>
-        <textarea id="spCaption" placeholder="Optional custom caption — leave blank for auto caption"></textarea>
+      <div id="detailMediaGrid" class="media-grid"></div>
+
+      <div class="divider"></div>
+      <h3 style="margin-bottom:12px">Add Media</h3>
+
+      <!-- Upload file -->
+      <label>Upload a file (image, video, PDF)</label>
+      <div class="upload-zone" onclick="document.getElementById('mediaFileInput').click()">
+        <div style="font-size:2rem">&#128193;</div>
+        <p>Click to upload — image, video, or PDF<br><span style="color:#475569">Max 50MB per file</span></p>
+        <input type="file" id="mediaFileInput" style="display:none" accept="image/*,video/*,.pdf" onchange="uploadMediaFile()"/>
       </div>
+      <div id="uploadProgress" style="display:none;font-size:.8rem;color:var(--blue);margin-top:6px">Uploading...</div>
+
+      <div class="divider"></div>
+
+      <!-- Or paste URL -->
+      <label>Or paste a URL directly</label>
       <div class="row">
+        <div class="grow"><input id="mediaUrl" placeholder="https://..."/></div>
         <div class="grow">
-          <label>Post time (24hr)</label>
-          <input id="spTime" placeholder="e.g. 09:00"/>
-        </div>
-        <div class="grow">
-          <label>Days</label>
-          <input id="spDays" placeholder="e.g. Mon,Wed,Fri"/>
-        </div>
-      </div>
-      <button class="btn btn-green" onclick="addStatusPost()">+ Schedule</button>
-    </div>
-    <div id="postList"></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- AUTO-REPLIES                                             -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-autoreplies" class="section">
-    <h2>Custom Auto-Replies</h2>
-    <div style="background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:16px">
-      💡 Your bot already handles products, prices, orders, delivery, socials and policies automatically. Add rules here only for extra questions specific to your business.
-    </div>
-    <div id="msgReplies" class="msg"></div>
-    <div class="card">
-      <div style="margin-bottom:10px">
-        <label>Keywords (comma separated)</label>
-        <input id="newKw" placeholder="e.g. discount, promo code, vip"/>
-      </div>
-      <div style="margin-bottom:10px">
-        <label>Reply</label>
-        <textarea id="newResp" placeholder="e.g. We don't currently have promo codes, but follow our status for exclusive deals!"></textarea>
-      </div>
-      <button class="btn btn-green" onclick="addFlow()">+ Add Rule</button>
-    </div>
-    <div id="flowList"></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- FEATURES                                                 -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-features" class="section">
-    <h2>Bot Features</h2>
-    <div class="card" style="border-color:var(--green);margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
-        <span style="font-size:1.3rem">🎤</span>
-        <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
-        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
-      </div>
-      <p style="font-size:.81rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot transcribes and replies automatically.</p>
-    </div>
-    <div class="card" style="border-color:var(--green);margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
-        <span style="font-size:1.3rem">💰</span>
-        <span style="font-weight:700;color:var(--green)">Payment Confirmation</span>
-        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
-      </div>
-      <p style="font-size:.81rem;color:#94a3b8">When a customer pays, the bot collects their receipt and links it to the order in your dashboard. Confirm directly from the Orders tab.</p>
-    </div>
-    <div class="card" style="border-color:var(--green);margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
-        <span style="font-size:1.3rem">🙋</span>
-        <span style="font-weight:700;color:var(--green)">Human Handoff</span>
-        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
-      </div>
-      <p style="font-size:.81rem;color:#94a3b8">Customer asks to speak to a human — bot pauses and alerts you immediately on WhatsApp.</p>
-    </div>
-    <div style="margin:20px 0 10px;padding:9px 13px;background:#0d1a2e;border-left:3px solid var(--purple);border-radius:6px">
-      <p style="font-size:.8rem;color:#93c5fd">🚀 <b style="color:#fff">Upcoming Upgrades</b> — You joined early. All features below unlock for you <b style="color:var(--green)">completely free</b>.</p>
-    </div>
-    <div class="coming-soon"><div class="cs-icon">🔒</div><h3>Fake Payment Receipt Detection</h3><p>AI scans every receipt image and alerts you if it looks edited or fake.</p><div class="cs-badge">COMING SOON</div></div>
-    <div class="coming-soon" style="border-color:#f97316;background:#1a0a00"><div class="cs-icon">📱🎬</div><h3 style="color:#f97316">Social Media Bot + AI Video Creator</h3><p>Expand to Instagram, TikTok and Facebook DMs. Auto-create and post promotional videos.</p><div class="cs-badge" style="background:#f97316">COMING SOON</div></div>
-    <div class="coming-soon" style="border-color:var(--red);background:#1a0000"><div class="cs-icon">🚨</div><h3 style="color:var(--red)">Community Fraud Blacklist</h3><p>Flag scammers once — protect the entire ForgeBot network automatically.</p><div class="cs-badge" style="background:var(--red)">COMING SOON</div></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- NOTIFICATIONS                                            -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-notifications" class="section">
-    <h2>Notifications</h2>
-
-    <!-- Push permission card -->
-    <div id="pushCard">
-      <h3>🔔 Never miss an order</h3>
-      <p>Allow ForgeBot to send you alerts when a new order comes in or a customer asks about your products — even when your phone screen is off.</p>
-      <button class="btn btn-green" onclick="requestPushPermission()">Allow Notifications</button>
-      <button class="dismiss" onclick="dismissPushCard()">maybe later</button>
-    </div>
-
-    <div id="notifList"><p style="color:#64748b;font-size:.85rem">No notifications yet.</p></div>
-  </div>
-
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!-- SETTINGS                                                 -->
-  <!-- ════════════════════════════════════════════════════════ -->
-  <div id="tab-settings" class="section">
-    <h2>Settings</h2>
-    <div id="msgSettings" class="msg"></div>
-
-    <!-- Profile -->
-    <div class="card">
-      <h3 style="margin-bottom:14px;color:var(--green)">Your Profile</h3>
-      <div class="row">
-        <div class="grow">
-          <label>Business Name</label>
-          <input id="settBizName" placeholder="Your business name"/>
-          <div class="lock-note" id="nameLockNote"></div>
-        </div>
-        <div class="grow">
-          <label>Email</label>
-          <input id="settEmail" disabled style="opacity:.5"/>
-        </div>
-      </div>
-      <div class="row">
-        <div class="grow">
-          <label>Business Type</label>
-          <select id="settBizType">
-            <option value="products">Sell Products</option>
-            <option value="services">Offer Services</option>
-            <option value="both">Both</option>
+          <select id="mediaType">
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="document">Document / PDF</option>
           </select>
         </div>
-        <div class="grow">
-          <label>Plan</label>
-          <input id="settPlan" disabled style="opacity:.5"/>
-        </div>
       </div>
-      <button class="btn btn-green" onclick="saveProfile()">Save Profile</button>
-    </div>
-
-    <div class="section-sep"></div>
-
-    <!-- Notification number -->
-    <div class="card">
-      <h3 style="margin-bottom:10px">Notification Number</h3>
-      <div class="notif-box">Your <b>personal WhatsApp number</b> where the bot sends all alerts — orders, payment claims, handoff requests.</div>
-      <label>Number (e.g. 2348012345678)</label>
-      <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:10px"/>
-      <button class="btn btn-green" onclick="saveNotifNumber()">Save</button>
-    </div>
-
-    <div class="section-sep"></div>
-
-    <!-- Business hours -->
-    <div class="card">
-      <h3 style="margin-bottom:10px">Business Hours</h3>
-      <p style="font-size:.8rem;color:#64748b;margin-bottom:10px">Your bot will tell customers when you're open or closed based on these hours.</p>
-      <label>Hours</label>
-      <input id="bizHours" placeholder="e.g. Monday – Saturday, 8am – 6pm. Closed Sundays." style="margin-bottom:10px"/>
-      <button class="btn btn-green" onclick="saveBizHours()">Save</button>
-    </div>
-
-    <div class="section-sep"></div>
-
-    <!-- Fallback -->
-    <div class="card">
-      <h3 style="margin-bottom:10px">Fallback Message</h3>
-      <p style="font-size:.8rem;color:#64748b;margin-bottom:10px">Sent when your bot genuinely can't understand the customer's message.</p>
-      <textarea id="fallbackMsg" placeholder="e.g. Thanks for reaching out! Let me get someone to help you shortly. 😊"></textarea>
-      <button class="btn btn-green" style="margin-top:10px" onclick="saveFallback()">Save</button>
-    </div>
-
-    <div class="section-sep"></div>
-
-    <!-- WhatsApp -->
-    <div class="card">
-      <h3 style="margin-bottom:10px">WhatsApp Connection</h3>
-      <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">If your bot disconnects, click Reconnect. Open the link on a computer to scan the QR code.</p>
-      <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
+      <label>Caption (optional)</label>
+      <input id="mediaCaption" placeholder="e.g. Front view of the property"/>
+      <label id="filenameLabel" style="display:none">File name shown in WhatsApp</label>
+      <input id="mediaFilename" placeholder="document.pdf" style="display:none"/>
+      <button class="btn btn-green" style="margin-top:12px" onclick="addMediaUrl()">Add Media</button>
+      <div id="msgMedia" class="msg" style="margin-top:10px"></div>
     </div>
   </div>
+</div>
 
-</div><!-- /container -->
+<!-- ═══════════ AUTO-REPLIES ═══════════ -->
+<div id="tab-replies" class="section">
+  <h2>Auto-Reply Rules</h2>
+  <div id="msgReplies" class="msg"></div>
+  <div class="card">
+    <label>Keywords (comma separated)</label>
+    <input id="newKw" placeholder="e.g. price, how much, cost"/>
+    <label style="margin-top:10px">Reply Message</label>
+    <textarea id="newResp" placeholder="Type the reply your bot will send..."></textarea>
+    <button class="btn btn-green" style="margin-top:12px" onclick="addFlow()">+ Add Rule</button>
+  </div>
+  <div id="flowList"></div>
+</div>
+
+<!-- ═══════════ FAQ ═══════════ -->
+<div id="tab-faq" class="section">
+  <h2>FAQ Builder</h2>
+  <p style="font-size:.82rem;color:#94a3b8;margin-bottom:16px">The bot checks these answers FIRST before auto-reply rules. Add every question your customers ask.</p>
+  <div id="msgFaq" class="msg"></div>
+  <div class="card">
+    <label>Question</label>
+    <input id="faqQ" placeholder="e.g. Do you offer payment plans?"/>
+    <label style="margin-top:10px">Answer</label>
+    <textarea id="faqA" placeholder="Type the full answer the bot will send..."></textarea>
+    <label style="margin-top:10px">Extra trigger keywords (optional, comma-separated)</label>
+    <input id="faqKw" placeholder="e.g. installment, pay later, flexible"/>
+    <button class="btn btn-green" style="margin-top:12px" onclick="addFaq()">+ Add FAQ</button>
+  </div>
+  <div id="faqList"></div>
+</div>
+
+<!-- ═══════════ STATUS POSTS ═══════════ -->
+<div id="tab-status" class="section">
+  <h2>WhatsApp Status Scheduler</h2>
+  <div id="msgStatus" class="msg"></div>
+  <div class="card">
+    <label>Image URL (direct link to image)</label>
+    <input id="spMedia" placeholder="https://i.imgur.com/yourimage.jpg"/>
+    <label style="margin-top:10px">Caption (optional)</label>
+    <textarea id="spCaption" placeholder="Optional caption..."></textarea>
+    <div class="row">
+      <div class="grow">
+        <label>Post Time (24hr, e.g. 09:00)</label>
+        <input id="spTime" placeholder="09:00"/>
+      </div>
+      <div class="grow">
+        <label>Days (e.g. Mon,Wed,Fri)</label>
+        <input id="spDays" placeholder="Mon,Wed,Fri"/>
+      </div>
+    </div>
+    <button class="btn btn-green" style="margin-top:12px" onclick="addStatusPost()">+ Schedule Post</button>
+  </div>
+  <div id="postList"></div>
+</div>
+
+<!-- ═══════════ BROADCAST ═══════════ -->
+<div id="tab-broadcast" class="section">
+  <h2>Send Broadcast</h2>
+  <div id="msgBroadcast" class="msg"></div>
+  <div class="card">
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">Sends to all contacts who have messaged your bot.</p>
+    <textarea id="bcMsg" placeholder="Type your broadcast message..."></textarea>
+    <button class="btn btn-green" style="margin-top:12px" onclick="sendBroadcast()">Send Broadcast</button>
+  </div>
+  <h2 style="margin-top:4px">Broadcast History</h2>
+  <div id="broadcastLog"></div>
+</div>
+
+<!-- ═══════════ FEATURES ═══════════ -->
+<div id="tab-features" class="section">
+  <h2>Bot Features</h2>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#127979;</span>
+      <span style="font-weight:700;color:var(--green)">Context-Aware Media Sending</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">When a customer asks for photos or videos, the bot knows exactly which listing they are talking about and sends ONLY the media for that specific listing — one by one. No random files.</p>
+  </div>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#128196;</span>
+      <span style="font-weight:700;color:var(--green)">PDF / Document Sending</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">Upload PDF brochures, catalogs, land documents, service menus, or any file to a listing. The bot sends them directly in WhatsApp when a customer requests them.</p>
+  </div>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#128205;</span>
+      <span style="font-weight:700;color:var(--green)">Location Sharing</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">Set your office address and Google Maps link in Settings. When a customer asks "where are you located?" the bot sends your address and map link automatically.</p>
+  </div>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#127358;</span>
+      <span style="font-weight:700;color:var(--green)">Lead Qualification</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">When a customer shows buying intent, the bot asks targeted qualifying questions based on your business type (real estate, photography, consulting, etc.) and sends a full summary to you. Enable this in Settings.</p>
+  </div>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#127908;</span>
+      <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">Customers can send voice notes in Yoruba, Igbo, Hausa, Pidgin, or English. The bot transcribes them and replies in text automatically.</p>
+  </div>
+
+  <div class="feat-card">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#128176;</span>
+      <span style="font-weight:700;color:var(--green)">Payment Alerts + Human Handoff</span>
+      <span class="feat-live">LIVE</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">When a customer says they have paid, you get a WhatsApp alert. When they ask for a real person, the bot connects them to you immediately and pauses itself for 30 minutes.</p>
+  </div>
+
+  <div class="feat-card" style="border-color:var(--purple);background:#0d0d1a">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#128274;</span>
+      <span style="font-weight:700;color:var(--purple)">Fake Receipt Detection</span>
+      <span class="feat-soon">COMING SOON</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">AI scans every payment screenshot customers send and flags manipulated receipts before you release goods or services.</p>
+  </div>
+
+  <div class="feat-card" style="border-color:#f97316;background:#0d0a00">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+      <span style="font-size:1.3rem">&#128247;</span>
+      <span style="font-weight:700;color:#f97316">Social Media Bot + AI Video Creator</span>
+      <span style="background:#f97316;color:#fff;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:8px">COMING SOON</span>
+    </div>
+    <p style="font-size:.82rem;color:#94a3b8">Same bot expands to Instagram, TikTok, and Facebook DMs. Plus AI-generated promo videos posted to your pages on a schedule.</p>
+  </div>
+</div>
+
+<!-- ═══════════ SETTINGS ═══════════ -->
+<div id="tab-settings" class="section">
+  <h2>Settings</h2>
+  <div id="msgSettings" class="msg"></div>
+
+  <!-- Notification number -->
+  <div class="card">
+    <h3 style="color:var(--green)">Your Notification Number</h3>
+    <div class="notif-box">
+      This is your <b>personal WhatsApp number</b> where the bot sends payment alerts, lead summaries, and handoff requests. International format without the + sign (e.g. 2348012345678).
+    </div>
+    <input id="notifNumber" placeholder="2348012345678"/>
+    <button class="btn btn-green" style="margin-top:10px" onclick="saveSettings()">Save Number</button>
+  </div>
+
+  <!-- Business location -->
+  <div class="card">
+    <h3>Business Location</h3>
+    <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">When customers ask "where are you located?" the bot sends this.</p>
+    <label>Address</label>
+    <input id="locAddress" placeholder="e.g. 12 Admiralty Way, Lekki Phase 1, Lagos"/>
+    <label style="margin-top:10px">Google Maps URL (optional)</label>
+    <input id="locMaps" placeholder="https://maps.google.com/..."/>
+    <button class="btn btn-green" style="margin-top:10px" onclick="saveLocation()">Save Location</button>
+  </div>
+
+  <!-- Fallback message -->
+  <div class="card">
+    <h3>Fallback Message</h3>
+    <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">Sent when no keyword, FAQ, or listing matches a customer message.</p>
+    <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
+    <button class="btn btn-green" style="margin-top:10px" onclick="saveFallback()">Save Fallback</button>
+  </div>
+
+  <!-- Lead qualification toggle -->
+  <div class="card">
+    <h3>Lead Qualification</h3>
+    <p style="font-size:.8rem;color:#94a3b8;margin-bottom:12px">When enabled, the bot asks customers a series of qualifying questions based on your business type and sends you a full lead summary before connecting them to you.</p>
+    <div style="display:flex;align-items:center;gap:12px">
+      <label style="margin:0;font-size:.85rem;color:#e2e8f0">Enable Lead Qualification</label>
+      <button id="qualToggleBtn" class="btn btn-gray btn-sm" onclick="toggleQualification()">Enable</button>
+    </div>
+    <p id="qualStatus" style="font-size:.78rem;color:#64748b;margin-top:8px"></p>
+  </div>
+
+  <!-- WhatsApp reconnect -->
+  <div class="card">
+    <h3>WhatsApp Connection</h3>
+    <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">If your bot disconnects, click below. Open the link on a computer to scan the QR code with your phone.</p>
+    <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
+  </div>
+</div>
+
+</div><!-- end container -->
 
 <script>
-// ── Constants & auth ─────────────────────────────────────────
-const API = '';
-let TOKEN = localStorage.getItem('forgebot_token');
+'use strict';
+
+// ── Auth ──────────────────────────────────────────────────────
+var TOKEN = localStorage.getItem('forgebot_token');
 if (!TOKEN) {
-  const t = new URLSearchParams(window.location.search).get('token');
+  var t = new URLSearchParams(window.location.search).get('token');
   if (t) { TOKEN = t; localStorage.setItem('forgebot_token', t); }
   else window.location.href = '/';
 }
-const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
+var H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
 
-let CLIENT = {};           // client data from /api/client/me
-let BIZ_TYPE = 'products'; // updated from CLIENT
-let currentOrderFilter = 'all';
-let lastOrderCount = 0;
-let lastInquiryCount = 0;
+// ── State ─────────────────────────────────────────────────────
+var currentClient      = null;
+var currentListingId   = null;
+var qualificationEnabled = false;
 
-// ── Tab switching ─────────────────────────────────────────────
+// Occupation metadata
+var OCC_META = {
+  real_estate:  { icon:'🏠', name:'Real Estate',         sub:'Properties, land, rentals',      listLabel:'Properties' },
+  photography:  { icon:'📷', name:'Photography',          sub:'Shoots, events, portrait',        listLabel:'Packages & Shoots' },
+  medical:      { icon:'🏥', name:'Medical / Clinic',     sub:'Healthcare services',             listLabel:'Services' },
+  legal:        { icon:'⚖️', name:'Legal / Law Firm',     sub:'Legal consultations & cases',     listLabel:'Practice Areas' },
+  consulting:   { icon:'💼', name:'Consulting',           sub:'Business, finance, strategy',     listLabel:'Services & Programs' },
+  agriculture:  { icon:'🌾', name:'Agriculture / Farm',   sub:'Produce, crops, livestock',       listLabel:'Products' },
+  fashion:      { icon:'👗', name:'Fashion / Tailoring',  sub:'Designs, bespoke, ready-to-wear', listLabel:'Designs & Services' },
+  food:         { icon:'🍽️', name:'Food / Catering',      sub:'Menu, events, delivery',          listLabel:'Menu Items' },
+  beauty:       { icon:'💅', name:'Beauty / Salon / Spa', sub:'Hair, nails, skincare',           listLabel:'Services' },
+  logistics:    { icon:'🚚', name:'Logistics / Delivery', sub:'Packages, cargo, transport',      listLabel:'Delivery Zones & Pricing' },
+  education:    { icon:'📚', name:'Education / Tutoring', sub:'Courses, subjects, classes',      listLabel:'Courses & Programs' },
+  events:       { icon:'🎉', name:'Events / Decoration',  sub:'Weddings, corporate, parties',    listLabel:'Event Packages' },
+  tech:         { icon:'💻', name:'Tech / IT Services',   sub:'Web, apps, IT support',           listLabel:'Services & Solutions' },
+  auto:         { icon:'🚗', name:'Auto / Car Dealer',    sub:'Vehicles, repair, parts',         listLabel:'Vehicle Inventory' },
+  interior:     { icon:'🏛️', name:'Interior Design',      sub:'Home, office, commercial',        listLabel:'Packages & Portfolio' },
+  travel:       { icon:'✈️', name:'Travel / Tourism',     sub:'Destinations, packages, tours',   listLabel:'Travel Packages' },
+  fitness:      { icon:'💪', name:'Fitness / Gym',        sub:'Training, programs, coaching',    listLabel:'Programs & Packages' },
+  religious:    { icon:'⛪', name:'Religious Org',         sub:'Services, programs, outreach',    listLabel:'Programs & Events' },
+  general:      { icon:'🏢', name:'General Service',      sub:'Service business',                listLabel:'Services' }
+};
+
+// ── Utilities ─────────────────────────────────────────────────
 function switchTab(id, btn) {
   document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
   document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
   document.getElementById('tab-'+id).classList.add('active');
-  if (btn) btn.classList.add('active');
-  if (id === 'orders')     loadOrders();
-  if (id === 'inquiries')  loadLeads();
-  if (id === 'customers')  loadCustomers();
-  if (id === 'broadcast')  loadBroadcastLogs();
-  if (id === 'autoreplies')loadFlows();
-  if (id === 'status')     loadStatusPosts();
-  if (id === 'notifications') loadNotifications();
-  if (id === 'settings')   loadSettings();
-  if (id === 'products')   loadItems();
-  // Clear badge
-  if (id === 'orders')     { document.getElementById('ordersBadge').classList.remove('show'); }
-  if (id === 'notifications') { document.getElementById('notifDot').classList.remove('show'); }
+  btn.classList.add('active');
+  if (id === 'listings') { loadListings(); closeListingDetail(); }
+  if (id === 'faq')      loadFaq();
+  if (id === 'replies')  loadFlows();
+  if (id === 'status')   loadStatusPosts();
+  if (id === 'broadcast') loadBroadcastLogs();
 }
 
 function showMsg(id, text, type) {
   var el = document.getElementById(id);
-  if (!el) return;
   el.textContent = text;
-  el.className = 'msg show ' + type;
+  el.className   = 'msg show ' + type;
   setTimeout(function(){ el.classList.remove('show'); }, 4500);
 }
 
-function logout() { localStorage.removeItem('forgebot_token'); window.location.href = '/'; }
-function reconnectWA() { window.open('/onboard?token='+TOKEN,'_blank'); }
-
-// ── Image preview + upload ────────────────────────────────────
-function previewImage(input, previewId, labelId) {
-  var preview = document.getElementById(previewId);
-  if (!input.files || !input.files[0]) { preview.style.display='none'; return; }
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    preview.src = e.target.result;
-    preview.style.display = 'block';
-    if (labelId) document.getElementById(labelId).textContent = '📷  ' + input.files[0].name;
-  };
-  reader.readAsDataURL(input.files[0]);
+function logout() {
+  localStorage.removeItem('forgebot_token');
+  window.location.href = '/';
 }
 
-async function uploadImage(fileInput) {
-  if (!fileInput.files || !fileInput.files[0]) return null;
-  var fd = new FormData();
-  fd.append('image', fileInput.files[0]);
-  try {
-    var r = await fetch(API+'/api/upload', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd });
-    if (r.ok) { var d = await r.json(); return d.url; }
-  } catch(e) {}
-  return null;
+function reconnectWA() {
+  window.open('/onboard?token=' + TOKEN, '_blank');
 }
 
-// ── Load on start ─────────────────────────────────────────────
-async function init() {
-  await loadClientData();
-  await loadItems();
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+async function loadAll() {
+  await loadClientInfo();
+  await loadOverviewStats();
   pollWaStatus();
-  startPolling();
-  initPWA();
 }
 
-async function loadClientData() {
+async function loadClientInfo() {
   try {
-    var r = await fetch(API+'/api/client/me', { headers:H });
+    var r = await fetch('/api/client/me', { headers: H });
+    if (!r.ok) { logout(); return; }
+    currentClient = await r.json();
+
+    // Populate fields
+    if (currentClient.notification_number)
+      document.getElementById('notifNumber').value = currentClient.notification_number;
+    if (currentClient.fallback_message)
+      document.getElementById('fallbackMsg').value = currentClient.fallback_message;
+    if (currentClient.location_address)
+      document.getElementById('locAddress').value = currentClient.location_address;
+    if (currentClient.location_maps_url)
+      document.getElementById('locMaps').value = currentClient.location_maps_url;
+
+    // Occupation meta
+    var occ  = currentClient.occupation || 'general';
+    var meta = OCC_META[occ] || OCC_META['general'];
+
+    var banner = document.getElementById('occBanner');
+    banner.style.display = 'flex';
+    document.getElementById('occIcon').textContent  = meta.icon;
+    document.getElementById('occName').textContent  = meta.name;
+    document.getElementById('occSub').textContent   = meta.sub;
+
+    // Listings heading
+    document.getElementById('listingsHeading').textContent = meta.listLabel;
+    document.getElementById('statListingsLabel').textContent = meta.listLabel;
+
+    // Qualification state
+    var occData = currentClient.occupation_data || {};
+    qualificationEnabled = !!occData.qualification_enabled;
+    updateQualBtn();
+
+    // Partner trial banner
+    await checkPartnerTrial();
+
+  } catch(e) { console.error('loadClientInfo:', e); }
+}
+
+async function checkPartnerTrial() {
+  try {
+    var r = await fetch('/api/client/partner-status', { headers: H });
     if (!r.ok) return;
-    CLIENT = await r.json();
-    BIZ_TYPE = CLIENT.business_type || 'products';
-    applyBizType();
-    checkSetupBanner();
-    if (CLIENT.notification_number) document.getElementById('notifNumber').value = CLIENT.notification_number;
-    if (CLIENT.fallback_message)    document.getElementById('fallbackMsg').value    = CLIENT.fallback_message;
-    if (CLIENT.business_name)       document.getElementById('settBizName').value    = CLIENT.business_name;
-    if (CLIENT.email)               document.getElementById('settEmail').value       = CLIENT.email;
-    if (CLIENT.plan)                document.getElementById('settPlan').value        = CLIENT.plan;
-    if (CLIENT.business_hours)      document.getElementById('bizHours').value        = CLIENT.business_hours;
-    document.getElementById('settBizType').value = BIZ_TYPE;
-    checkNameLock();
+    var p = await r.json();
+    if (!p.is_partner) return;
+
+    var banner = document.getElementById('trialBanner');
+    banner.style.display = 'block';
+    var msg    = document.getElementById('trialMsg');
+
+    if (p.expired || !p.still_active) {
+      banner.classList.add('expired');
+      msg.innerHTML = '&#9888; Your partner trial has <span>EXPIRED</span>. Your bot is currently paused.';
+    } else {
+      var days = p.days_left !== null ? p.days_left : '?';
+      msg.innerHTML = '&#8987; Partner Trial: <span>' + days + ' day' + (days !== 1 ? 's' : '') + ' remaining</span>';
+    }
   } catch(e) {}
 }
 
-function applyBizType() {
-  var label = document.getElementById('navProdLabel');
-  var addTitle = document.getElementById('addItemTitle');
-  var durField = document.getElementById('durationField');
-  if (BIZ_TYPE === 'services') {
-    label.textContent = 'Services';
-    addTitle.textContent = 'Add Service';
-    durField.style.display = 'block';
-  } else if (BIZ_TYPE === 'both') {
-    label.textContent = 'Products & Services';
-    addTitle.textContent = 'Add Product / Service';
-    durField.style.display = 'block';
-  } else {
-    label.textContent = 'Products';
-    addTitle.textContent = 'Add Product';
-    durField.style.display = 'none';
-  }
+async function loadOverviewStats() {
+  try {
+    var [listingsR, faqR, flowsR] = await Promise.all([
+      fetch('/api/client/listings', { headers: H }),
+      fetch('/api/client/faq',      { headers: H }),
+      fetch('/api/client/flows',    { headers: H })
+    ]);
+    var listings = listingsR.ok ? await listingsR.json() : [];
+    var faqs     = faqR.ok     ? await faqR.json()      : [];
+    var flows    = flowsR.ok   ? await flowsR.json()    : [];
+
+    document.getElementById('statListings').textContent = listings.length;
+    document.getElementById('statFaq').textContent      = faqs.length;
+    document.getElementById('statFlows').textContent    = flows.length;
+  } catch(e) {}
 }
 
-function checkSetupBanner() {
-  var missing = !CLIENT.notification_number || !CLIENT.business_hours || !CLIENT.setup_completed;
-  document.getElementById('setupBanner').classList.toggle('show', missing);
-}
-
-function checkNameLock() {
-  var note = document.getElementById('nameLockNote');
-  if (!CLIENT.name_last_changed) { note.textContent = ''; return; }
-  var last = new Date(CLIENT.name_last_changed);
-  var unlock = new Date(last.getTime() + 30*24*60*60*1000);
-  var now = new Date();
-  if (now < unlock) {
-    var days = Math.ceil((unlock - now) / (24*60*60*1000));
-    document.getElementById('settBizName').disabled = true;
-    note.textContent = '🔒 Name locked for ' + days + ' more day' + (days>1?'s':'') + '.';
-  }
-}
-
-// ── WA status polling ─────────────────────────────────────────
 async function pollWaStatus() {
   try {
-    var r = await fetch(API+'/api/client/me', { headers:H });
+    var r = await fetch('/api/client/me', { headers: H });
     if (r.ok) {
-      var c = await r.json();
+      var c     = await r.json();
       var badge = document.getElementById('waBadge');
-      badge.textContent = c.whatsapp_status === 'connected' ? '⬤ Connected' : '⬤ Disconnected';
-      badge.className = 'status-badge' + (c.whatsapp_status === 'connected' ? '' : ' disc');
+      if (c.whatsapp_status === 'connected') {
+        badge.textContent = '● Connected';
+        badge.className   = 'wa-badge';
+      } else {
+        badge.textContent = '● Disconnected';
+        badge.className   = 'wa-badge disc';
+      }
     }
   } catch(e) {}
   setTimeout(pollWaStatus, 12000);
 }
 
-// ── Background polling for new orders / inquiries ─────────────
-function startPolling() {
-  setInterval(async function() {
-    try {
-      var r = await fetch(API+'/api/client/orders?status=pending', { headers:H });
-      if (r.ok) {
-        var data = await r.json();
-        var count = (data||[]).length;
-        if (count > lastOrderCount) {
-          playNotifSound();
-          document.getElementById('ordersBadge').textContent = count;
-          document.getElementById('ordersBadge').classList.add('show');
-          document.getElementById('notifDot').classList.add('show');
-        }
-        lastOrderCount = count;
-      }
-    } catch(e) {}
-    try {
-      var r2 = await fetch(API+'/api/client/inquiries?limit=1', { headers:H });
-      if (r2.ok) {
-        var d2 = await r2.json();
-        var total = d2.total || 0;
-        if (total > lastInquiryCount && lastInquiryCount > 0) {
-          document.getElementById('inquiriesBadge').textContent = '!';
-          document.getElementById('inquiriesBadge').classList.add('show');
-          playNotifSound();
-        }
-        lastInquiryCount = total;
-      }
-    } catch(e) {}
-  }, 20000); // every 20 seconds
+// ═══════════ LISTINGS ════════════════════════════════════════
+
+function showNewListingForm() {
+  document.getElementById('newListingForm').style.display = 'block';
+  document.getElementById('nlName').focus();
+}
+function hideNewListingForm() {
+  document.getElementById('newListingForm').style.display = 'none';
+  ['nlName','nlPrice','nlLocation','nlCategory','nlKeywords','nlDesc'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
 }
 
-// ── Notification sound ────────────────────────────────────────
-function playNotifSound() {
+async function loadListings() {
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.22);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-  } catch(e) {}
-}
+    var r    = await fetch('/api/client/listings', { headers: H });
+    var data = r.ok ? await r.json() : [];
+    var el   = document.getElementById('listingItems');
 
-// ═══════════════════════════════════════════════════════════════
-// PRODUCTS & SERVICES
-// ═══════════════════════════════════════════════════════════════
-async function loadItems() {
-  var endpoint = BIZ_TYPE === 'services' ? 'services' : 'products';
-  var el = document.getElementById('itemList');
-  try {
-    var urls = BIZ_TYPE === 'both'
-      ? [fetch(API+'/api/client/products',{headers:H}), fetch(API+'/api/client/services',{headers:H})]
-      : [fetch(API+'/api/client/'+endpoint,{headers:H})];
-    var responses = await Promise.all(urls);
-    var datasets = await Promise.all(responses.map(function(r){ return r.ok ? r.json() : []; }));
-    var all = [];
-    if (BIZ_TYPE === 'both') {
-      (datasets[0]||[]).forEach(function(i){ i._type='product'; all.push(i); });
-      (datasets[1]||[]).forEach(function(i){ i._type='service'; all.push(i); });
-    } else {
-      (datasets[0]||[]).forEach(function(i){ i._type=endpoint.slice(0,-1); all.push(i); });
+    if (!data.length) {
+      el.innerHTML = '<p style="color:#64748b;font-size:.85rem;margin-top:8px">No listings yet. Add your first one above.</p>';
+      return;
     }
-    if (!all.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No items yet. Add your first one above.</p>'; return; }
-    el.innerHTML = all.map(function(item) {
-      var stockLabel = (BIZ_TYPE==='services'||item._type==='service')
-        ? (item.available ? 'Available' : 'Fully Booked')
-        : (item.in_stock  ? 'In Stock'  : 'Out of Stock');
-      var stockClass = (item.in_stock||item.available) ? 'in' : 'out';
-      var typeTag = BIZ_TYPE==='both' ? '<span style="font-size:.68rem;color:#64748b;margin-left:5px">['+item._type+']</span>' : '';
-      return '<div class="item-row">'+
-        '<div class="item-img">'+(item.image_url ? '<img src="'+item.image_url+'" alt=""/>' : '📦')+'</div>'+
-        '<div class="item-info">'+
-          '<div class="item-name">'+item.name+typeTag+'</div>'+
-          '<div class="item-price">₦'+Number(item.price).toLocaleString()+(item.duration?' &nbsp;·&nbsp; '+item.duration:'')+'</div>'+
-          (item.description?'<div class="item-desc">'+item.description+'</div>':'')+'</div>'+
-        '<div class="item-actions">'+
-          '<button class="toggle-stock '+stockClass+'" onclick="toggleStock(\''+item.id+'\',\''+item._type+'\',this)">'+stockLabel+'</button>'+
-          '<button class="btn btn-red" onclick="deleteItem(\''+item.id+'\',\''+item._type+'\')">✕</button>'+
-        '</div></div>';
-    }).join('');
-  } catch(e) { el.innerHTML='<p style="color:var(--red);font-size:.85rem">Error loading items.</p>'; }
-}
 
-async function addItem() {
-  var name  = document.getElementById('itemName').value.trim();
-  var price = document.getElementById('itemPrice').value.trim();
-  var desc  = document.getElementById('itemDesc').value.trim();
-  var dur   = document.getElementById('itemDuration').value.trim();
-  if (!name || !price) { showMsg('msgProducts','Please enter item name and price.','err'); return; }
-
-  var btn = document.getElementById('addItemBtn');
-  btn.textContent='Saving...'; btn.disabled=true;
-
-  var imageUrl = await uploadImage(document.getElementById('itemImageFile'));
-
-  // Determine endpoint based on biz type
-  // For 'both', user picks type via a toggle — for now default to 'product'
-  var isService = BIZ_TYPE === 'services';
-  var endpoint = isService ? 'services' : 'products';
-  var body = { name, price:parseFloat(price), description:desc };
-  if (imageUrl) body.image_url = imageUrl;
-  if (isService && dur) body.duration = dur;
-
-  var r = await fetch(API+'/api/client/'+endpoint, { method:'POST', headers:H, body:JSON.stringify(body) });
-  if (r.ok) {
-    document.getElementById('itemName').value='';
-    document.getElementById('itemPrice').value='';
-    document.getElementById('itemDesc').value='';
-    document.getElementById('itemDuration').value='';
-    document.getElementById('itemPreview').style.display='none';
-    document.getElementById('itemImageFile').value='';
-    showMsg('msgProducts','Item added!','ok');
-    loadItems();
-  } else showMsg('msgProducts','Failed to add item.','err');
-  btn.textContent='+ Add'; btn.disabled=false;
-}
-
-async function toggleStock(id, type, btn) {
-  var endpoint = type==='service' ? 'services' : 'products';
-  var field    = type==='service' ? 'available' : 'in_stock';
-  var current  = btn.classList.contains('in');
-  var r = await fetch(API+'/api/client/'+endpoint+'/'+id, {
-    method:'PATCH', headers:H, body:JSON.stringify({[field]: !current})
-  });
-  if (r.ok) loadItems();
-}
-
-async function deleteItem(id, type) {
-  if (!confirm('Delete this item?')) return;
-  var endpoint = type==='service' ? 'services' : 'products';
-  var r = await fetch(API+'/api/client/'+endpoint+'/'+id, { method:'DELETE', headers:H });
-  if (r.ok) loadItems();
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ORDERS
-// ═══════════════════════════════════════════════════════════════
-async function loadOrders() {
-  var el = document.getElementById('orderList');
-  var url = currentOrderFilter === 'all'
-    ? API+'/api/client/orders'
-    : API+'/api/client/orders?status='+currentOrderFilter;
-  try {
-    var r = await fetch(url, { headers:H });
-    var orders = r.ok ? await r.json() : [];
-    if (!orders.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No orders found.</p>'; return; }
-    el.innerHTML = orders.map(function(o) {
-      var items = (o.items||[]).map(function(i){ return i.qty+'× '+i.name+' (₦'+Number(i.price).toLocaleString()+')'; }).join(', ');
-      var statusCls = 'status-' + (o.status||'pending').replace(/_/g,'-');
-      var statusLabel = {pending:'⏳ Pending',accepted:'✅ Accepted',in_delivery:'🚚 In Delivery',delivered:'📦 Delivered',completed:'✅ Completed',cancelled:'❌ Cancelled'}[o.status] || o.status;
-      var addressLine = o.order_type==='booking'
-        ? '<div class="order-address">📅 Appointment: '+(o.appointment_time||'TBC')+'</div>'
-        : '<div class="order-address">📍 Delivery: '+(o.delivery_address||'Not provided')+'</div>';
-      var receiptHtml = o.receipt_url
-        ? '<div class="order-receipt"><img src="'+o.receipt_url+'" onclick="window.open(this.src)" title="Click to view full size"/><div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Payment receipt received</div></div>'
-        : '<div class="order-receipt"><div class="receipt-pending">⏳ Awaiting payment receipt...</div></div>';
-      var payBtns = o.receipt_url && o.payment_status==='unpaid'
-        ? '<button class="btn btn-green" onclick="confirmPayment(\''+o.id+'\',true)">✅ Confirm Payment</button>'+
-          '<button class="btn" style="background:#374151;color:#e2e8f0" onclick="confirmPayment(\''+o.id+'\',false)">❌ Reject Payment</button>'
-        : '';
-      var statusBtns = '';
-      if (o.status==='pending')      statusBtns='<button class="btn btn-green" onclick="updateOrderStatus(\''+o.id+'\',\'accepted\')">Accept Order</button><button class="btn btn-red" onclick="updateOrderStatus(\''+o.id+'\',\'cancelled\')">Decline</button>';
-      if (o.status==='accepted')     statusBtns='<button class="btn btn-blue" onclick="updateOrderStatus(\''+o.id+'\','+(o.order_type==='booking'?'\'completed\'':'\'in_delivery\'')+')">Mark '+(o.order_type==='booking'?'Completed':'In Delivery')+'</button>';
-      if (o.status==='in_delivery')  statusBtns='<button class="btn btn-green" onclick="updateOrderStatus(\''+o.id+'\',\'delivered\')">Mark Delivered</button>';
-      return '<div class="order-card">'+
-        '<div class="order-head">'+
-          '<div><div class="order-customer">👤 '+(o.customer_name||o.customer_jid)+'</div><div class="order-time">'+new Date(o.created_at).toLocaleString()+'</div></div>'+
-          '<div class="order-status '+statusCls+'">'+statusLabel+'</div>'+
-        '</div>'+
-        '<div class="order-items">🛒 '+items+'</div>'+
-        '<div class="order-total">Total: ₦'+Number(o.total||0).toLocaleString()+'</div>'+
-        addressLine+
-        receiptHtml+
-        '<div class="order-btns">'+statusBtns+' '+payBtns+'</div>'+
-        '</div>';
-    }).join('');
-  } catch(e) { el.innerHTML='<p style="color:var(--red);font-size:.85rem">Error loading orders.</p>'; }
-}
-
-function filterOrders(status) {
-  currentOrderFilter = status;
-  loadOrders();
-}
-
-async function updateOrderStatus(orderId, status) {
-  var r = await fetch(API+'/api/client/orders/'+orderId, { method:'PATCH', headers:H, body:JSON.stringify({status}) });
-  if (r.ok) loadOrders(); else alert('Update failed. Please try again.');
-}
-
-async function confirmPayment(orderId, confirmed) {
-  var r = await fetch(API+'/api/client/orders/'+orderId+'/payment', {
-    method:'POST', headers:H, body:JSON.stringify({confirmed})
-  });
-  if (r.ok) loadOrders(); else alert('Update failed.');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PRICE INQUIRIES / LEADS
-// ═══════════════════════════════════════════════════════════════
-async function loadLeads() {
-  var el = document.getElementById('leadList');
-  try {
-    var r = await fetch(API+'/api/client/inquiries', { headers:H });
-    var leads = r.ok ? await r.json() : [];
-    if (!leads.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No inquiries yet.</p>'; return; }
-    el.innerHTML = leads.map(function(l) {
-      return '<div class="lead-row">'+
-        '<div class="lead-info">'+
-          '<div class="lead-name">👤 '+(l.customer_name||l.customer_jid)+'</div>'+
-          '<div class="lead-product">Asked about: '+l.product_name+' — ₦'+Number(l.product_price||0).toLocaleString()+'</div>'+
-          '<div class="lead-time">'+new Date(l.created_at).toLocaleString()+'</div>'+
-        '</div></div>';
-    }).join('');
-    document.getElementById('inquiriesBadge').textContent = leads.length;
-    document.getElementById('inquiriesBadge').classList.toggle('show', leads.length > 0);
-  } catch(e) {}
-}
-
-function broadcastToLeads() {
-  document.getElementById('bcTarget').value = 'inquiries';
-  switchTab('broadcast', document.querySelector('[data-tab=broadcast]'));
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CUSTOMERS
-// ═══════════════════════════════════════════════════════════════
-async function loadCustomers() {
-  var el = document.getElementById('customerList');
-  try {
-    var r = await fetch(API+'/api/client/customers', { headers:H });
-    var custs = r.ok ? await r.json() : [];
-    if (!custs.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No customers yet.</p>'; return; }
-    el.innerHTML = custs.map(function(c) {
-      var initials = (c.name||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
-      return '<div class="customer-row">'+
-        '<div class="cust-avatar">'+initials+'</div>'+
-        '<div class="cust-info">'+
-          '<div class="cust-name">'+(c.name||'Unknown')+'</div>'+
-          '<div class="cust-meta">'+c.phone+' · Last contact: '+new Date(c.last_contact).toLocaleDateString()+'</div>'+
-        '</div>'+
-        '<div class="cust-orders">'+c.order_count+' order'+(c.order_count!==1?'s':'')+'</div>'+
-        '</div>';
-    }).join('');
-  } catch(e) {}
-}
-
-// ═══════════════════════════════════════════════════════════════
-// BROADCAST
-// ═══════════════════════════════════════════════════════════════
-async function sendBroadcast() {
-  var message = document.getElementById('bcMsg').value.trim();
-  var target  = document.getElementById('bcTarget').value;
-  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
-  if (!confirm('Send this to your '+(target==='all'?'all contacts':target)+'?')) return;
-  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message,target}) });
-  if (r.ok) { document.getElementById('bcMsg').value=''; showMsg('msgBroadcast','Broadcast sent!','ok'); loadBroadcastLogs(); }
-  else showMsg('msgBroadcast','Failed to send.','err');
-}
-
-async function loadBroadcastLogs() {
-  var r = await fetch(API+'/api/client/broadcasts', { headers:H });
-  var logs = r.ok ? await r.json() : [];
-  var el = document.getElementById('broadcastLog');
-  if (!logs.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No broadcasts sent yet.</p>'; return; }
-  el.innerHTML = logs.map(function(l){
-    return '<div class="bc-row">'+new Date(l.created_at).toLocaleString()+' · '+l.recipients+' recipients · "'+String(l.message).slice(0,55)+'..."</div>';
-  }).join('');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// STATUS POSTS
-// ═══════════════════════════════════════════════════════════════
-async function addStatusPost() {
-  var caption = document.getElementById('spCaption').value.trim();
-  var time    = document.getElementById('spTime').value.trim();
-  var days    = document.getElementById('spDays').value.trim();
-  if (!time || !days) { showMsg('msgStatus','Please enter time and days.','err'); return; }
-  var imageUrl = await uploadImage(document.getElementById('statusImageFile'));
-  if (!imageUrl) { showMsg('msgStatus','Please upload an image.','err'); return; }
-  var r = await fetch(API+'/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({mediaUrl:imageUrl,caption,scheduledTime:time,scheduledDays:days}) });
-  if (r.ok) {
-    document.getElementById('spCaption').value=''; document.getElementById('spTime').value=''; document.getElementById('spDays').value='';
-    document.getElementById('statusPreview').style.display='none';
-    showMsg('msgStatus','Post scheduled!','ok'); loadStatusPosts();
-  } else showMsg('msgStatus','Failed.','err');
-}
-
-async function loadStatusPosts() {
-  var r = await fetch(API+'/api/client/status-posts', { headers:H });
-  var posts = r.ok ? await r.json() : [];
-  var el = document.getElementById('postList');
-  if (!posts.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No scheduled posts.</p>'; return; }
-  el.innerHTML = posts.map(function(p){
-    return '<div class="post-item">'+
-      '<img class="post-thumb" src="'+(p.media_url||'')+'" alt=""/>'+
-      '<div class="post-info"><div class="post-caption">'+(p.caption||'(auto caption)')+'</div><div class="post-schedule">'+p.scheduled_time+' · '+p.scheduled_days+'</div></div>'+
-      '<button class="btn btn-red" onclick="deletePost(\''+p.id+'\')">✕</button>'+
+    el.innerHTML = data.map(function(item) {
+      var avail = item.available ? '<span class="item-badge badge-green">Available</span>' : '<span class="item-badge badge-red">Unavailable</span>';
+      var loc   = item.location ? '<span style="color:#64748b">📍 ' + esc(item.location) + '</span> ' : '';
+      var price = item.price_label ? '<span style="color:var(--green)">💰 ' + esc(item.price_label) + '</span>' : '';
+      return '<div class="list-item">' +
+        '<div class="item-body">' +
+          '<div class="item-title">' + esc(item.name) + '</div>' +
+          '<div class="item-sub">' + loc + price + '</div>' +
+          '<div>' + avail + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
+          '<button class="btn btn-blue btn-sm" onclick="openListingDetail(\'' + item.id + '\',\'' + esc(item.name) + '\',\'' + esc(item.location||'') + '\',\'' + esc(item.price_label||'') + '\')">Media</button>' +
+          '<button class="btn btn-red btn-sm" onclick="deleteListing(\'' + item.id + '\')">Delete</button>' +
+        '</div>' +
       '</div>';
-  }).join('');
+    }).join('');
+  } catch(e) { console.error('loadListings:', e); }
 }
 
-async function deletePost(id) {
-  if (!confirm('Delete?')) return;
-  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
-  if (r.ok) loadStatusPosts();
+async function saveListing() {
+  var name     = document.getElementById('nlName').value.trim();
+  var keywords = document.getElementById('nlKeywords').value.trim();
+  if (!name || !keywords) { showMsg('msgListings','Name and Keywords are required.','err'); return; }
+
+  var body = {
+    name:        name,
+    price_label: document.getElementById('nlPrice').value.trim() || null,
+    location:    document.getElementById('nlLocation').value.trim() || null,
+    category:    document.getElementById('nlCategory').value.trim() || null,
+    keywords:    keywords,
+    description: document.getElementById('nlDesc').value.trim() || null
+  };
+
+  var r = await fetch('/api/client/listings', { method:'POST', headers:H, body:JSON.stringify(body) });
+  if (r.ok) {
+    showMsg('msgListings','Listing added!','ok');
+    hideNewListingForm();
+    loadListings();
+    loadOverviewStats();
+  } else {
+    var err = await r.json();
+    showMsg('msgListings', err.error || 'Failed to save.','err');
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AUTO-REPLIES
-// ═══════════════════════════════════════════════════════════════
+async function deleteListing(id) {
+  if (!confirm('Delete this listing and all its media?')) return;
+  var r = await fetch('/api/client/listings/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgListings','Deleted.','ok'); loadListings(); loadOverviewStats(); }
+}
+
+// ── Listing detail / media ──
+function openListingDetail(id, name, loc, price) {
+  currentListingId = id;
+  document.getElementById('listingsList').style.display  = 'none';
+  document.getElementById('listingDetail').style.display = 'block';
+  document.getElementById('detailListingName').textContent = name;
+
+  var meta = [];
+  if (loc)   meta.push('📍 ' + loc);
+  if (price) meta.push('💰 ' + price);
+  document.getElementById('detailListingMeta').textContent = meta.join('  ');
+
+  // Show filename field only for documents
+  document.getElementById('mediaType').addEventListener('change', function() {
+    var isDoc = this.value === 'document';
+    document.getElementById('filenameLabel').style.display = isDoc ? 'block' : 'none';
+    document.getElementById('mediaFilename').style.display = isDoc ? 'block' : 'none';
+  });
+
+  loadListingMedia();
+}
+
+function closeListingDetail() {
+  currentListingId = null;
+  document.getElementById('listingsList').style.display  = 'block';
+  document.getElementById('listingDetail').style.display = 'none';
+  document.getElementById('mediaUrl').value     = '';
+  document.getElementById('mediaCaption').value = '';
+  document.getElementById('mediaFilename').value = '';
+}
+
+async function loadListingMedia() {
+  if (!currentListingId) return;
+  try {
+    var r    = await fetch('/api/client/listings/'+currentListingId+'/media', { headers: H });
+    var data = r.ok ? await r.json() : [];
+    var grid = document.getElementById('detailMediaGrid');
+
+    if (!data.length) {
+      grid.innerHTML = '<p style="color:#64748b;font-size:.82rem;grid-column:1/-1">No media yet. Upload or paste a URL below.</p>';
+      return;
+    }
+
+    grid.innerHTML = data.map(function(m) {
+      var icon = m.media_type === 'image' ? '' : (m.media_type === 'video' ? '🎬' : '📄');
+      var inner = m.media_type === 'image'
+        ? '<img src="' + esc(m.url) + '" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\'🖼\'"/>'
+        : '<span style="font-size:2rem">' + icon + '</span>';
+
+      return '<div class="media-thumb" title="' + esc(m.caption||m.filename||m.media_type) + '">' +
+        inner +
+        '<button class="del-media" onclick="deleteMedia(\'' + m.id + '\')">&#10005;</button>' +
+      '</div>';
+    }).join('');
+  } catch(e) {}
+}
+
+async function uploadMediaFile() {
+  var file = document.getElementById('mediaFileInput').files[0];
+  if (!file) return;
+
+  document.getElementById('uploadProgress').style.display = 'block';
+  var form = new FormData();
+  form.append('file', file);
+
+  try {
+    var r    = await fetch('/api/client/upload', { method:'POST', headers:{ 'Authorization':'Bearer '+TOKEN }, body: form });
+    var data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Upload failed');
+
+    // Auto-detect type
+    var ext  = file.name.split('.').pop().toLowerCase();
+    var type = ['pdf','doc','docx'].includes(ext) ? 'document' : (file.type.startsWith('video') ? 'video' : 'image');
+
+    // Save to listing_media
+    var body = { url: data.url, media_type: type, filename: data.filename };
+    var r2   = await fetch('/api/client/listings/'+currentListingId+'/media', { method:'POST', headers:H, body:JSON.stringify(body) });
+    if (!r2.ok) throw new Error('Media record save failed');
+
+    showMsg('msgMedia','File uploaded!','ok');
+    loadListingMedia();
+  } catch(e) {
+    showMsg('msgMedia', e.message, 'err');
+  } finally {
+    document.getElementById('uploadProgress').style.display = 'none';
+    document.getElementById('mediaFileInput').value = '';
+  }
+}
+
+async function addMediaUrl() {
+  var url      = document.getElementById('mediaUrl').value.trim();
+  var type     = document.getElementById('mediaType').value;
+  var caption  = document.getElementById('mediaCaption').value.trim();
+  var filename = document.getElementById('mediaFilename').value.trim();
+  if (!url) { showMsg('msgMedia','Please enter a URL.','err'); return; }
+
+  var body = { url: url, media_type: type, caption: caption || null, filename: filename || null };
+  var r    = await fetch('/api/client/listings/'+currentListingId+'/media', { method:'POST', headers:H, body:JSON.stringify(body) });
+  if (r.ok) {
+    showMsg('msgMedia','Media added!','ok');
+    document.getElementById('mediaUrl').value     = '';
+    document.getElementById('mediaCaption').value = '';
+    document.getElementById('mediaFilename').value = '';
+    loadListingMedia();
+  } else {
+    var e = await r.json();
+    showMsg('msgMedia', e.error || 'Failed.','err');
+  }
+}
+
+async function deleteMedia(id) {
+  if (!confirm('Remove this media file?')) return;
+  var r = await fetch('/api/client/media/'+id, { method:'DELETE', headers:H });
+  if (r.ok) loadListingMedia();
+}
+
+// ═══════════ AUTO-REPLIES ════════════════════════════════════
+
 async function loadFlows() {
-  var r = await fetch(API+'/api/client/flows', { headers:H });
+  var r     = await fetch('/api/client/flows', { headers: H });
   var flows = r.ok ? await r.json() : [];
-  var el = document.getElementById('flowList');
-  if (!flows.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No custom rules yet.</p>'; return; }
-  el.innerHTML = flows.map(function(f){
-    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">'+f.keywords+'</div><div class="flow-resp">'+f.response+'</div></div><button class="btn btn-red" onclick="deleteFlow(\''+f.id+'\')">✕</button></div>';
+  var el    = document.getElementById('flowList');
+  if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return; }
+  el.innerHTML = flows.map(function(f) {
+    return '<div class="list-item">' +
+      '<div class="item-body">' +
+        '<div class="item-title" style="color:var(--green)">' + esc(f.keywords) + '</div>' +
+        '<div class="item-sub">' + esc(f.response) + '</div>' +
+      '</div>' +
+      '<button class="btn btn-red btn-sm" onclick="deleteFlow(\'' + f.id + '\')">Delete</button>' +
+    '</div>';
   }).join('');
 }
 
 async function addFlow() {
   var kw   = document.getElementById('newKw').value.trim();
   var resp = document.getElementById('newResp').value.trim();
-  if (!kw||!resp) { showMsg('msgReplies','Please fill both fields.','err'); return; }
-  var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:resp}) });
-  if (r.ok) { document.getElementById('newKw').value=''; document.getElementById('newResp').value=''; showMsg('msgReplies','Rule added!','ok'); loadFlows(); }
-  else showMsg('msgReplies','Failed.','err');
+  if (!kw || !resp) { showMsg('msgReplies','Fill in keywords and reply.','err'); return; }
+  var r = await fetch('/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({ keywords:kw, response:resp }) });
+  if (r.ok) {
+    document.getElementById('newKw').value   = '';
+    document.getElementById('newResp').value = '';
+    showMsg('msgReplies','Rule added!','ok');
+    loadFlows();
+    loadOverviewStats();
+  } else { showMsg('msgReplies','Failed.','err'); }
 }
 
 async function deleteFlow(id) {
-  if (!confirm('Delete?')) return;
-  var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
-  if (r.ok) loadFlows();
+  if (!confirm('Delete this rule?')) return;
+  var r = await fetch('/api/client/flows/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgReplies','Deleted.','ok'); loadFlows(); loadOverviewStats(); }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// NOTIFICATIONS TAB
-// ═══════════════════════════════════════════════════════════════
-async function loadNotifications() {
-  // Show push permission card if not yet granted
-  var pushGranted = localStorage.getItem('fb_push_granted');
-  var pushSupported = 'PushManager' in window && 'serviceWorker' in navigator;
-  var pushCard = document.getElementById('pushCard');
-  if (pushSupported && !pushGranted) {
-    pushCard.classList.add('show');
-  }
+// ═══════════ FAQ ════════════════════════════════════════════
+
+async function loadFaq() {
+  var r    = await fetch('/api/client/faq', { headers: H });
+  var faqs = r.ok ? await r.json() : [];
+  var el   = document.getElementById('faqList');
+  if (!faqs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem;margin-top:8px">No FAQ yet.</p>'; return; }
+  el.innerHTML = faqs.map(function(f) {
+    return '<div class="list-item">' +
+      '<div class="item-body">' +
+        '<div class="item-title">Q: ' + esc(f.question) + '</div>' +
+        '<div class="item-sub" style="margin-top:4px">A: ' + esc(f.answer) + '</div>' +
+        (f.keywords ? '<div class="item-sub">Keywords: ' + esc(f.keywords) + '</div>' : '') +
+      '</div>' +
+      '<button class="btn btn-red btn-sm" onclick="deleteFaq(\'' + f.id + '\')">Delete</button>' +
+    '</div>';
+  }).join('');
 }
 
-async function requestPushPermission() {
-  try {
-    var reg = await navigator.serviceWorker.ready;
-    var perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      // Subscribe to push (VAPID public key from backend)
-      var r = await fetch(API+'/api/push/vapid-key', { headers:H });
-      if (r.ok) {
-        var { publicKey } = await r.json();
-        var sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey)
-        });
-        await fetch(API+'/api/push/subscribe', { method:'POST', headers:H, body:JSON.stringify(sub) });
-      }
-      localStorage.setItem('fb_push_granted','1');
-      document.getElementById('pushCard').classList.remove('show');
-      showMsg('msgSettings','🔔 Notifications enabled!','ok');
-    }
-  } catch(e) { console.warn('Push setup failed', e); }
+async function addFaq() {
+  var q  = document.getElementById('faqQ').value.trim();
+  var a  = document.getElementById('faqA').value.trim();
+  var kw = document.getElementById('faqKw').value.trim();
+  if (!q || !a) { showMsg('msgFaq','Question and answer are required.','err'); return; }
+  var r = await fetch('/api/client/faq', { method:'POST', headers:H, body:JSON.stringify({ question:q, answer:a, keywords:kw||null }) });
+  if (r.ok) {
+    document.getElementById('faqQ').value  = '';
+    document.getElementById('faqA').value  = '';
+    document.getElementById('faqKw').value = '';
+    showMsg('msgFaq','FAQ added!','ok');
+    loadFaq();
+    loadOverviewStats();
+  } else { showMsg('msgFaq','Failed.','err'); }
 }
 
-function dismissPushCard() {
-  document.getElementById('pushCard').classList.remove('show');
-  // Remind tomorrow
-  localStorage.setItem('fb_push_snoozed', Date.now() + 86400000);
+async function deleteFaq(id) {
+  if (!confirm('Delete this FAQ?')) return;
+  var r = await fetch('/api/client/faq/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgFaq','Deleted.','ok'); loadFaq(); loadOverviewStats(); }
 }
 
-function urlBase64ToUint8Array(base64String) {
-  var padding = '='.repeat((4 - base64String.length % 4) % 4);
-  var base64 = (base64String + padding).replace(/-/g,'+'). replace(/_/g,'/');
-  var rawData = window.atob(base64);
-  var outputArray = new Uint8Array(rawData.length);
-  for (var i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
-  return outputArray;
+// ═══════════ STATUS POSTS ════════════════════════════════════
+
+async function loadStatusPosts() {
+  var r     = await fetch('/api/client/status-posts', { headers: H });
+  var posts = r.ok ? await r.json() : [];
+  var el    = document.getElementById('postList');
+  if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
+  el.innerHTML = posts.map(function(p) {
+    return '<div class="list-item">' +
+      '<div class="item-body">' +
+        '<div class="item-title">' + esc(p.caption || '(auto caption)') + '</div>' +
+        '<div class="item-sub">' + (p.scheduled_time||p.post_time||'') + ' — ' + (p.scheduled_days||p.repeat_daily||'') + '</div>' +
+      '</div>' +
+      '<button class="btn btn-red btn-sm" onclick="deletePost(\'' + p.id + '\')">Delete</button>' +
+    '</div>';
+  }).join('');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SETTINGS
-// ═══════════════════════════════════════════════════════════════
-async function loadSettings() { /* data already loaded in init */ }
-
-async function saveProfile() {
-  var name    = document.getElementById('settBizName').value.trim();
-  var bizType = document.getElementById('settBizType').value;
-  if (!name) { showMsg('msgSettings','Please enter a business name.','err'); return; }
-  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({business_name:name, business_type:bizType}) });
-  if (r.ok) { showMsg('msgSettings','Profile saved!','ok'); BIZ_TYPE=bizType; applyBizType(); }
-  else {
-    var d = await r.json().catch(function(){return{};});
-    showMsg('msgSettings', d.message||'Save failed.','err');
-  }
+async function addStatusPost() {
+  var mediaUrl = document.getElementById('spMedia').value.trim();
+  var caption  = document.getElementById('spCaption').value.trim();
+  var time     = document.getElementById('spTime').value.trim();
+  var days     = document.getElementById('spDays').value.trim();
+  if (!mediaUrl || !time || !days) { showMsg('msgStatus','Fill in media URL, time and days.','err'); return; }
+  var r = await fetch('/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({ mediaUrl:mediaUrl, caption:caption, scheduledTime:time, scheduledDays:days }) });
+  if (r.ok) {
+    document.getElementById('spMedia').value   = '';
+    document.getElementById('spCaption').value = '';
+    document.getElementById('spTime').value    = '';
+    document.getElementById('spDays').value    = '';
+    showMsg('msgStatus','Scheduled!','ok');
+    loadStatusPosts();
+  } else { showMsg('msgStatus','Failed.','err'); }
 }
 
-async function saveNotifNumber() {
+async function deletePost(id) {
+  if (!confirm('Delete this post?')) return;
+  var r = await fetch('/api/client/status-posts/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgStatus','Deleted.','ok'); loadStatusPosts(); }
+}
+
+// ═══════════ BROADCAST ═══════════════════════════════════════
+
+async function loadBroadcastLogs() {
+  var r    = await fetch('/api/client/broadcasts', { headers: H });
+  var logs = r.ok ? await r.json() : [];
+  var el   = document.getElementById('broadcastLog');
+  if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
+  el.innerHTML = logs.map(function(l) {
+    return '<div class="bc-log">' + new Date(l.created_at).toLocaleString() + ' &mdash; ' + (l.recipients||l.sent||0) + ' recipients &mdash; "' + esc((l.message||'').slice(0,60)) + '..."</div>';
+  }).join('');
+}
+
+async function sendBroadcast() {
+  var msg = document.getElementById('bcMsg').value.trim();
+  if (!msg) { showMsg('msgBroadcast','Type a message.','err'); return; }
+  if (!confirm('Send to all recent contacts?')) return;
+  var r = await fetch('/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({ message:msg }) });
+  if (r.ok) {
+    var data = await r.json();
+    document.getElementById('bcMsg').value = '';
+    showMsg('msgBroadcast','Sent to ' + data.sent + ' contacts!','ok');
+    loadBroadcastLogs();
+  } else { showMsg('msgBroadcast','Failed.','err'); }
+}
+
+// ═══════════ SETTINGS ════════════════════════════════════════
+
+async function saveSettings() {
   var num = document.getElementById('notifNumber').value.trim().replace(/\D/g,'');
-  if (!num) { showMsg('msgSettings','Please enter a valid number.','err'); return; }
-  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({notification_number:num}) });
-  if (r.ok) showMsg('msgSettings','Notification number saved!','ok');
+  if (!num) { showMsg('msgSettings','Enter a valid number.','err'); return; }
+  var r = await fetch('/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({ notification_number:num }) });
+  if (r.ok) showMsg('msgSettings','Number saved!','ok');
   else showMsg('msgSettings','Save failed.','err');
 }
 
-async function saveBizHours() {
-  var hours = document.getElementById('bizHours').value.trim();
-  if (!hours) { showMsg('msgSettings','Please enter your business hours.','err'); return; }
-  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({business_hours:hours}) });
-  if (r.ok) { showMsg('msgSettings','Business hours saved!','ok'); checkSetupBanner(); }
+async function saveLocation() {
+  var addr = document.getElementById('locAddress').value.trim();
+  var maps = document.getElementById('locMaps').value.trim();
+  var r    = await fetch('/api/client/location', { method:'PUT', headers:H, body:JSON.stringify({ location_address:addr, location_maps_url:maps }) });
+  if (r.ok) showMsg('msgSettings','Location saved!','ok');
   else showMsg('msgSettings','Save failed.','err');
 }
 
 async function saveFallback() {
   var msg = document.getElementById('fallbackMsg').value.trim();
-  if (!msg) { showMsg('msgSettings','Please enter a fallback message.','err'); return; }
-  var r = await fetch(API+'/api/client/fallback', { method:'PUT', headers:H, body:JSON.stringify({fallback_message:msg}) });
+  if (!msg) { showMsg('msgSettings','Enter a fallback message.','err'); return; }
+  var r = await fetch('/api/client/fallback', { method:'PUT', headers:H, body:JSON.stringify({ fallback_message:msg }) });
   if (r.ok) showMsg('msgSettings','Fallback saved!','ok');
   else showMsg('msgSettings','Save failed.','err');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PWA INSTALL LOGIC
-// ═══════════════════════════════════════════════════════════════
-function initPWA() {
-  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  if (isStandalone) {
-    // Already installed — show push card after short delay
-    setTimeout(function() {
-      var snoozed = localStorage.getItem('fb_push_snoozed');
-      if (!snoozed || Date.now() > parseInt(snoozed)) {
-        document.getElementById('pushCard').classList.add('show');
-        switchTab('notifications', document.querySelector('[data-tab=notifications]'));
-      }
-    }, 2000);
-    return;
+function updateQualBtn() {
+  var btn = document.getElementById('qualToggleBtn');
+  var txt = document.getElementById('qualStatus');
+  if (qualificationEnabled) {
+    btn.textContent  = 'Disable';
+    btn.className    = 'btn btn-red btn-sm';
+    txt.textContent  = 'Enabled — bot will ask qualifying questions when customers show buying intent.';
+  } else {
+    btn.textContent  = 'Enable';
+    btn.className    = 'btn btn-green btn-sm';
+    txt.textContent  = 'Disabled — bot will not ask qualifying questions.';
   }
-  if (localStorage.getItem('forgebot_pwa_installed')) return;
+}
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
-
-  var overlay    = document.getElementById('pwa-overlay');
-  var androidSec = document.getElementById('android-section');
-  var iosSec     = document.getElementById('ios-section');
-  var installBtn = document.getElementById('pwa-install-btn');
-  var snoozeBtn  = document.getElementById('pwa-snooze-btn');
-  var doneBtn    = document.getElementById('pwa-done-btn');
-  var deferred   = null;
-  var isIOS      = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-
-  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred = e; });
-
-  // Show on every load until installed
-  setTimeout(function() {
-    if (isIOS) { androidSec.style.display='none'; iosSec.style.display='block'; }
-    overlay.classList.add('show');
-  }, 1000);
-
-  installBtn && installBtn.addEventListener('click', function() {
-    if (deferred) {
-      deferred.prompt();
-      deferred.userChoice.then(function(r) {
-        if (r.outcome==='accepted') { localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show'); }
-        deferred = null;
-      });
-    } else { localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show'); }
-  });
-
-  doneBtn && doneBtn.addEventListener('click', function() {
-    localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show');
-  });
-
-  // Snooze 10 minutes only — never sets installed flag
-  snoozeBtn && snoozeBtn.addEventListener('click', function() {
-    overlay.classList.remove('show');
-    setTimeout(function(){ overlay.classList.add('show'); }, 10 * 60 * 1000);
-  });
-
-  window.addEventListener('appinstalled', function() {
-    localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show');
-  });
+async function toggleQualification() {
+  qualificationEnabled = !qualificationEnabled;
+  var r = await fetch('/api/client/qualification-toggle', { method:'PUT', headers:H, body:JSON.stringify({ enabled:qualificationEnabled }) });
+  if (r.ok) {
+    updateQualBtn();
+    showMsg('msgSettings','Lead qualification ' + (qualificationEnabled ? 'enabled' : 'disabled') + '!','ok');
+  } else {
+    qualificationEnabled = !qualificationEnabled; // revert
+    showMsg('msgSettings','Failed to update.','err');
+  }
 }
 
 // ── Boot ──────────────────────────────────────────────────────
-init();
+loadAll();
 </script>
 </body>
 </html>
