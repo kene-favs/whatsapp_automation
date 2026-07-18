@@ -1,80 +1,101 @@
 // ============================================================
-//  ForgeBot — Smart Reply Engine v3.0
-//  Rule-based conversation engine with state machine,
-//  product catalog matching, order flow & leads tracking.
+//  ForgeBot — Smart Reply Engine
+//  File: src/bot/replyEngine.js
+//
+//  State machine conversation engine. No OpenAI needed.
+//  Integrates with existing db, voiceHandler and paymentNotifier.
 // ============================================================
 
-const supabase = require('./supabaseClient');  // adjust path if needed
+const { createClient } = require('@supabase/supabase-js');
+const db = require('../db/supabase');                           // existing module
+const { transcribeVoiceNote } = require('./voiceHandler');      // existing module
+const {
+  isPaymentClaim,
+  notifyOwnerOfPaymentClaim,
+  handleOwnerReply,
+  notifyOwnerHumanRequest
+} = require('./paymentNotifier');                               // existing module
+
+// ── Supabase client for new tables (products, orders, etc.) ──
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // ── Conversation state machine ────────────────────────────────
-// States per customer (key: "clientId:jid")
-const convStates = new Map();
-// { state, customerName, cart, orderId, expectingField }
-
 const STATE = {
-  GREETING:           'GREETING',
-  AWAITING_NAME:      'AWAITING_NAME',
-  BROWSING:           'BROWSING',
-  ORDERING:           'ORDERING',
-  AWAITING_ADDRESS:   'AWAITING_ADDRESS',
-  AWAITING_APPT:      'AWAITING_APPT',
-  AWAITING_DEPOSIT:   'AWAITING_DEPOSIT',
-  AWAITING_RECEIPT:   'AWAITING_RECEIPT',
-  HUMAN_PAUSED:       'HUMAN_PAUSED',
+  GREETING:        'GREETING',
+  AWAITING_NAME:   'AWAITING_NAME',
+  BROWSING:        'BROWSING',
+  ORDERING:        'ORDERING',
+  AWAITING_ADDRESS:'AWAITING_ADDRESS',
+  AWAITING_APPT:   'AWAITING_APPT',
+  AWAITING_RECEIPT:'AWAITING_RECEIPT',
+  HUMAN_PAUSED:    'HUMAN_PAUSED'
 };
 
-// Human handoff pause tracker { key → timeout handle }
-const humanPaused = new Map();
+// key: "clientId:jid" → { state, customerName, cart[], orderId, lastMsg }
+const convStates = new Map();
 
-// ── Intent keywords ───────────────────────────────────────────
-const INTENT = {
-  PRICE:       ['how much','price','cost','rate','fee','charge','how much is','what is the price','pricing','cost of','price of','how much for'],
-  ORDER:       ['i want','i want to order','order','buy','get me','i need','i\'d like','i will take','i\'ll take','purchase','can i get','let me get','add to cart','i\'ll order','place order'],
-  MORE_ITEMS:  ['and also','also add','add another','i also want','and i want','plus','what about'],
-  DONE_ORDER:  ['that\'s all','that is all','nothing else','done','that\'s everything','checkout','proceed','confirm order','just that'],
-  CATALOG:     ['what do you have','what do you sell','show me','your products','your services','what\'s available','catalog','list','menu','what can i order','what you get','all products','all services'],
-  DELIVERY:    ['delivery','deliver','shipping','how long','when will i','how many days','when do i','dispatch','when will it arrive'],
-  LOCATION:    ['where are you','your location','address','where to','how to get','come and pick','pickup','pick up','your office','your shop','your studio','where is your'],
-  HOURS:       ['open','opening hours','business hours','working hours','available','what time','when do you close','when do you open','are you open','closed','office hours'],
-  SOCIAL:      ['instagram','facebook','tiktok','twitter','social media','follow you','your page','online','your handle','whatsapp channel','your channel'],
-  PAYMENT_Q:   ['how to pay','account number','bank details','where to transfer','payment details','send account','your account','bank account','which bank'],
-  COMPLAINT:   ['damaged','wrong item','wrong product','broken','not what i ordered','issue','problem','bad','spoilt','received wrong','got wrong','defective'],
-  RETURN:      ['return','exchange','refund','give back','change it','swap','money back'],
-  BULK:        ['bulk','wholesale','large quantity','many units','lots of','mass order','large order'],
-  REFERRAL:    ['referral','refer','referral bonus','refer a friend'],
-  PROMO:       ['promo','discount','offer','sale','coupon','deal','promotion','any deal'],
-  HUMAN:       ['speak to human','real person','talk to someone','agent','customer care','customer service','representative','call me','speak to someone','human please','real agent','i need help from'],
-  PAYMENT_CLAIM:['i have paid','i\'ve paid','i sent','i transferred','payment done','i paid','done paying','just paid','already paid','sent the money'],
-  GREETING_W:  ['hello','hi','good morning','good afternoon','good evening','hey','helo','hii','howdy','sup','whats up','what\'s up','greetings'],
-  THANKS:      ['thank you','thanks','thank u','ok thank','ok thanks','perfect','great','alright','noted','okay','got it'],
+function getState(clientId, jid) {
+  return convStates.get(clientId + ':' + jid) || { state: STATE.GREETING, cart: [] };
+}
+function setState(clientId, jid, data) {
+  const key = clientId + ':' + jid;
+  convStates.set(key, { ...getState(clientId, jid), ...data });
+}
+function clearState(clientId, jid) {
+  convStates.delete(clientId + ':' + jid);
+}
+
+// ── Intent keyword detection ──────────────────────────────────
+const INTENTS = {
+  CATALOG:    ['catalog','catalogue','products','what do you have','what you have','show me','menu','list','what do you sell','your items','your products','your services','price list'],
+  PRICE:      ['how much','price','cost','fee','rate','amount','naira','₦','how much is','what is the price','cost of'],
+  ORDER:      ['i want','order','buy','purchase','get','i need','i'll take','i will take','send me','place order','i go buy'],
+  MORE_ITEMS: ['add','also','and','more','another','plus','i also want','i need more'],
+  DONE_ORDER: ['that is all','that\'s all','done','finish','checkout','i am done','nothing else','no more','that\'s it','thats it','complete order'],
+  DELIVERY:   ['deliver','delivery','shipping','ship','how long','when will','location','where are you','your address','office','pickup'],
+  HOURS:      ['open','close','hours','time','when','available','working hours','office hours','what time'],
+  SOCIAL:     ['instagram','facebook','tiktok','twitter','youtube','social','follow','page','channel','whatsapp channel'],
+  PAYMENT_Q:  ['account','bank','how do i pay','payment','transfer','how to pay','account number','account name','your bank'],
+  COMPLAINT:  ['complain','complaint','bad','wrong','issue','problem','not happy','disappointed','rubbish','terrible'],
+  RETURN:     ['return','refund','exchange','send back','wrong item','not what i','damaged'],
+  BULK:       ['bulk','wholesale','many','large order','50','100','large quantity','discount for'],
+  REFERRAL:   ['refer','referral','bring friend','commission','reward'],
+  PROMO:      ['promo','discount','sale','offer','deal','coupon','special'],
+  HUMAN:      ['speak to human','talk to human','real person','speak to someone','talk to agent','connect me','speak to owner','talk to owner','human please','abeg connect me','give me human','i want owner','customer service','customer care','live agent','actual person','not bot','no bot','human being'],
+  PAYMENT_CLAIM: ['i have paid','i paid','payment done','sent','transferred','i sent','i transfer','see alert','check your account','paid already'],
+  GREETING_W: ['hi','hello','hey','good morning','good afternoon','good evening','good night','sup','holla','oga','how far'],
+  THANKS:     ['thank','thanks','thank you','okay','ok','noted','alright','cool','nice','great','wonderful','perfect']
 };
 
 function detect(text) {
-  const t = text.toLowerCase().trim();
-  for (const [intent, keywords] of Object.entries(INTENT)) {
-    if (keywords.some(kw => t.includes(kw))) return intent;
-  }
-  return 'UNKNOWN';
-}
-
-// Fuzzy product/service name matcher
-function findItem(text, items) {
-  if (!items || !items.length) return null;
-  const t = text.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-  // Exact match first
-  for (const item of items) {
-    if (t.includes(item.name.toLowerCase())) return item;
-  }
-  // Word overlap match
-  for (const item of items) {
-    const words = item.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(' ').filter(w => w.length > 2);
-    const hits = words.filter(w => t.includes(w));
-    if (words.length > 0 && hits.length >= Math.ceil(words.length * 0.6)) return item;
+  const lower = text.toLowerCase();
+  for (const [intent, keywords] of Object.entries(INTENTS)) {
+    if (keywords.some(k => lower.includes(k))) return intent;
   }
   return null;
 }
 
-// Greeting based on current time (client's server timezone)
+// ── Fuzzy product/service name match (60% word overlap) ───────
+function normalize(str) {
+  return str.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+}
+
+function findItem(text, items) {
+  const queryWords = normalize(text);
+  let best = null, bestScore = 0;
+  for (const item of items) {
+    const nameWords = normalize(item.name);
+    const matches = queryWords.filter(w => nameWords.some(n => n.includes(w) || w.includes(n)));
+    const score = matches.length / Math.max(queryWords.length, nameWords.length);
+    if (score > bestScore && score >= 0.4) { bestScore = score; best = item; }
+  }
+  return best;
+}
+
+// ── Time-based greeting ───────────────────────────────────────
 function timeGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -82,743 +103,730 @@ function timeGreeting() {
   return 'Good evening';
 }
 
-function fmt(price) { return '₦' + Number(price).toLocaleString(); }
+// ── Format price ──────────────────────────────────────────────
+function fmt(num) { return '₦' + Number(num).toLocaleString('en-NG'); }
 
-// ── Main handler ──────────────────────────────────────────────
-async function handleMessage(clientId, jid, text, imageMsg, sock) {
-  const key = `${clientId}:${jid}`;
+// ── Human delay (realistic typing simulation) ─────────────────
+function humanDelay() { return new Promise(r => setTimeout(r, 1000 + Math.random() * 1500)); }
 
-  // ── 0. Load client data (cached per-process is fine for low traffic) ──
-  const { data: client } = await supabase
-    .from('clients')
-    .select('*, bot_setup(*)')
-    .eq('id', clientId)
-    .single();
-
-  if (!client) return;
-  const setup = client.bot_setup?.[0] || {};
-  const bizType = client.business_type || 'products';
-  const bizName = client.business_name || 'our business';
-  const ownerJid = client.notification_number ? `${client.notification_number}@s.whatsapp.net` : null;
-
-  // ── 1. Initialise conversation state ──────────────────────────
-  if (!convStates.has(key)) {
-    convStates.set(key, { state: STATE.GREETING, customerName: null, cart: [], orderId: null });
-  }
-  const conv = convStates.get(key);
-
-  // ── 2. Human paused — do nothing ──────────────────────────────
-  if (conv.state === STATE.HUMAN_PAUSED) return;
-
-  // ── 3. Human handoff check (any state) ────────────────────────
-  if (detect(text) === 'HUMAN') {
-    conv.state = STATE.HUMAN_PAUSED;
-    convStates.set(key, conv);
-    await send(sock, jid, `Please hold on ${conv.customerName ? conv.customerName : ''}! 🙏 Let me get someone to assist you right away. Someone will be with you shortly.`);
-    if (ownerJid) {
-      await send(sock, ownerJid,
-        `🙋 *Human Handoff Alert* — ${bizName}\n\n` +
-        `Customer: *${conv.customerName || jid}*\n` +
-        `They want to speak to a real person. Please respond on WhatsApp now.\n\n` +
-        `👉 View dashboard: ${buildDashLink(client)}`
-      );
-    }
-    // Resume bot after 30 minutes
-    const handle = setTimeout(() => {
-      const c = convStates.get(key);
-      if (c) { c.state = STATE.BROWSING; convStates.set(key, c); }
-      humanPaused.delete(key);
-    }, 30 * 60 * 1000);
-    humanPaused.set(key, handle);
-    return;
-  }
-
-  // ── 4. OWNER reply to notification (1/2/3 fallback) ───────────
-  if (jid === ownerJid && /^[123]$/.test(text.trim())) {
-    // find the most recent pending order
-    const { data: pendingOrders } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('payment_status', 'unpaid')
-      .not('receipt_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (pendingOrders && pendingOrders[0]) {
-      const order = pendingOrders[0];
-      const custJid = order.customer_jid;
-      const custName = order.customer_name || 'Customer';
-      const choice = text.trim();
-      if (choice === '1') {
-        await supabase.from('orders').update({ payment_status: 'confirmed', status: 'accepted' }).eq('id', order.id);
-        await send(sock, custJid, `✅ Great news ${custName}! Your payment has been confirmed and your order is now being processed. We'll keep you updated! 🎉`);
-        await send(sock, ownerJid, `✅ Payment confirmed for ${custName}'s order.`);
-      } else if (choice === '2') {
-        await send(sock, custJid, `Hi ${custName}, we're still verifying your payment. Please give us a few more minutes. Thank you for your patience! 🙏`);
-      } else if (choice === '3') {
-        await supabase.from('orders').update({ payment_status: 'rejected' }).eq('id', order.id);
-        await send(sock, custJid, `Hi ${custName}, we couldn't confirm your payment. Please resend your receipt or contact us if you believe this is an error. 🙏`);
-        await send(sock, ownerJid, `❌ Payment rejected for ${custName}'s order.`);
-      }
-    }
-    return;
-  }
-
-  // ── 5. State machine ──────────────────────────────────────────
-
-  // ────── GREETING ─────────────────────────────────────────────
-  if (conv.state === STATE.GREETING) {
-    // Check if we already know this customer
-    const { data: existing } = await supabase
-      .from('customers')
-      .select('name')
-      .eq('client_id', clientId)
-      .eq('jid', jid)
-      .single();
-
-    if (existing && existing.name) {
-      conv.customerName = existing.name;
-      conv.state = STATE.BROWSING;
-      convStates.set(key, conv);
-      await send(sock, jid,
-        `${timeGreeting()} ${existing.name}! 👋 Welcome back to *${bizName}*. How can we help you today?`
-      );
-      return;
-    }
-
-    // First time — introduce and ask name
-    conv.state = STATE.AWAITING_NAME;
-    convStates.set(key, conv);
-    await send(sock, jid,
-      `${timeGreeting()}! 👋\n\n` +
-      `Welcome to *${bizName}*. We're happy to have you here!\n\n` +
-      `Before we continue, may we know your name please? 😊`
-    );
-    return;
-  }
-
-  // ────── AWAITING NAME ────────────────────────────────────────
-  if (conv.state === STATE.AWAITING_NAME) {
-    const name = text.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    conv.customerName = name;
-    conv.state = STATE.BROWSING;
-    convStates.set(key, conv);
-
-    // Save to customers table
-    await supabase.from('customers').upsert({
-      client_id: clientId, jid, name,
-      phone: jid.replace('@s.whatsapp.net',''),
-      last_contact: new Date().toISOString()
-    }, { onConflict: 'client_id,jid' });
-
-    await send(sock, jid,
-      `Nice to meet you, *${name}*! 😊\n\n` +
-      `How can we help you today? You can:\n` +
-      `• Ask about our products or services\n` +
-      `• Place an order\n` +
-      `• Ask about delivery, prices, or anything else\n\n` +
-      `Just type your question! 👇`
-    );
-    return;
-  }
-
-  const name = conv.customerName || '';
-
-  // ────── AWAITING RECEIPT (image) ─────────────────────────────
-  if (conv.state === STATE.AWAITING_RECEIPT) {
-    if (imageMsg) {
-      // Download and upload receipt image
-      const receiptUrl = await saveReceiptImage(sock, imageMsg, clientId, jid);
-
-      // Link to pending order
-      if (conv.orderId) {
-        await supabase.from('orders')
-          .update({ receipt_url: receiptUrl })
-          .eq('id', conv.orderId);
-      }
-
-      await send(sock, jid,
-        `Thank you ${name}! 🙏 We've received your payment receipt and it's been submitted for verification.\n\n` +
-        `Please give us a few minutes to confirm. We'll notify you as soon as it's done! ⏳`
-      );
-
-      // Alert owner with dashboard link
-      if (ownerJid) {
-        await send(sock, ownerJid,
-          `💰 *Payment Receipt — ${bizName}*\n\n` +
-          `Customer: *${name || jid}*\n` +
-          `Order total: ${fmt(getOrderTotal(conv.cart))}\n\n` +
-          `Receipt has been uploaded. Please log in to confirm:\n` +
-          `👉 ${buildDashLink(client)}\n\n` +
-          `Or reply:\n*1* — Confirm payment ✅\n*2* — Ask to wait ⏳\n*3* — Payment not received ❌`
-        );
-      }
-      conv.state = STATE.BROWSING;
-      convStates.set(key, conv);
-    } else {
-      await send(sock, jid,
-        `${name ? name + ', please' : 'Please'} send your payment receipt as an *image or screenshot* so we can verify it. 📸`
-      );
-    }
-    return;
-  }
-
-  // ────── AWAITING ADDRESS ─────────────────────────────────────
-  if (conv.state === STATE.AWAITING_ADDRESS) {
-    const address = text.trim();
-    if (address.length < 5) {
-      await send(sock, jid, `Please type your full delivery address so we know exactly where to send your order. 📍`);
-      return;
-    }
-
-    // Save order to DB
-    const total = getOrderTotal(conv.cart);
-    const { data: order } = await supabase.from('orders').insert({
-      client_id: clientId,
-      customer_jid: jid,
-      customer_name: name,
-      items: conv.cart,
-      total,
-      order_type: 'delivery',
-      delivery_address: address,
-      status: 'pending',
-      dashboard_token: client.token || '',
-    }).select().single();
-
-    conv.orderId = order?.id;
-    conv.state = STATE.AWAITING_RECEIPT;
-    convStates.set(key, conv);
-
-    const summary = conv.cart.map(i => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n');
-    await send(sock, jid,
-      `Perfect! Here's your order summary:\n\n${summary}\n\n` +
-      `*Total: ${fmt(total)}*\n` +
-      `📍 Delivery to: ${address}\n\n` +
-      `To complete your order, please make payment to:\n\n` +
-      buildAccountMsg(client) +
-      `\nAfter payment, send your *receipt or screenshot* here so we can confirm. 📸`
-    );
-
-    // Alert owner
-    if (ownerJid) {
-      await send(sock, ownerJid,
-        `🛒 *New Order — ${bizName}*\n\n` +
-        `Customer: *${name || jid}*\n${summary}\n` +
-        `Total: *${fmt(total)}*\n` +
-        `📍 Delivery: ${address}\n\n` +
-        `👉 View order: ${buildDashLink(client)}`
-      );
-    }
-    return;
-  }
-
-  // ────── AWAITING APPOINTMENT ──────────────────────────────────
-  if (conv.state === STATE.AWAITING_APPT) {
-    const apptTime = text.trim();
-    if (apptTime.length < 3) {
-      await send(sock, jid, `Please tell us your preferred date and time for the appointment. 📅`);
-      return;
-    }
-
-    const total = getOrderTotal(conv.cart);
-    const depositRequired = setup.deposit_required && !setup.deposit_required.toLowerCase().startsWith('no');
-
-    const { data: order } = await supabase.from('orders').insert({
-      client_id: clientId,
-      customer_jid: jid,
-      customer_name: name,
-      items: conv.cart,
-      total,
-      order_type: 'booking',
-      appointment_time: apptTime,
-      status: 'pending',
-      dashboard_token: client.token || '',
-    }).select().single();
-
-    conv.orderId = order?.id;
-
-    const summary = conv.cart.map(i => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n');
-
-    if (depositRequired) {
-      conv.state = STATE.AWAITING_RECEIPT;
-      convStates.set(key, conv);
-      const depositPct = parseInt((setup.deposit_required.match(/\d+/) || ['50'])[0]);
-      const depositAmt = Math.round(total * depositPct / 100);
-      await send(sock, jid,
-        `Great! Here's your booking summary:\n\n${summary}\n\n` +
-        `📅 Preferred time: ${apptTime}\n*Total: ${fmt(total)}*\n\n` +
-        `To secure your appointment, please pay a *deposit of ${fmt(depositAmt)}* (${depositPct}%) to:\n\n` +
-        buildAccountMsg(client) +
-        `\nSend your receipt here and we'll confirm your booking! 📸`
-      );
-    } else {
-      conv.state = STATE.BROWSING;
-      convStates.set(key, conv);
-      await send(sock, jid,
-        `Your booking has been received! 🎉\n\n${summary}\n📅 Preferred time: ${apptTime}\n\n` +
-        `We'll confirm your appointment shortly. Is there anything else you need? 😊`
-      );
-    }
-
-    // Alert owner
-    if (ownerJid) {
-      await send(sock, ownerJid,
-        `📅 *New Booking — ${bizName}*\n\n` +
-        `Customer: *${name || jid}*\n${summary}\n` +
-        `Total: *${fmt(total)}*\n` +
-        `📅 Preferred: ${apptTime}\n\n` +
-        `👉 View booking: ${buildDashLink(client)}`
-      );
-    }
-    return;
-  }
-
-  // ────── ORDERING — adding to cart ────────────────────────────
-  if (conv.state === STATE.ORDERING) {
-    const intent = detect(text);
-
-    if (intent === 'DONE_ORDER') {
-      // Proceed to checkout
-      if (!conv.cart.length) {
-        conv.state = STATE.BROWSING;
-        convStates.set(key, conv);
-        await send(sock, jid, `Okay ${name}, feel free to browse anytime! 😊`);
-        return;
-      }
-      conv.state = bizType === 'services' ? STATE.AWAITING_APPT : STATE.AWAITING_ADDRESS;
-      convStates.set(key, conv);
-      if (bizType === 'services') {
-        await send(sock, jid, `Great choices! What date and time works for you? 📅`);
-      } else {
-        await send(sock, jid, `Great! What is your delivery address? 📍`);
-      }
-      return;
-    }
-
-    // Try to add another item
-    const allItems = await getClientItems(clientId, bizType);
-    const found = findItem(text, allItems);
-    if (found) {
-      const available = found.in_stock !== false && found.available !== false;
-      if (!available) {
-        await send(sock, jid,
-          `Sorry ${name}, *${found.name}* is currently ${bizType==='services'?'fully booked':'out of stock'}. ` +
-          `${await suggestAlternatives(clientId, bizType, found.id)}`
-        );
-        return;
-      }
-      addToCart(conv, found);
-      convStates.set(key, conv);
-      const summary = conv.cart.map(i => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n');
-      await send(sock, jid,
-        `Added *${found.name}* to your order! ✅\n\n` +
-        `*Your cart:*\n${summary}\n` +
-        `*Total: ${fmt(getOrderTotal(conv.cart))}*\n\n` +
-        `Anything else? Or type *done* to proceed.`
-      );
-    } else {
-      await send(sock, jid,
-        `Hmm, I couldn't find that item. Could you check the name or browse what we have?\n\n` +
-        `Type *catalog* to see all available ${bizType === 'services' ? 'services' : 'products'}.`
-      );
-    }
-    return;
-  }
-
-  // ────── BROWSING — main intent routing ───────────────────────
-  const intent = detect(text);
-  const allItems = await getClientItems(clientId, bizType);
-
-  // Try product/service name match regardless of intent
-  const matchedItem = findItem(text, allItems);
-
-  // PAYMENT_CLAIM
-  if (intent === 'PAYMENT_CLAIM') {
-    if (conv.orderId) {
-      conv.state = STATE.AWAITING_RECEIPT;
-      convStates.set(key, conv);
-      await send(sock, jid,
-        `Thank you ${name}! Please send your *payment receipt or screenshot* here so we can verify it quickly. 📸`
-      );
-    } else {
-      await send(sock, jid,
-        `Thank you for letting us know ${name}! Please send your *payment receipt or screenshot* here so we can confirm. 📸`
-      );
-      conv.state = STATE.AWAITING_RECEIPT;
-      convStates.set(key, conv);
-    }
-    return;
-  }
-
-  // PRICE inquiry
-  if (intent === 'PRICE' || (matchedItem && !intent.startsWith('ORDER'))) {
-    const item = matchedItem || findItemFromContext(text, allItems);
-    if (item) {
-      const available = item.in_stock !== false && item.available !== false;
-      const status = available
-        ? (bizType==='services' ? '✅ Available' : '✅ In stock')
-        : (bizType==='services' ? '❌ Fully booked' : '❌ Out of stock');
-      const durStr = item.duration ? `\n⏱ Duration: ${item.duration}` : '';
-      await send(sock, jid,
-        `*${item.name}*\n` +
-        `💰 Price: *${fmt(item.price)}*` + durStr + `\n` +
-        (item.description ? `📝 ${item.description}\n` : '') +
-        `${status}\n\n` +
-        (available ? `To order, just say *"I want ${item.name}"* 😊` : `We'll notify you when it's back!`)
-      );
-
-      // Log price inquiry
-      await supabase.from('price_inquiries').insert({
-        client_id: clientId,
-        customer_jid: jid,
-        customer_name: name,
-        product_name: item.name,
-        product_price: item.price,
-        item_type: item._type || 'product',
-      }).catch(() => {});
-
-      // Alert owner (lead alert)
-      if (ownerJid) {
-        await send(sock, ownerJid,
-          `👀 *Price Inquiry — ${bizName}*\n\n` +
-          `*${name || jid}* just asked about *${item.name}* (${fmt(item.price)})\n\n` +
-          `This could be a potential order! 🔥`
-        );
-      }
-      return;
-    }
-  }
-
-  // ORDER intent
-  if (intent === 'ORDER') {
-    const item = matchedItem;
-    if (item) {
-      const available = item.in_stock !== false && item.available !== false;
-      if (!available) {
-        await send(sock, jid,
-          `Sorry ${name}, *${item.name}* is currently ${bizType==='services'?'fully booked':'out of stock'}. ` +
-          `${await suggestAlternatives(clientId, bizType, item.id)}`
-        );
-        return;
-      }
-      conv.state = STATE.ORDERING;
-      addToCart(conv, item);
-      convStates.set(key, conv);
-      await send(sock, jid,
-        `*${item.name}* has been added to your order! ✅\n` +
-        `Price: *${fmt(item.price)}*\n\n` +
-        `Would you like to add anything else? Or type *done* to proceed to checkout. 😊`
-      );
-    } else {
-      // No specific item found — show catalog
-      await send(sock, jid, await buildCatalogMsg(allItems, bizType, bizName));
-    }
-    return;
-  }
-
-  // MORE ITEMS (while browsing, not in ordering state)
-  if (intent === 'MORE_ITEMS') {
-    conv.state = STATE.ORDERING;
-    convStates.set(key, conv);
-    await send(sock, jid, `Sure! Just tell me what else you'd like to add. 😊`);
-    return;
-  }
-
-  // CATALOG
-  if (intent === 'CATALOG') {
-    await send(sock, jid, await buildCatalogMsg(allItems, bizType, bizName));
-    return;
-  }
-
-  // GREETING
-  if (intent === 'GREETING_W') {
-    await send(sock, jid,
-      `${timeGreeting()} ${name ? name + '!' : '!'} 😊 Welcome to *${bizName}*. How can we help you today?`
-    );
-    return;
-  }
-
-  // THANKS
-  if (intent === 'THANKS') {
-    await send(sock, jid, `You're welcome ${name}! 😊 If you need anything else, we're always here. Have a wonderful day! 🌟`);
-    return;
-  }
-
-  // DELIVERY
-  if (intent === 'DELIVERY') {
-    if (!setup.delivers_to) {
-      await send(sock, jid, `For delivery information, please contact us directly. 😊`);
-      return;
-    }
-    await send(sock, jid,
-      `📦 *Delivery Information — ${bizName}*\n\n` +
-      `📍 We deliver to: *${setup.delivers_to}*\n\n` +
-      `🏙 Within the city:\n• Fee: ${setup.delivery_fee_local}\n• Time: ${setup.delivery_time_local}\n\n` +
-      `🌍 Outside the city:\n• Fee: ${setup.delivery_fee_outside}\n• Time: ${setup.delivery_time_outside}\n\n` +
-      (setup.payment_on_delivery ? `💳 Payment on delivery: ${setup.payment_on_delivery}\n` : '') +
-      (setup.minimum_order ? `🛒 Minimum order: ${setup.minimum_order}` : '')
-    );
-    return;
-  }
-
-  // LOCATION
-  if (intent === 'LOCATION') {
-    const loc = setup.studio_location || client.business_address;
-    if (loc) {
-      await send(sock, jid,
-        `📍 *Our Location*\n${loc}\n\n` +
-        (setup.availability_days ? `🕐 Hours: ${setup.availability_days}\n\n` : '') +
-        `Feel free to visit us anytime! 😊`
-      );
-    } else {
-      await send(sock, jid,
-        `We are an online business and deliver to you. Type *delivery* to see our delivery info. 😊`
-      );
-    }
-    return;
-  }
-
-  // HOURS
-  if (intent === 'HOURS') {
-    const hours = client.business_hours || setup.availability_days;
-    if (hours) {
-      await send(sock, jid, `🕐 *Our Business Hours*\n${hours}\n\nWe're happy to assist you during these times! 😊`);
-    } else {
-      await send(sock, jid, `We operate daily. Feel free to message us and we'll respond as soon as possible! 😊`);
-    }
-    return;
-  }
-
-  // SOCIAL
-  if (intent === 'SOCIAL') {
-    const socials = [];
-    if (setup.instagram)       socials.push(`📸 Instagram: ${setup.instagram}`);
-    if (setup.facebook)        socials.push(`👥 Facebook: ${setup.facebook}`);
-    if (setup.tiktok)          socials.push(`🎵 TikTok: ${setup.tiktok}`);
-    if (setup.whatsapp_channel) socials.push(`💬 WhatsApp Channel: ${setup.whatsapp_channel}`);
-    if (socials.length) {
-      await send(sock, jid,
-        `📲 *Follow us on social media!*\n\n${socials.join('\n')}\n\n` +
-        `Stay updated with our latest products and deals! 🔥`
-      );
-    } else {
-      await send(sock, jid, `We'll be on social media soon! Stay tuned. 😊`);
-    }
-    return;
-  }
-
-  // PAYMENT QUESTION
-  if (intent === 'PAYMENT_Q') {
-    await send(sock, jid, buildAccountMsg(client));
-    return;
-  }
-
-  // COMPLAINT
-  if (intent === 'COMPLAINT') {
-    const policy = setup.complaint_handling || 'Please send us a photo or description of the issue and we will resolve it as soon as possible.';
-    await send(sock, jid,
-      `We're so sorry to hear that ${name}! 😔\n\n${policy}\n\n` +
-      `Our team will attend to this immediately.`
-    );
-    if (ownerJid) {
-      await send(sock, ownerJid,
-        `⚠️ *Complaint — ${bizName}*\n\nCustomer *${name || jid}* reported an issue:\n"${text}"\n\nPlease follow up!\n👉 ${buildDashLink(client)}`
-      );
-    }
-    return;
-  }
-
-  // RETURN
-  if (intent === 'RETURN') {
-    const policy = setup.return_policy || 'Please contact us directly about returns and we will be happy to assist you.';
-    await send(sock, jid, `📋 *Our Return Policy*\n\n${policy}\n\nFeel free to reach out if you have any questions! 😊`);
-    return;
-  }
-
-  // BULK
-  if (intent === 'BULK') {
-    const policy = setup.bulk_orders || 'Please contact us directly for bulk order pricing.';
-    await send(sock, jid, `📦 *Bulk Orders*\n\n${policy}\n\nSend us the details of what you need and we'll get back to you! 😊`);
-    return;
-  }
-
-  // REFERRAL
-  if (intent === 'REFERRAL') {
-    const policy = setup.referral_reward || 'We don\'t have a referral programme at the moment, but stay tuned!';
-    await send(sock, jid, `🎁 *Referral Programme*\n\n${policy} 😊`);
-    return;
-  }
-
-  // PROMO
-  if (intent === 'PROMO') {
-    const promo = setup.current_promo || 'We don\'t have any active promotions right now. Follow our WhatsApp status for the latest deals!';
-    await send(sock, jid, `🎉 *Current Promotions*\n\n${promo}`);
-    return;
-  }
-
-  // ── Custom FAQ matching (from bot_setup questions) ────────────
-  const customMatch = matchCustomFAQ(text, setup);
-  if (customMatch) {
-    await send(sock, jid, customMatch);
-    return;
-  }
-
-  // ── Custom auto-reply rules ───────────────────────────────────
-  const { data: flows } = await supabase.from('flows').select('*').eq('client_id', clientId);
-  if (flows && flows.length) {
-    const t = text.toLowerCase();
-    for (const flow of flows) {
-      const keywords = flow.keywords.split(',').map(k => k.trim().toLowerCase());
-      if (keywords.some(kw => t.includes(kw))) {
-        await send(sock, jid, flow.response);
-        return;
-      }
-    }
-  }
-
-  // ── Product name matched but intent unknown — show product ────
-  if (matchedItem) {
-    const available = matchedItem.in_stock !== false && matchedItem.available !== false;
-    await send(sock, jid,
-      `*${matchedItem.name}*\n💰 *${fmt(matchedItem.price)}*\n` +
-      (matchedItem.description ? `📝 ${matchedItem.description}\n` : '') +
-      (available ? `\nTo order, just say *"I want ${matchedItem.name}"* 😊` : `\nCurrently ${bizType==='services'?'fully booked':'out of stock'}.`)
-    );
-    return;
-  }
-
-  // ── Fallback ──────────────────────────────────────────────────
-  const fallback = client.fallback_message ||
-    `Thank you for your message ${name ? name : ''}! 😊 I'm not sure I understood that. You can:\n\n` +
-    `• Type *catalog* to see what we offer\n` +
-    `• Ask about price, delivery, or location\n` +
-    `• Say *"I want to order"* to place an order`;
-  await send(sock, jid, fallback);
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-
-async function send(sock, jid, text) {
+// ── Send a push notification to the business owner ────────────
+async function pushOwner(clientId, title, body, url) {
   try {
-    await sock.sendMessage(jid, { text });
-  } catch(e) {
-    console.error(`[replyEngine] send error to ${jid}:`, e.message);
-  }
+    if (typeof global.getSock === 'function') {
+      // routes.js exports pushToClient — use it if available
+      const routes = require('../../routes');
+      if (routes && routes.pushToClient) {
+        await routes.pushToClient(clientId, title, body, url);
+      }
+    }
+  } catch (_) { /* push is non-critical */ }
 }
 
+// ── Build bank transfer message ───────────────────────────────
 function buildAccountMsg(client) {
-  if (!client.bank_name) {
-    return `Please contact us for payment details. 😊`;
-  }
-  return (
-    `🏦 *Payment Details*\n\n` +
-    `Bank: *${client.bank_name}*\n` +
-    `Account Number: *${client.account_number}*\n` +
-    `Account Name: *${client.account_name || client.business_name}*\n\n` +
-    `After payment, please send your *receipt or screenshot* here so we can confirm quickly. 📸`
-  );
+  if (!client.bank_name && !client.account_number) return null;
+  return `💳 *Payment Details*\n` +
+    `Bank: *${client.bank_name || 'N/A'}*\n` +
+    `Account Number: *${client.account_number || 'N/A'}*\n` +
+    `Account Name: *${client.account_name || 'N/A'}*\n\n` +
+    `After payment, please send your *receipt/screenshot* here so we can confirm. 🙏`;
 }
 
-function buildDashLink(client) {
-  const base = process.env.APP_URL || 'https://yourapp.railway.app';
-  return `${base}/dashboard?token=${client.token || ''}`;
-}
-
-function addToCart(conv, item) {
-  const existing = conv.cart.find(c => c.id === item.id);
-  if (existing) { existing.qty += 1; }
-  else { conv.cart.push({ id: item.id, name: item.name, price: item.price, qty: 1, type: item._type || 'product' }); }
-}
-
-function getOrderTotal(cart) {
-  return cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-}
-
-async function getClientItems(clientId, bizType) {
-  const items = [];
-  if (bizType === 'products' || bizType === 'both') {
-    const { data } = await supabase.from('products').select('*').eq('client_id', clientId);
-    (data || []).forEach(i => { i._type = 'product'; items.push(i); });
-  }
-  if (bizType === 'services' || bizType === 'both') {
-    const { data } = await supabase.from('services').select('*').eq('client_id', clientId);
-    (data || []).forEach(i => { i._type = 'service'; items.push(i); });
-  }
-  return items;
-}
-
-async function buildCatalogMsg(items, bizType, bizName) {
-  if (!items || !items.length) {
-    return `We're currently updating our ${bizType === 'services' ? 'services' : 'products'}. Please check back soon! 😊`;
-  }
-  const available = items.filter(i => i.in_stock !== false && i.available !== false);
-  if (!available.length) {
-    return `All our ${bizType === 'services' ? 'services' : 'products'} are currently sold out. We'll restock soon! 😊`;
-  }
-  const lines = available.map(i =>
-    `• *${i.name}* — ${fmt(i.price)}${i.duration ? ' ('+i.duration+')' : ''}${i.description ? '\n  '+i.description : ''}`
-  ).join('\n\n');
-  return (
-    `📋 *${bizName} — ${bizType === 'services' ? 'Our Services' : 'Our Products'}*\n\n` +
-    `${lines}\n\n` +
-    `To order, just say *"I want [item name]"* 😊`
-  );
-}
-
-async function suggestAlternatives(clientId, bizType, excludeId) {
-  const { data } = bizType === 'services'
-    ? await supabase.from('services').select('*').eq('client_id', clientId).eq('available', true).neq('id', excludeId).limit(3)
-    : await supabase.from('products').select('*').eq('client_id', clientId).eq('in_stock', true).neq('id', excludeId).limit(3);
-
-  if (!data || !data.length) return `We'll let you know when it's available again! 😊`;
-  const names = data.map(i => `*${i.name}* (${fmt(i.price)})`).join(', ');
-  return `You might also like: ${names}. 😊`;
-}
-
-function matchCustomFAQ(text, setup) {
-  const t = text.toLowerCase();
-  const pairs = [
-    [setup.custom_service_1_q, setup.custom_service_1_a],
-    [setup.custom_service_2_q, setup.custom_service_2_a],
-    [setup.custom_service_3_q, setup.custom_service_3_a],
-  ];
-  for (const [q, a] of pairs) {
-    if (!q || !a) continue;
-    const qWords = q.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(' ').filter(w => w.length > 3);
-    const hits = qWords.filter(w => t.includes(w));
-    if (hits.length >= Math.ceil(qWords.length * 0.5)) return a;
-  }
-  return null;
-}
-
-function findItemFromContext(text, items) {
-  return findItem(text, items);
-}
-
-async function saveReceiptImage(sock, imageMsg, clientId, jid) {
-  // Download image buffer from WhatsApp
+// ── Save receipt image to Supabase Storage ────────────────────
+async function saveReceiptImage(sock, msg, clientId, jid) {
   try {
-    const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-    const stream = await downloadContentFromMessage(imageMsg, 'image');
-    const chunks = [];
-    for await (const chunk of stream) chunks.push(chunk);
-    const buffer = Buffer.concat(chunks);
+    const imgMsg = msg.message.imageMessage;
+    if (!imgMsg) return null;
 
-    // Upload to Supabase Storage
-    const filename = `receipts/${clientId}/${jid.replace('@s.whatsapp.net','')}/${Date.now()}.jpg`;
-    const { data, error } = await supabase.storage
+    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+    const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: { error: ()=>{}, warn: ()=>{}, info: ()=>{} } });
+
+    const filename = `receipts/${clientId}/${Date.now()}.jpg`;
+    const { error } = await supabase.storage
       .from('forgebot-receipts')
       .upload(filename, buffer, { contentType: 'image/jpeg', upsert: false });
 
-    if (!error) {
-      const { data: urlData } = supabase.storage.from('forgebot-receipts').getPublicUrl(filename);
-      return urlData?.publicUrl || null;
-    }
-  } catch(e) {
-    console.error('[replyEngine] receipt upload failed:', e.message);
+    if (error) throw error;
+    const { data } = supabase.storage.from('forgebot-receipts').getPublicUrl(filename);
+    return data.publicUrl;
+  } catch (e) {
+    console.error('[ReplyEngine] Receipt upload failed:', e.message);
+    return null;
+  }
+}
+
+// ── Get or create customer record ─────────────────────────────
+async function getOrCreateCustomer(clientId, jid, name) {
+  const { data } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('jid', jid)
+    .single();
+
+  if (data) {
+    // Update last contact
+    await supabase.from('customers').update({ last_contact: new Date().toISOString(), name: name || data.name }).eq('id', data.id);
+    return data;
+  }
+
+  // New customer
+  const { data: newCust } = await supabase
+    .from('customers')
+    .insert({ client_id: clientId, jid, name: name || null, phone: jid.replace('@s.whatsapp.net','') })
+    .select().single();
+  return newCust;
+}
+
+// ── Get catalog (products + services based on business type) ──
+async function getCatalog(clientId, businessType) {
+  const items = [];
+
+  if (businessType === 'products' || businessType === 'both') {
+    const { data } = await supabase.from('products').select('*').eq('client_id', clientId).eq('in_stock', true);
+    (data || []).forEach(p => items.push({ ...p, _type: 'product' }));
+  }
+
+  if (businessType === 'services' || businessType === 'both') {
+    const { data } = await supabase.from('services').select('*').eq('client_id', clientId).eq('available', true);
+    (data || []).forEach(s => items.push({ ...s, _type: 'service' }));
+  }
+
+  return items;
+}
+
+// ── Build catalog message ─────────────────────────────────────
+function buildCatalogMsg(items, businessName) {
+  if (!items.length) return `We are currently updating our catalog. Please check back soon! 😊`;
+
+  let msg = `🛍️ *${businessName} — Our Catalog*\n\n`;
+  const products = items.filter(i => i._type === 'product');
+  const services = items.filter(i => i._type === 'service');
+
+  if (products.length) {
+    msg += `📦 *Products*\n`;
+    products.forEach((p, i) => {
+      msg += `${i + 1}. *${p.name}* — ${fmt(p.price)}\n`;
+      if (p.description) msg += `   _${p.description}_\n`;
+    });
+    msg += '\n';
+  }
+
+  if (services.length) {
+    msg += `✨ *Services*\n`;
+    services.forEach((s, i) => {
+      msg += `${i + 1}. *${s.name}* — ${fmt(s.price)}\n`;
+      if (s.duration) msg += `   ⏱️ ${s.duration}\n`;
+      if (s.description) msg += `   _${s.description}_\n`;
+    });
+    msg += '\n';
+  }
+
+  msg += `To order, just tell me what you want! 😊`;
+  return msg;
+}
+
+// ── Check custom Q&A from bot_setup ──────────────────────────
+async function matchCustomQA(text, clientId) {
+  const { data: setup } = await supabase
+    .from('bot_setup')
+    .select('custom_service_1_q,custom_service_1_a,custom_service_2_q,custom_service_2_a,custom_service_3_q,custom_service_3_a')
+    .eq('client_id', clientId)
+    .single();
+
+  if (!setup) return null;
+
+  const pairs = [
+    [setup.custom_service_1_q, setup.custom_service_1_a],
+    [setup.custom_service_2_q, setup.custom_service_2_a],
+    [setup.custom_service_3_q, setup.custom_service_3_a]
+  ].filter(([q, a]) => q && a);
+
+  const queryWords = normalize(text);
+  for (const [question, answer] of pairs) {
+    const qWords = normalize(question);
+    const matches = queryWords.filter(w => qWords.some(q => q.includes(w) || w.includes(q)));
+    const score = matches.length / Math.max(queryWords.length, qWords.length);
+    if (score >= 0.5) return answer;
   }
   return null;
+}
+
+// ── Alert owner of new order via WhatsApp + push ──────────────
+async function alertOwnerNewOrder(sock, client, order, customerName) {
+  try {
+    const appUrl = process.env.APP_URL || 'https://yourapp.railway.app';
+    const dashUrl = `${appUrl}/dashboard?token=${client.token || ''}`;
+
+    const itemList = order.items.map(i => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n');
+    const msg = `🛒 *New Order — ${client.business_name}*\n\n` +
+      `👤 Customer: *${customerName}*\n` +
+      `📦 Items:\n${itemList}\n` +
+      `💰 Total: *${fmt(order.total)}*\n\n` +
+      `Reply *1* to confirm payment ✅\n` +
+      `Reply *2* to reject ❌\n\n` +
+      `👉 *View order:* ${dashUrl}`;
+
+    const ownerJid = client.notification_number
+      ? client.notification_number.replace(/\D/g, '') + '@s.whatsapp.net'
+      : null;
+
+    if (ownerJid && sock) {
+      await sock.sendMessage(ownerJid, { text: msg });
+    }
+
+    // Push notification to phone home screen
+    await pushOwner(client.id, `🛒 New Order — ${customerName}`, `${fmt(order.total)} · ${order.items.length} item(s)`, dashUrl);
+  } catch (e) {
+    console.error('[ReplyEngine] Owner alert failed:', e.message);
+  }
+}
+
+// ── Alert owner of price inquiry ──────────────────────────────
+async function alertOwnerPriceInquiry(sock, client, customerName, itemName, price) {
+  try {
+    const appUrl = process.env.APP_URL || 'https://yourapp.railway.app';
+    const dashUrl = `${appUrl}/dashboard?token=${client.token || ''}`;
+    const msg = `👀 *Price Inquiry* — ${client.business_name}\n` +
+      `*${customerName}* just asked about *${itemName}* (${fmt(price)})\n\n` +
+      `👉 ${dashUrl}`;
+
+    const ownerJid = client.notification_number
+      ? client.notification_number.replace(/\D/g, '') + '@s.whatsapp.net'
+      : null;
+
+    if (ownerJid && sock) await sock.sendMessage(ownerJid, { text: msg });
+
+    await pushOwner(client.id, `👀 ${customerName} asked about ${itemName}`, `Price: ${fmt(price)}`, dashUrl);
+  } catch (_) {}
+}
+
+// ── Handle owner's 1/2 payment reply ─────────────────────────
+async function handleOwnerPaymentReply(sock, text, clientId) {
+  const t = text.trim();
+  if (t !== '1' && t !== '2') return false;
+
+  // Find the most recent unpaid order for this client
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('payment_status', 'unpaid')
+    .not('receipt_url', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (!orders || !orders.length) return false;
+
+  const order = orders[0];
+  const confirmed = t === '1';
+
+  await supabase.from('orders').update({
+    payment_status: confirmed ? 'confirmed' : 'rejected',
+    status:         confirmed ? 'accepted'  : 'pending',
+    updated_at:     new Date().toISOString()
+  }).eq('id', order.id);
+
+  const customerMsg = confirmed
+    ? '✅ Your payment has been *confirmed*! Your order is now being processed. We will keep you updated. Thank you! 🙏'
+    : '❌ We could not verify your payment. Please resend a *clear screenshot* of your bank transfer or contact us directly.';
+
+  if (sock) await sock.sendMessage(order.customer_jid, { text: customerMsg });
+  return true;
+}
+
+// ============================================================
+//  MAIN MESSAGE HANDLER
+// ============================================================
+async function handleMessage(sock, msg, clientId) {
+  try {
+    const jid = msg.key.remoteJid;
+    if (jid === 'status@broadcast') return;
+
+    const msgContent = msg.message;
+    const isVoice = !!(msgContent?.audioMessage?.ptt);
+    const isAudio = !!(msgContent?.audioMessage);
+    const isImage = !!(msgContent?.imageMessage);
+
+    let text = msgContent?.conversation ||
+               msgContent?.extendedTextMessage?.text ||
+               msgContent?.imageMessage?.caption || '';
+
+    // ── Get client from existing DB ─────────────────────────
+    const client = await db.getClientById(clientId);
+    if (!client || client.status !== 'active') return;
+
+    // ── Check if owner is replying (existing paymentNotifier) ─
+    const ownerHandled = await handleOwnerReply(sock, jid, text, clientId);
+    if (ownerHandled) return;
+
+    // ── Also check for owner's 1/2 payment reply ────────────
+    const ownerPayment = await handleOwnerPaymentReply(sock, text, clientId);
+    if (ownerPayment) return;
+
+    // ── Get bot_setup for this client ───────────────────────
+    const { data: setup } = await supabase
+      .from('bot_setup')
+      .select('*')
+      .eq('client_id', clientId)
+      .single();
+
+    const bizType = client.business_type || 'products';
+
+    // ── Load conversation state ──────────────────────────────
+    let conv = getState(clientId, jid);
+
+    // ── Handle image (could be receipt) ─────────────────────
+    if (isImage) {
+      await sock.sendPresenceUpdate('composing', jid);
+      await humanDelay();
+
+      if (conv.state === STATE.AWAITING_RECEIPT && conv.orderId) {
+        // Save receipt and link to order
+        const receiptUrl = await saveReceiptImage(sock, msg, clientId, jid);
+
+        if (receiptUrl) {
+          await supabase.from('orders').update({ receipt_url: receiptUrl }).eq('id', conv.orderId);
+
+          await sock.sendMessage(jid, {
+            text: '✅ Thank you! Your receipt has been received. The owner will confirm your payment shortly. We will notify you right away! 🙏'
+          });
+
+          // Alert owner
+          await alertOwnerNewOrder(sock, client, { ...conv.orderData, id: conv.orderId }, conv.customerName || 'Customer');
+          setState(clientId, jid, { state: STATE.BROWSING });
+        } else {
+          await sock.sendMessage(jid, { text: 'Sorry, I could not receive that image clearly. Please try again or send a clearer screenshot. 📸' });
+        }
+        return;
+      }
+
+      // If image comes in but not expecting receipt — treat as general
+      if (!text.trim()) {
+        await sock.sendMessage(jid, { text: 'Thanks for the image! How can I help you? 😊' });
+        return;
+      }
+    }
+
+    // ── Voice note handling ──────────────────────────────────
+    if (isVoice || isAudio) {
+      await sock.sendPresenceUpdate('composing', jid);
+      const transcribed = await transcribeVoiceNote(sock, msg);
+      if (!transcribed) {
+        await humanDelay();
+        await sock.sendMessage(jid, { text: 'I received your voice note! Could you please *type your message* so I can help you faster? 😊' });
+        return;
+      }
+      text = transcribed;
+      await sock.sendMessage(jid, { text: `I heard: _"${transcribed}"_\n\nLet me help you with that...` });
+    }
+
+    if (!text.trim()) return;
+
+    await sock.sendPresenceUpdate('composing', jid);
+
+    // ── Human handoff check (always active) ─────────────────
+    if (conv.state !== STATE.HUMAN_PAUSED) {
+      const intent = detect(text);
+      if (intent === 'HUMAN') {
+        await humanDelay();
+        await sock.sendMessage(jid, {
+          text: 'Got it! I am connecting you with the owner right now. Please hold on — they will be with you shortly. 🙏'
+        });
+        setState(clientId, jid, { state: STATE.HUMAN_PAUSED, pausedUntil: Date.now() + 30 * 60 * 1000 });
+        await notifyOwnerHumanRequest(sock, clientId, jid);
+        return;
+      }
+    }
+
+    // ── Human paused — check if expired ─────────────────────
+    if (conv.state === STATE.HUMAN_PAUSED) {
+      if (conv.pausedUntil && Date.now() < conv.pausedUntil) return; // still paused
+      setState(clientId, jid, { state: STATE.BROWSING }); // auto-resume after 30 min
+      conv = getState(clientId, jid);
+    }
+
+    // ── STATE: GREETING → check if known customer ────────────
+    if (conv.state === STATE.GREETING) {
+      const existing = await getOrCreateCustomer(clientId, jid, null);
+      if (existing && existing.name) {
+        // Returning customer — skip name capture
+        setState(clientId, jid, { state: STATE.BROWSING, customerName: existing.name });
+        conv = getState(clientId, jid);
+        await humanDelay();
+        await sock.sendMessage(jid, {
+          text: `${timeGreeting()} *${existing.name}*! 👋 Welcome back to *${client.business_name}*. How can we help you today?`
+        });
+        return;
+      } else {
+        // New customer — ask for name
+        setState(clientId, jid, { state: STATE.AWAITING_NAME });
+        await humanDelay();
+        await sock.sendMessage(jid, {
+          text: `${timeGreeting()}! 👋 Welcome to *${client.business_name}*.\n\nMay I know your name please? 😊`
+        });
+        return;
+      }
+    }
+
+    // ── STATE: AWAITING_NAME ─────────────────────────────────
+    if (conv.state === STATE.AWAITING_NAME) {
+      const name = text.trim().split(' ')[0]; // take first word as name
+      const capitalName = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      setState(clientId, jid, { state: STATE.BROWSING, customerName: capitalName });
+      await getOrCreateCustomer(clientId, jid, capitalName);
+      await humanDelay();
+      await sock.sendMessage(jid, {
+        text: `Nice to meet you, *${capitalName}*! 😊\n\nHow can we help you at *${client.business_name}* today?\n\n` +
+          `You can:\n• Ask about our products/services\n• Place an order\n• Ask any question!`
+      });
+      return;
+    }
+
+    // ── From here, customer is known (state = BROWSING or ORDERING) ──
+    const customerName = conv.customerName || 'there';
+    const intent = detect(text);
+
+    // ── CATALOG intent ───────────────────────────────────────
+    if (intent === 'CATALOG') {
+      const items = await getCatalog(clientId, bizType);
+      await humanDelay();
+      await sock.sendMessage(jid, { text: buildCatalogMsg(items, client.business_name) });
+      return;
+    }
+
+    // ── HOURS intent ─────────────────────────────────────────
+    if (intent === 'HOURS') {
+      await humanDelay();
+      const hours = client.business_hours || (setup?.availability_days) || 'Please contact us to confirm our operating hours.';
+      await sock.sendMessage(jid, { text: `🕐 *Our Business Hours*\n\n${hours}\n\nFeel free to message us anytime — we respond during business hours! 😊` });
+      return;
+    }
+
+    // ── DELIVERY intent ──────────────────────────────────────
+    if (intent === 'DELIVERY') {
+      await humanDelay();
+      if (setup?.delivers_to) {
+        let msg = `🚚 *Delivery Information*\n\n`;
+        msg += `📍 We deliver to: *${setup.delivers_to}*\n`;
+        if (setup.delivery_fee_local)    msg += `💰 Local delivery: *${setup.delivery_fee_local}*\n`;
+        if (setup.delivery_fee_outside)  msg += `💰 Outside delivery: *${setup.delivery_fee_outside}*\n`;
+        if (setup.delivery_time_local)   msg += `⏱️ Local timing: *${setup.delivery_time_local}*\n`;
+        if (setup.delivery_time_outside) msg += `⏱️ Outside timing: *${setup.delivery_time_outside}*\n`;
+        if (setup.minimum_order)         msg += `📦 Minimum order: *${setup.minimum_order}*\n`;
+        await sock.sendMessage(jid, { text: msg });
+      } else {
+        await sock.sendMessage(jid, { text: `🚚 We offer delivery! Please contact us directly for delivery details and rates. 😊` });
+      }
+      return;
+    }
+
+    // ── SOCIAL intent ─────────────────────────────────────────
+    if (intent === 'SOCIAL') {
+      await humanDelay();
+      if (setup) {
+        let msg = `📱 *Find Us Online*\n\n`;
+        if (setup.instagram)        msg += `📸 Instagram: ${setup.instagram}\n`;
+        if (setup.facebook)         msg += `👍 Facebook: ${setup.facebook}\n`;
+        if (setup.tiktok)           msg += `🎵 TikTok: ${setup.tiktok}\n`;
+        if (setup.whatsapp_channel) msg += `📢 WhatsApp Channel: ${setup.whatsapp_channel}\n`;
+        if (msg === `📱 *Find Us Online*\n\n`) msg += `We are building our social presence. Stay tuned! 😊`;
+        await sock.sendMessage(jid, { text: msg });
+      } else {
+        await sock.sendMessage(jid, { text: `We will share our social links soon! 😊` });
+      }
+      return;
+    }
+
+    // ── PAYMENT_Q intent ─────────────────────────────────────
+    if (intent === 'PAYMENT_Q') {
+      await humanDelay();
+      const accountMsg = buildAccountMsg(client);
+      if (accountMsg) {
+        await sock.sendMessage(jid, { text: accountMsg });
+      } else {
+        const methods = setup?.payment_methods || 'Bank transfer and other options available. Please ask us directly!';
+        await sock.sendMessage(jid, { text: `💳 *Payment Methods*\n\n${methods}` });
+      }
+      return;
+    }
+
+    // ── PROMO intent ──────────────────────────────────────────
+    if (intent === 'PROMO') {
+      await humanDelay();
+      const promo = setup?.current_promo;
+      if (promo) {
+        await sock.sendMessage(jid, { text: `🎉 *Current Promo*\n\n${promo}\n\nDon't miss out! 😍` });
+      } else {
+        await sock.sendMessage(jid, { text: `We currently have no active promo, but follow our page for updates! 😊` });
+      }
+      return;
+    }
+
+    // ── RETURN / COMPLAINT intent ─────────────────────────────
+    if (intent === 'RETURN' || intent === 'COMPLAINT') {
+      await humanDelay();
+      const policy = intent === 'RETURN'
+        ? (setup?.return_policy || 'Please contact us directly to arrange a return or exchange.')
+        : (setup?.complaint_handling || 'We are sorry to hear that! Please share the details and we will resolve it right away.');
+      await sock.sendMessage(jid, { text: `${intent === 'COMPLAINT' ? '😔' : '🔄'} *${intent === 'COMPLAINT' ? 'We are sorry to hear that!' : 'Return & Exchange Policy'}*\n\n${policy}` });
+      return;
+    }
+
+    // ── REFERRAL intent ──────────────────────────────────────
+    if (intent === 'REFERRAL') {
+      await humanDelay();
+      const reward = setup?.referral_reward;
+      if (reward) {
+        await sock.sendMessage(jid, { text: `🤝 *Referral Program*\n\n${reward}\n\nThank you for spreading the word! 🙏` });
+      } else {
+        await sock.sendMessage(jid, { text: `We love referrals! Contact us to learn about our referral program. 😊` });
+      }
+      return;
+    }
+
+    // ── BULK intent ───────────────────────────────────────────
+    if (intent === 'BULK') {
+      await humanDelay();
+      const bulk = setup?.bulk_orders;
+      if (bulk) {
+        await sock.sendMessage(jid, { text: `📦 *Bulk Orders*\n\n${bulk}` });
+      } else {
+        await sock.sendMessage(jid, { text: `Yes, we accept bulk orders! Please contact us for special pricing. 😊` });
+      }
+      return;
+    }
+
+    // ── THANKS intent ─────────────────────────────────────────
+    if (intent === 'THANKS') {
+      await humanDelay();
+      await sock.sendMessage(jid, { text: `You're welcome, *${customerName}*! 😊 Is there anything else I can help you with?` });
+      return;
+    }
+
+    // ── PAYMENT_CLAIM intent ─────────────────────────────────
+    if (intent === 'PAYMENT_CLAIM') {
+      await humanDelay();
+      await sock.sendMessage(jid, { text: `Thank you, *${customerName}*! Your payment claim has been received. Please send your *receipt/screenshot* and the owner will be notified right away. 📸` });
+      setState(clientId, jid, { state: STATE.AWAITING_RECEIPT });
+      await notifyOwnerOfPaymentClaim(sock, clientId, jid, text);
+      return;
+    }
+
+    // ── STATE: AWAITING_ADDRESS ──────────────────────────────
+    if (conv.state === STATE.AWAITING_ADDRESS) {
+      const address = text.trim();
+      setState(clientId, jid, { deliveryAddress: address });
+      conv = getState(clientId, jid);
+
+      // Create order in DB
+      const total = conv.cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+      const { data: order } = await supabase.from('orders').insert({
+        client_id:        clientId,
+        customer_jid:     jid,
+        customer_name:    customerName,
+        items:            conv.cart,
+        total,
+        order_type:       'delivery',
+        delivery_address: address,
+        status:           'pending',
+        payment_status:   'unpaid'
+      }).select().single();
+
+      const orderId = order?.id;
+      setState(clientId, jid, { state: STATE.AWAITING_RECEIPT, orderId, orderData: { items: conv.cart, total } });
+
+      // Send account details
+      await humanDelay();
+      const accountMsg = buildAccountMsg(client);
+      const total_fmt  = fmt(total);
+      let payMsg = `✅ *Order Received!*\n\n📦 Your items:\n`;
+      conv.cart.forEach(i => { payMsg += `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}\n`; });
+      payMsg += `\n💰 *Total: ${total_fmt}*\n📍 Delivery to: ${address}\n\n`;
+
+      if (accountMsg) {
+        payMsg += accountMsg;
+      } else {
+        payMsg += `Please transfer ${total_fmt} and send your receipt here. 🙏`;
+      }
+
+      await sock.sendMessage(jid, { text: payMsg });
+
+      // Update customer order count
+      await supabase.from('customers').update({
+        order_count:  supabase.rpc ? undefined : undefined, // handled separately
+        last_contact: new Date().toISOString()
+      }).eq('client_id', clientId).eq('jid', jid);
+
+      return;
+    }
+
+    // ── STATE: AWAITING_APPT ─────────────────────────────────
+    if (conv.state === STATE.AWAITING_APPT) {
+      const apptTime = text.trim();
+
+      // Create booking in DB
+      const total = conv.cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+      const { data: order } = await supabase.from('orders').insert({
+        client_id:       clientId,
+        customer_jid:    jid,
+        customer_name:   customerName,
+        items:           conv.cart,
+        total,
+        order_type:      'booking',
+        appointment_time: apptTime,
+        status:          'pending',
+        payment_status:  'unpaid'
+      }).select().single();
+
+      const needsDeposit = setup?.deposit_required && setup.deposit_required.toLowerCase().includes('yes');
+      setState(clientId, jid, { state: STATE.AWAITING_RECEIPT, orderId: order?.id, orderData: { items: conv.cart, total } });
+
+      await humanDelay();
+      let msg = `📅 *Booking Confirmed!*\n\n`;
+      conv.cart.forEach(i => { msg += `• ${i.name}\n`; });
+      msg += `\n🗓️ Date/Time: *${apptTime}*\n💰 Total: *${fmt(total)}*\n\n`;
+
+      if (needsDeposit) {
+        const depositInfo = setup.deposit_required;
+        msg += `⚠️ *Deposit Required*: ${depositInfo}\n\n`;
+        const accountMsg = buildAccountMsg(client);
+        if (accountMsg) msg += accountMsg;
+      } else {
+        msg += `Your slot is confirmed! See you then. 😊`;
+      }
+
+      await sock.sendMessage(jid, { text: msg });
+      await alertOwnerNewOrder(sock, client, { items: conv.cart, total, id: order?.id }, customerName);
+      return;
+    }
+
+    // ── STATE: ORDERING — add to cart / checkout ─────────────
+    if (conv.state === STATE.ORDERING) {
+      // More items
+      if (intent === 'MORE_ITEMS' || intent === 'ORDER') {
+        // fall through to item matching below
+      }
+      // Done ordering — proceed to checkout
+      if (intent === 'DONE_ORDER') {
+        const isService = conv.cart.some(i => i._type === 'service');
+        await humanDelay();
+        if (isService) {
+          setState(clientId, jid, { state: STATE.AWAITING_APPT });
+          await sock.sendMessage(jid, { text: `Great! 😊 Please tell me your preferred *date and time* for your booking.` });
+        } else {
+          setState(clientId, jid, { state: STATE.AWAITING_ADDRESS });
+          await sock.sendMessage(jid, { text: `Great choice, *${customerName}*! 😊\n\nPlease send your full *delivery address* so we can get this to you.` });
+        }
+        return;
+      }
+    }
+
+    // ── PRICE / ORDER intent + product matching ───────────────
+    if (intent === 'PRICE' || intent === 'ORDER' || conv.state === STATE.ORDERING) {
+      const items = await getCatalog(clientId, bizType);
+      if (!items.length) {
+        await humanDelay();
+        await sock.sendMessage(jid, { text: `We are currently updating our catalog. Please check back soon! 😊` });
+        return;
+      }
+
+      const found = findItem(text, items);
+
+      if (found) {
+        if (intent === 'PRICE') {
+          // Price inquiry — log it
+          await supabase.from('price_inquiries').insert({
+            client_id:    clientId,
+            customer_jid: jid,
+            customer_name: customerName,
+            product_name: found.name,
+            product_price: found.price,
+            item_type:    found._type
+          });
+
+          await alertOwnerPriceInquiry(sock, client, customerName, found.name, found.price);
+          await humanDelay();
+          let msg = `${found._type === 'service' ? '✨' : '🛍️'} *${found.name}*\n💰 ${fmt(found.price)}`;
+          if (found.description) msg += `\n📝 ${found.description}`;
+          if (found._type === 'service' && found.duration) msg += `\n⏱️ Duration: ${found.duration}`;
+          if (found._type === 'product' && setup?.delivery_fee_local) msg += `\n🚚 Local delivery: ${setup.delivery_fee_local}`;
+          msg += `\n\nWould you like to *order* this? Just say "order" or "I want it"! 😊`;
+          await sock.sendMessage(jid, { text: msg });
+          return;
+        }
+
+        if (intent === 'ORDER' || conv.state === STATE.ORDERING) {
+          // Add to cart
+          const existingItem = (conv.cart || []).find(c => c.id === found.id);
+          let newCart;
+          if (existingItem) {
+            newCart = conv.cart.map(c => c.id === found.id ? { ...c, qty: c.qty + 1 } : c);
+          } else {
+            newCart = [...(conv.cart || []), { id: found.id, name: found.name, price: found.price, qty: 1, _type: found._type }];
+          }
+          setState(clientId, jid, { state: STATE.ORDERING, cart: newCart });
+
+          await humanDelay();
+          const cartSummary = newCart.map(i => `• ${i.name} × ${i.qty} — ${fmt(i.price * i.qty)}`).join('\n');
+          await sock.sendMessage(jid, {
+            text: `✅ *${found.name}* added!\n\n🛒 *Your cart:*\n${cartSummary}\n\n💰 Total: *${fmt(newCart.reduce((s,i)=>s+i.price*i.qty,0))}*\n\nWant to add more? Or say *"done"* to checkout! 😊`
+          });
+          return;
+        }
+      } else if (intent === 'PRICE' || intent === 'ORDER') {
+        // No specific item found — show catalog
+        await humanDelay();
+        await sock.sendMessage(jid, { text: buildCatalogMsg(items, client.business_name) });
+        return;
+      }
+    }
+
+    // ── Check custom Q&A ──────────────────────────────────────
+    const customAnswer = await matchCustomQA(text, clientId);
+    if (customAnswer) {
+      await humanDelay();
+      await sock.sendMessage(jid, { text: customAnswer });
+      return;
+    }
+
+    // ── Greeting response ──────────────────────────────────────
+    if (intent === 'GREETING_W') {
+      await humanDelay();
+      await sock.sendMessage(jid, {
+        text: `${timeGreeting()} *${customerName}*! 👋 Welcome to *${client.business_name}*. How can we help you today?`
+      });
+      return;
+    }
+
+    // ── Check existing flows (your original keyword system) ───
+    const flows = await db.getFlows(clientId, true);
+    let matched = null;
+    for (const flow of flows) {
+      const kws = flow.keywords.split(',').map(k => k.trim().toLowerCase());
+      if (kws.some(kw => text.toLowerCase().includes(kw))) { matched = flow; break; }
+    }
+
+    await humanDelay();
+    await sock.sendPresenceUpdate('paused', jid);
+
+    if (matched) {
+      if (matched.response_type === 'image' && matched.media_url) {
+        await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response });
+      } else {
+        await sock.sendMessage(jid, { text: matched.response });
+      }
+      return;
+    }
+
+    // ── Fallback ───────────────────────────────────────────────
+    const fallback = client.fallback_message ||
+      `Thank you for reaching out to *${client.business_name}*! 😊 Someone will get back to you shortly. You can also:\n• Ask about our products/services\n• Place an order\n• Ask about delivery`;
+    await sock.sendMessage(jid, { text: fallback });
+
+  } catch (err) {
+    console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message);
+  }
 }
 
 module.exports = { handleMessage };
