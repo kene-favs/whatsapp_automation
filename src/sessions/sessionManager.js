@@ -7,6 +7,12 @@ const replyEngine = require('../bot/replyEngine');
 const sessions = {}; // clientId → { sock, cleanup }
 const logger = pino({ level: 'silent' });
 
+// ── Helper: push an event to all SSE listeners waiting for this client's QR ──
+function notifyQRListeners(clientId, payload) {
+  const listeners = global.qrListeners?.get(clientId) || [];
+  listeners.forEach(fn => { try { fn(payload); } catch (_) {} });
+}
+
 async function startSession(clientId, callbacks = {}) {
   // If already running, just return existing
   if (sessions[clientId]?.sock) {
@@ -33,13 +39,18 @@ async function startSession(clientId, callbacks = {}) {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr && callbacks.onQR) {
-      callbacks.onQR(qr);
+    if (qr) {
+      // Fire existing admin callback
+      if (callbacks.onQR) callbacks.onQR(qr);
+      // Fire SSE stream for onboard.html
+      notifyQRListeners(clientId, { type: 'qr', qr });
     }
 
     if (connection === 'open') {
       console.log(`[ForgeBot] Client ${clientId} connected`);
       if (callbacks.onConnected) callbacks.onConnected();
+      // Tell onboard.html the scan succeeded → show "Set Up My Bot" button
+      notifyQRListeners(clientId, { type: 'connected' });
     }
 
     if (connection === 'close') {
@@ -50,6 +61,8 @@ async function startSession(clientId, callbacks = {}) {
       console.log(`[ForgeBot] Client ${clientId} disconnected (code ${code}), reconnect=${shouldReconnect}`);
 
       if (callbacks.onDisconnected) callbacks.onDisconnected();
+      // Tell onboard.html if still open
+      notifyQRListeners(clientId, { type: 'disconnected' });
       delete sessions[clientId];
 
       if (shouldReconnect) {

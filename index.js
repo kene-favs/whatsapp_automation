@@ -2,47 +2,74 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 
-const db = require('./src/db/supabase');
-const sessionManager = require('./src/sessions/sessionManager');
 const { startScheduler } = require('./src/bot/statusScheduler');
+const { createSession } = require('./src/sessions/sessionManager');
+const sessionManager    = require('./src/sessions/sessionManager');
+const db = require('./src/db/database');
 const adminRoutes = require('./src/admin/routes');
-const clientRoutes = require('./src/routes/client-portal');
-const webhookRoutes = require('./src/routes/webhooks');
+const apiRoutes   = require('./routes');   // ← new client dashboard API
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Middleware ─────────────────────────────────────────────────
-app.use(express.json());
+// ─── Global sock map (used by routes.js & replyEngine.js) ─────────────────
+// sessionManager already holds socks internally; we expose a simple getter
+// so routes.js can call getSock(clientId) → Baileys sock
+global.getSock = (clientId) => sessionManager.getSession(clientId);
+
+// ─── Global QR listener map (used by the /api/client/qr-stream SSE route) ─
+global.qrListeners = new Map();
+
+// ─── Middleware ────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Static files
+// Serve client-facing pages: index.html, onboard.html, dashboard.html,
+// setup.html, manifest.json, sw.js, icons/, etc.
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/admin', express.static(path.join(__dirname, 'src/admin/public')));
 
-// ── Routes ─────────────────────────────────────────────────────
-app.use('/api/client', clientRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/webhooks', webhookRoutes);
+// Serve ForgeBot super-admin panel static files
+app.use(express.static(path.join(__dirname, 'src/admin/public')));
 
-// Pages
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
-app.get('/onboard', (req, res) => res.sendFile(path.join(__dirname, 'public/onboard.html')));
-app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public/dashboard.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'src/admin/public/index.html')));
+// ─── Routes ────────────────────────────────────────────────────────────────
+app.use('/api', apiRoutes);      // ← client dashboard API  (NEW)
+app.use('/', adminRoutes);       // ← your existing admin panel
 
-// ── Start ──────────────────────────────────────────────────────
-app.listen(PORT, async () => {
-  console.log(`\n🤖 ForgeBot server running on port ${PORT}`);
-  console.log(`   Landing:   http://localhost:${PORT}/`);
-  console.log(`   Admin:     http://localhost:${PORT}/admin`);
-  console.log(`   Dashboard: http://localhost:${PORT}/dashboard\n`);
+// ─── Boot ──────────────────────────────────────────────────────────────────
+async function start() {
+  console.log('');
+  console.log('╔══════════════════════════════════════╗');
+  console.log('║   WhatsApp Automation Platform       ║');
+  console.log('╚══════════════════════════════════════╝');
+  console.log('');
 
-  try {
-    const activeClients = await db.getActiveClients();
-    await sessionManager.bootAllSessions(activeClients);
-    startScheduler();
-  } catch (err) {
-    console.error('Boot error:', err.message);
+  // Start the status post scheduler
+  startScheduler();
+
+  // Reconnect clients that were previously connected
+  const clients = db.getClients().filter(c =>
+    c.status === 'connected' || c.status === 'reconnecting'
+  );
+
+  if (clients.length > 0) {
+    console.log(`🔄 Reconnecting ${clients.length} existing client(s)...`);
+    for (const client of clients) {
+      await createSession(client.id, null);
+      await new Promise(r => setTimeout(r, 1500));
+    }
   }
+
+  // Start server
+  app.listen(PORT, () => {
+    console.log('');
+    console.log(`🚀 Server running at: http://localhost:${PORT}`);
+    console.log(`📊 Admin panel:       http://localhost:${PORT}`);
+    console.log('');
+    console.log('Press Ctrl+C to stop');
+  });
+}
+
+start().catch(err => {
+  console.error('❌ Startup error:', err);
+  process.exit(1);
 });

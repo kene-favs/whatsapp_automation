@@ -4,226 +4,541 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ForgeBot"/>
+<meta name="theme-color" content="#22c55e"/>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
-  :root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
-  header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-  header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
-  header .logo span{color:#fff}
-  .status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
-  .status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
-  nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
-  nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
-  nav button.active{color:var(--green);border-bottom-color:var(--green)}
-  .container{max-width:900px;margin:0 auto;padding:28px 20px}
-  .section{display:none}
-  .section.active{display:block}
-  h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
-  label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
-  input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
-  input:focus,textarea:focus,select:focus{border-color:var(--blue)}
-  textarea{min-height:80px;resize:vertical}
-  .btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
-  .btn-green{background:var(--green);color:#000}
-  .btn-green:hover{background:#16a34a}
-  .btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
-  .btn-blue{background:var(--blue);color:#fff}
-  .btn-gray{background:#374151;color:#e2e8f0}
-  .row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
-  .row .grow{flex:1}
-  .flow-item,.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
-  .flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
-  .msg{padding:10px 14px;border-radius:6px;font-size:.85rem;margin-bottom:12px;display:none}
-  .msg.show{display:block}
-  .msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
-  .msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
-  .broadcast-log{font-size:.8rem;color:#64748b;padding:6px 0;border-bottom:1px solid var(--border)}
-  .coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:22px;margin-bottom:16px;text-align:center}
-  .coming-soon .cs-icon{font-size:2.4rem;margin-bottom:8px}
-  .coming-soon h3{color:var(--purple);font-size:1rem;margin-bottom:6px}
-  .coming-soon p{font-size:.82rem;color:#94a3b8;max-width:420px;margin:0 auto 12px}
-  .cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px}
-  .feat-card{background:var(--card);border-radius:10px;padding:18px;margin-bottom:14px}
-  .notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
-  .notif-box b{color:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
+:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
+
+/* ── Header ── */
+header{background:#111827;border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:1.2rem;font-weight:700;color:var(--green)}
+.logo span{color:#fff}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:600}
+.status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
+.notif-bell{background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;position:relative;padding:4px}
+.notif-bell .badge{position:absolute;top:0;right:0;width:8px;height:8px;background:var(--red);border-radius:50%;display:none}
+.notif-bell .badge.show{display:block}
+.btn-sm{padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600}
+.btn-gray{background:#374151;color:#e2e8f0}
+.btn-gray:hover{background:#4b5563}
+
+/* ── Incomplete setup banner ── */
+#setupBanner{background:#1a1200;border-bottom:1px solid var(--orange);padding:10px 20px;display:none;align-items:center;justify-content:space-between;gap:12px}
+#setupBanner.show{display:flex}
+#setupBanner p{font-size:.82rem;color:#fbbf24}
+#setupBanner button{background:var(--orange);color:#000;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap}
+
+/* ── Nav ── */
+nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:none;color:#64748b;padding:12px 14px;cursor:pointer;font-size:.82rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:5px}
+nav button.active{color:var(--green);border-bottom-color:var(--green)}
+nav button .n-badge{background:var(--red);color:#fff;font-size:.65rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+nav button .n-badge.show{display:inline-block}
+
+.container{max-width:920px;margin:0 auto;padding:22px 16px 60px}
+.section{display:none}
+.section.active{display:block}
+h2{font-size:1.05rem;font-weight:600;margin-bottom:16px;color:#f1f5f9}
+h3{font-size:.9rem;font-weight:600;color:#f1f5f9}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px}
+input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:8px 12px;font-size:.86rem;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--blue)}
+textarea{min-height:75px;resize:vertical}
+.row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap}
+.grow{flex:1;min-width:140px}
+
+/* ── Buttons ── */
+.btn{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-size:.84rem;font-weight:600;transition:.2s}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{background:#16a34a}
+.btn-red{background:var(--red);color:#fff;padding:4px 10px;font-size:.76rem}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-orange{background:var(--orange);color:#000}
+
+/* ── Messages ── */
+.msg{padding:9px 13px;border-radius:6px;font-size:.83rem;margin-bottom:10px;display:none}
+.msg.show{display:block}
+.msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
+.msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+
+/* ── Products / Services list items ── */
+.item-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.item-img{width:44px;height:44px;border-radius:7px;object-fit:cover;background:#1e2d3d;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#374151;font-size:1.2rem;overflow:hidden}
+.item-img img{width:100%;height:100%;object-fit:cover}
+.item-info{flex:1;min-width:0}
+.item-name{font-size:.88rem;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-price{font-size:.82rem;color:var(--green);font-weight:600}
+.item-desc{font-size:.76rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.toggle-stock{background:none;border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:.72rem;cursor:pointer;color:#94a3b8}
+.toggle-stock.in{border-color:var(--green);color:var(--green)}
+.toggle-stock.out{border-color:var(--red);color:var(--red)}
+
+/* ── Orders ── */
+.order-card{background:#0d1526;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
+.order-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.order-customer{font-size:.9rem;font-weight:700;color:#f1f5f9}
+.order-time{font-size:.74rem;color:#64748b}
+.order-status{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px}
+.status-pending{background:#451a03;color:var(--orange);border:1px solid var(--orange)}
+.status-accepted{background:#0d2137;color:var(--blue);border:1px solid var(--blue)}
+.status-delivery{background:#0d1f3c;color:#60a5fa;border:1px solid #60a5fa}
+.status-delivered,.status-completed{background:#14532d;color:var(--green);border:1px solid var(--green)}
+.status-cancelled{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+.order-items{font-size:.82rem;color:#94a3b8;margin-bottom:8px;padding:8px;background:#111827;border-radius:6px}
+.order-items b{color:#f1f5f9}
+.order-total{font-size:.9rem;font-weight:700;color:var(--green);margin-bottom:8px}
+.order-address{font-size:.78rem;color:#64748b;margin-bottom:10px}
+.order-receipt{margin-bottom:10px}
+.order-receipt img{width:100%;max-height:160px;object-fit:cover;border-radius:7px;border:1px solid var(--border);cursor:pointer}
+.receipt-pending{font-size:.78rem;color:#64748b;font-style:italic}
+.order-btns{display:flex;gap:8px;flex-wrap:wrap}
+.order-btns .btn{font-size:.78rem;padding:6px 12px}
+
+/* ── Leads / Price Inquiries ── */
+.lead-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lead-info{flex:1}
+.lead-name{font-size:.86rem;font-weight:600;color:#f1f5f9}
+.lead-product{font-size:.8rem;color:var(--green)}
+.lead-time{font-size:.72rem;color:#64748b}
+
+/* ── Customers ── */
+.customer-row{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px}
+.cust-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--blue));display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#000;flex-shrink:0}
+.cust-info{flex:1}
+.cust-name{font-size:.86rem;font-weight:600;color:#f1f5f9}
+.cust-meta{font-size:.74rem;color:#64748b}
+.cust-orders{font-size:.78rem;color:var(--green);font-weight:600}
+
+/* ── Status posts ── */
+.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.post-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;background:#1e2d3d;flex-shrink:0}
+.post-info{flex:1;min-width:0}
+.post-caption{font-size:.84rem;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post-schedule{font-size:.74rem;color:#64748b;margin-top:2px}
+
+/* ── Auto-Replies ── */
+.flow-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
+.flow-resp{font-size:.8rem;color:#94a3b8;margin-top:3px}
+
+/* ── Broadcast log ── */
+.bc-row{font-size:.8rem;color:#64748b;padding:7px 0;border-bottom:1px solid var(--border)}
+
+/* ── Settings ── */
+.notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:11px 13px;font-size:.81rem;color:#93c5fd;margin-bottom:12px}
+.notif-box b{color:#fff}
+.section-sep{height:1px;background:var(--border);margin:20px 0}
+.lock-note{font-size:.74rem;color:#64748b;margin-top:4px}
+
+/* ── Coming soon ── */
+.coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:20px;margin-bottom:14px;text-align:center}
+.coming-soon .cs-icon{font-size:2.2rem;margin-bottom:7px}
+.coming-soon h3{color:var(--purple);font-size:.95rem;margin-bottom:5px}
+.coming-soon p{font-size:.8rem;color:#94a3b8;max-width:400px;margin:0 auto 10px}
+.cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:.5px}
+
+/* ── Upload button ── */
+.upload-label{display:inline-flex;align-items:center;gap:7px;background:#1e2d3d;border:1px dashed #374151;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:.82rem;color:#94a3b8;transition:.2s;width:100%;justify-content:center;margin-bottom:8px}
+.upload-label:hover{border-color:var(--blue);color:var(--blue)}
+.upload-label input{display:none}
+.preview-img{width:100%;max-height:140px;object-fit:cover;border-radius:7px;border:1px solid var(--border);margin-bottom:8px;display:none}
+
+/* ── PWA Overlay ── */
+#pwa-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px}
+#pwa-overlay.show{display:flex}
+#pwa-card{background:#111827;border:1px solid var(--border);border-radius:20px;padding:28px 24px;max-width:350px;width:100%;text-align:center;animation:slideUp .35s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.pwa-logo{font-size:2rem;font-weight:900;color:var(--green);margin-bottom:4px}
+.pwa-logo span{color:#fff}
+.pwa-tag{font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:100px;padding:3px 10px;display:inline-block;margin-bottom:16px}
+#pwa-card h2{font-size:1.1rem;font-weight:800;color:#f1f5f9;margin-bottom:7px;line-height:1.3}
+#pwa-card p{font-size:.82rem;color:#64748b;margin-bottom:20px;line-height:1.5}
+.pwa-install-btn{width:100%;background:var(--green);color:#000;border:none;border-radius:10px;padding:13px;font-size:.92rem;font-weight:800;cursor:pointer;margin-bottom:8px}
+.pwa-snooze{background:none;border:none;color:#374151;font-size:.74rem;cursor:pointer;text-decoration:underline}
+.ios-steps{text-align:left;margin-bottom:18px}
+.ios-step{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.step-num{width:24px;height:24px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--green);flex-shrink:0;margin-top:1px}
+.step-txt{font-size:.81rem;color:#94a3b8;line-height:1.4}
+.step-txt strong{color:#f1f5f9}
+.bounce{animation:bounce .8s infinite alternate;display:inline-block;margin-left:3px}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-5px)}}
+.pwa-done-btn{width:100%;background:var(--green);color:#000;border:none;border-radius:10px;padding:13px;font-size:.92rem;font-weight:800;cursor:pointer}
+#ios-section{display:none}
+
+/* ── Push permission card ── */
+#pushCard{display:none;background:#0d1a2e;border:1px solid var(--green);border-radius:14px;padding:20px;margin-bottom:20px;text-align:center}
+#pushCard.show{display:block}
+#pushCard h3{color:var(--green);font-size:1rem;margin-bottom:6px}
+#pushCard p{font-size:.82rem;color:#94a3b8;margin-bottom:16px;line-height:1.5}
+#pushCard .btn-green{padding:11px 24px;font-size:.9rem}
+#pushCard .dismiss{background:none;border:none;color:#374151;font-size:.74rem;cursor:pointer;margin-top:8px;text-decoration:underline;display:block;margin-left:auto;margin-right:auto}
 </style>
 </head>
 <body>
 
+<!-- ── PWA Install Overlay ── -->
+<div id="pwa-overlay">
+  <div id="pwa-card">
+    <div class="pwa-logo">Forge<span>Bot</span></div>
+    <div class="pwa-tag">Quick Access</div>
+    <h2>Add ForgeBot to your Home Screen</h2>
+    <p>Open your dashboard in one tap — no browser, no links, just click and go.</p>
+    <div id="android-section">
+      <button class="pwa-install-btn" id="pwa-install-btn">📲 &nbsp;Add to Home Screen</button><br/>
+      <button class="pwa-snooze" id="pwa-snooze-btn">Remind me in 10 minutes</button>
+    </div>
+    <div id="ios-section">
+      <div class="ios-steps">
+        <div class="ios-step"><div class="step-num">1</div><div class="step-txt">Tap the <strong>Share</strong> button at the bottom <span class="bounce">⬆️</span></div></div>
+        <div class="ios-step"><div class="step-num">2</div><div class="step-txt">Tap <strong>"Add to Home Screen"</strong></div></div>
+        <div class="ios-step"><div class="step-num">3</div><div class="step-txt">Tap <strong>"Add"</strong> in the top right corner</div></div>
+      </div>
+      <button class="pwa-done-btn" id="pwa-done-btn">✅ &nbsp;I've Added It!</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Header ── -->
 <header>
   <div class="logo">Forge<span>Bot</span></div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span id="waBadge" class="status-badge disc">&#9679; Disconnected</span>
-    <button class="btn btn-gray" onclick="logout()" style="padding:6px 14px;font-size:.8rem">Logout</button>
+  <div class="hdr-right">
+    <button class="notif-bell" id="notifBell" onclick="switchTab('notifications',document.querySelector('[data-tab=notifications]'))" title="Notifications">
+      🔔<span class="badge" id="notifDot"></span>
+    </button>
+    <span id="waBadge" class="status-badge disc">⬤ Disconnected</span>
+    <button class="btn-sm btn-gray" onclick="logout()">Logout</button>
   </div>
 </header>
 
-<nav>
-  <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
-  <button onclick="switchTab('status',this)">Status Posts</button>
-  <button onclick="switchTab('broadcast',this)">Broadcast</button>
-  <button onclick="switchTab('features',this)">Features</button>
-  <button onclick="switchTab('settings',this)">Settings</button>
+<!-- ── Incomplete setup banner ── -->
+<div id="setupBanner">
+  <p>⚠️ Your bot isn't fully set up yet. Some settings are missing — complete them so your bot works perfectly.</p>
+  <button onclick="switchTab('settings',document.querySelector('[data-tab=settings]'))">Go to Settings</button>
+</div>
+
+<!-- ── Push permission card (shown after PWA install) ── -->
+
+<!-- ── Navigation ── -->
+<nav id="mainNav">
+  <button class="active" data-tab="products"  onclick="switchTab('products',this)">📦 <span id="navProdLabel">Products</span></button>
+  <button data-tab="orders"         onclick="switchTab('orders',this)">🛒 Orders <span class="n-badge" id="ordersBadge"></span></button>
+  <button data-tab="inquiries"      onclick="switchTab('inquiries',this)">👁 Inquiries <span class="n-badge" id="inquiriesBadge"></span></button>
+  <button data-tab="customers"      onclick="switchTab('customers',this)">👥 Customers</button>
+  <button data-tab="broadcast"      onclick="switchTab('broadcast',this)">📣 Broadcast</button>
+  <button data-tab="status"         onclick="switchTab('status',this)">🖼 Status</button>
+  <button data-tab="autoreplies"    onclick="switchTab('autoreplies',this)">⚡ Auto-Replies</button>
+  <button data-tab="features"       onclick="switchTab('features',this)">✨ Features</button>
+  <button data-tab="notifications"  onclick="switchTab('notifications',this)">🔔 Notifications</button>
+  <button data-tab="settings"       onclick="switchTab('settings',this)">⚙️ Settings</button>
 </nav>
 
 <div class="container">
 
-  <!-- AUTO-REPLIES -->
-  <div id="tab-replies" class="section active">
-    <h2>Auto-Reply Rules</h2>
-    <div id="msgReplies" class="msg"></div>
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- PRODUCTS / SERVICES                                      -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-products" class="section active">
+    <div id="msgProducts" class="msg"></div>
+
+    <!-- Add item form -->
     <div class="card">
+      <h3 id="addItemTitle" style="margin-bottom:14px">Add Product</h3>
+
+      <label class="upload-label" id="uploadLabel">
+        <input type="file" id="itemImageFile" accept="image/*" onchange="previewImage(this,'itemPreview','uploadLabel')"/>
+        📷 &nbsp;Tap to upload product photo
+      </label>
+      <img id="itemPreview" class="preview-img"/>
+
       <div class="row">
         <div class="grow">
-          <label>Keywords (comma separated)</label>
-          <input id="newKw" placeholder="e.g. price, how much, cost"/>
+          <label>Name <span style="color:var(--red)">*</span></label>
+          <input id="itemName" placeholder="e.g. Ankara Maxi Dress"/>
+        </div>
+        <div class="grow">
+          <label>Price (₦) <span style="color:var(--red)">*</span></label>
+          <input id="itemPrice" type="number" placeholder="e.g. 5000"/>
         </div>
       </div>
-      <div style="margin-bottom:12px">
-        <label>Reply Message</label>
-        <textarea id="newResp" placeholder="Type the reply your bot will send..."></textarea>
+
+      <!-- Service-only: duration -->
+      <div id="durationField" style="display:none;margin-bottom:10px">
+        <label>Session Duration</label>
+        <input id="itemDuration" placeholder="e.g. 60 minutes"/>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <label>Description <span style="color:#374151;font-size:.75rem">(optional but recommended)</span></label>
+        <textarea id="itemDesc" placeholder="e.g. Available in red, blue and yellow. Sizes S, M, L, XL."></textarea>
+      </div>
+      <button class="btn btn-green" id="addItemBtn" onclick="addItem()">+ Add</button>
+    </div>
+
+    <div id="itemList"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- ORDERS                                                   -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-orders" class="section">
+    <h2>Orders</h2>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-gray" onclick="filterOrders('all')"    id="fo-all">All</button>
+      <button class="btn btn-sm" style="background:#451a03;color:var(--orange)" onclick="filterOrders('pending')"   id="fo-pending">Pending</button>
+      <button class="btn btn-sm btn-blue"  onclick="filterOrders('accepted')"  id="fo-accepted">Accepted</button>
+      <button class="btn btn-sm" style="background:#14532d;color:var(--green)" onclick="filterOrders('delivered')"  id="fo-delivered">Completed</button>
+    </div>
+    <div id="orderList"><p style="color:#64748b;font-size:.85rem">No orders yet.</p></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- PRICE INQUIRIES / LEADS                                  -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-inquiries" class="section">
+    <h2>Price Inquiries — Leads</h2>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px">Customers who asked about your products or services but haven't ordered yet. You can broadcast to them.</p>
+    <button class="btn btn-green" style="margin-bottom:14px" onclick="broadcastToLeads()">📣 Broadcast to All Leads</button>
+    <div id="leadList"><p style="color:#64748b;font-size:.85rem">No inquiries yet.</p></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- CUSTOMERS                                                -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-customers" class="section">
+    <h2>Your Customers</h2>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px">Everyone who has ever chatted with your bot. Use broadcasts to reconnect with them.</p>
+    <div id="customerList"><p style="color:#64748b;font-size:.85rem">No customers yet.</p></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- BROADCAST                                                -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-broadcast" class="section">
+    <h2>Send Broadcast</h2>
+    <div id="msgBroadcast" class="msg"></div>
+    <div class="card">
+      <div style="margin-bottom:10px">
+        <label>Send to</label>
+        <select id="bcTarget">
+          <option value="all">All customers</option>
+          <option value="inquiries">Price inquiry leads only</option>
+          <option value="ordered">Customers who have ordered</option>
+        </select>
+      </div>
+      <div style="margin-bottom:10px">
+        <label>Message</label>
+        <textarea id="bcMsg" placeholder="Type your message..."></textarea>
+      </div>
+      <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
+    </div>
+    <h2 style="margin-top:4px">Sent Broadcasts</h2>
+    <div id="broadcastLog"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- STATUS POSTS                                             -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-status" class="section">
+    <h2>WhatsApp Status Scheduler</h2>
+    <div id="msgStatus" class="msg"></div>
+    <div class="card">
+      <label class="upload-label">
+        <input type="file" id="statusImageFile" accept="image/*" onchange="previewImage(this,'statusPreview',null)"/>
+        📷 &nbsp;Upload status image
+      </label>
+      <img id="statusPreview" class="preview-img"/>
+      <div style="margin-bottom:10px">
+        <label>Caption <span style="color:#374151;font-size:.75rem">(optional)</span></label>
+        <textarea id="spCaption" placeholder="Optional custom caption — leave blank for auto caption"></textarea>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label>Post time (24hr)</label>
+          <input id="spTime" placeholder="e.g. 09:00"/>
+        </div>
+        <div class="grow">
+          <label>Days</label>
+          <input id="spDays" placeholder="e.g. Mon,Wed,Fri"/>
+        </div>
+      </div>
+      <button class="btn btn-green" onclick="addStatusPost()">+ Schedule</button>
+    </div>
+    <div id="postList"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- AUTO-REPLIES                                             -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-autoreplies" class="section">
+    <h2>Custom Auto-Replies</h2>
+    <div style="background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:16px">
+      💡 Your bot already handles products, prices, orders, delivery, socials and policies automatically. Add rules here only for extra questions specific to your business.
+    </div>
+    <div id="msgReplies" class="msg"></div>
+    <div class="card">
+      <div style="margin-bottom:10px">
+        <label>Keywords (comma separated)</label>
+        <input id="newKw" placeholder="e.g. discount, promo code, vip"/>
+      </div>
+      <div style="margin-bottom:10px">
+        <label>Reply</label>
+        <textarea id="newResp" placeholder="e.g. We don't currently have promo codes, but follow our status for exclusive deals!"></textarea>
       </div>
       <button class="btn btn-green" onclick="addFlow()">+ Add Rule</button>
     </div>
     <div id="flowList"></div>
   </div>
 
-  <!-- STATUS POSTS -->
-  <div id="tab-status" class="section">
-    <h2>WhatsApp Status Scheduler</h2>
-    <div id="msgStatus" class="msg"></div>
-    <div class="card">
-      <div style="margin-bottom:12px">
-        <label>Image URL (direct link)</label>
-        <input id="spMedia" placeholder="https://i.imgur.com/yourimage.jpg"/>
-      </div>
-      <div style="margin-bottom:12px">
-        <label>Caption (optional - leave blank for auto caption)</label>
-        <textarea id="spCaption" placeholder="Optional custom caption..."></textarea>
-      </div>
-      <div class="row">
-        <div class="grow">
-          <label>Post Time (24hr e.g. 09:00)</label>
-          <input id="spTime" placeholder="09:00"/>
-        </div>
-        <div class="grow">
-          <label>Days (Mon,Wed,Fri etc)</label>
-          <input id="spDays" placeholder="Mon,Wed,Fri"/>
-        </div>
-      </div>
-      <button class="btn btn-green" onclick="addStatusPost()">+ Schedule Post</button>
-    </div>
-    <div id="postList"></div>
-  </div>
-
-  <!-- BROADCAST -->
-  <div id="tab-broadcast" class="section">
-    <h2>Send Broadcast</h2>
-    <div id="msgBroadcast" class="msg"></div>
-    <div class="card">
-      <div style="margin-bottom:12px">
-        <label>Message to send to all recent contacts</label>
-        <textarea id="bcMsg" placeholder="Type your broadcast message..."></textarea>
-      </div>
-      <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
-    </div>
-    <h2 style="margin-top:8px">Recent Broadcasts</h2>
-    <div id="broadcastLog"></div>
-  </div>
-
-  <!-- FEATURES -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- FEATURES                                                 -->
+  <!-- ════════════════════════════════════════════════════════ -->
   <div id="tab-features" class="section">
     <h2>Bot Features</h2>
-
-    <div class="feat-card" style="border:1px solid var(--green)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#127908;</span>
+    <div class="card" style="border-color:var(--green);margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <span style="font-size:1.3rem">🎤</span>
         <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
-        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
       </div>
-      <p style="font-size:.83rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot automatically transcribes and replies in English text. Powered by OpenAI Whisper.</p>
+      <p style="font-size:.81rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot transcribes and replies automatically.</p>
     </div>
-
-    <div class="feat-card" style="border:1px solid var(--green)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#128176;</span>
-        <span style="font-weight:700;color:var(--green)">Payment Confirmation Alerts</span>
-        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+    <div class="card" style="border-color:var(--green);margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <span style="font-size:1.3rem">💰</span>
+        <span style="font-weight:700;color:var(--green)">Payment Confirmation</span>
+        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
       </div>
-      <p style="font-size:.83rem;color:#94a3b8">When a customer says they have paid, your bot alerts you on your personal WhatsApp. Reply <b style="color:#fff">1</b> to confirm, <b style="color:#fff">2</b> to ask them wait, <b style="color:#fff">3</b> if not received. Bot messages the customer automatically.</p>
-      <p style="font-size:.78rem;color:var(--orange);margin-top:8px">Set your notification number in the Settings tab.</p>
+      <p style="font-size:.81rem;color:#94a3b8">When a customer pays, the bot collects their receipt and links it to the order in your dashboard. Confirm directly from the Orders tab.</p>
     </div>
-
-    <div class="feat-card" style="border:1px solid var(--green)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#128588;</span>
-        <span style="font-weight:700;color:var(--green)">Human Handoff Detection</span>
-        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+    <div class="card" style="border-color:var(--green);margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <span style="font-size:1.3rem">🙋</span>
+        <span style="font-weight:700;color:var(--green)">Human Handoff</span>
+        <span style="background:var(--green);color:#000;font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:20px">LIVE</span>
       </div>
-      <p style="font-size:.83rem;color:#94a3b8">When a customer asks to speak to a real person, the bot tells them to hold on, pauses itself for 30 minutes, and alerts you immediately on your personal WhatsApp.</p>
+      <p style="font-size:.81rem;color:#94a3b8">Customer asks to speak to a human — bot pauses and alerts you immediately on WhatsApp.</p>
     </div>
-
-    <div style="margin:28px 0 10px;padding:10px 14px;background:#0d1a2e;border-left:3px solid var(--purple);border-radius:6px">
-      <p style="font-size:.82rem;color:#93c5fd">&#128640; <b style="color:#fff">Upcoming Upgrades</b> &mdash; You joined ForgeBot early. All features below will be unlocked for you <b style="color:var(--green)">completely free</b> when they go live. No extra payment needed.</p>
+    <div style="margin:20px 0 10px;padding:9px 13px;background:#0d1a2e;border-left:3px solid var(--purple);border-radius:6px">
+      <p style="font-size:.8rem;color:#93c5fd">🚀 <b style="color:#fff">Upcoming Upgrades</b> — You joined early. All features below unlock for you <b style="color:var(--green)">completely free</b>.</p>
     </div>
-
-    <div class="coming-soon">
-      <div class="cs-icon">&#128274;</div>
-      <h3>Fake Payment Receipt Detection</h3>
-      <p>Customers sometimes send edited or fake payment screenshots to collect goods without paying. Our AI will scan every payment receipt image customers send in chat, verify if it is genuine or manipulated, and alert you immediately if it looks suspicious &mdash; so you never get deceived again.</p>
-      <div class="cs-badge">COMING SOON</div>
-    </div>
-
-    <div class="coming-soon" style="border-color:#f97316;background:#1a0a00">
-      <div class="cs-icon">&#128247;&#127916;</div>
-      <h3 style="color:#f97316">Social Media Bot + AI Video Creator</h3>
-      <p>This is an upgrade to your existing ForgeBot &mdash; not a separate product. The same bot that handles your WhatsApp will expand to automatically reply DMs on <b style="color:#fff">Instagram, TikTok, and Facebook</b> using the same auto-reply rules you set here. On top of that, it will use AI to create short promotional videos for your business, add captions and background music, then post them directly to your social pages on a schedule you choose. Your business stays active online 24/7 without you doing anything.</p>
-      <div class="cs-badge" style="background:#f97316">COMING SOON</div>
-    </div>
-
-    <div class="coming-soon" style="border-color:#ef4444;background:#1a0000">
-      <div class="cs-icon">&#128680;</div>
-      <h3 style="color:#ef4444">Community Fraud Blacklist</h3>
-      <p>If a customer scams your business, you will be able to flag their WhatsApp number directly inside ForgeBot with one tap. When <b style="color:#fff">5 or more ForgeBot businesses</b> flag the same number, that person gets automatically blacklisted across the entire ForgeBot network. Every business using ForgeBot gets warned the moment that number tries to contact them. Nigerian SMEs looking out for each other &mdash; as a community.</p>
-      <div class="cs-badge" style="background:#ef4444">COMING SOON</div>
-    </div>
+    <div class="coming-soon"><div class="cs-icon">🔒</div><h3>Fake Payment Receipt Detection</h3><p>AI scans every receipt image and alerts you if it looks edited or fake.</p><div class="cs-badge">COMING SOON</div></div>
+    <div class="coming-soon" style="border-color:#f97316;background:#1a0a00"><div class="cs-icon">📱🎬</div><h3 style="color:#f97316">Social Media Bot + AI Video Creator</h3><p>Expand to Instagram, TikTok and Facebook DMs. Auto-create and post promotional videos.</p><div class="cs-badge" style="background:#f97316">COMING SOON</div></div>
+    <div class="coming-soon" style="border-color:var(--red);background:#1a0000"><div class="cs-icon">🚨</div><h3 style="color:var(--red)">Community Fraud Blacklist</h3><p>Flag scammers once — protect the entire ForgeBot network automatically.</p><div class="cs-badge" style="background:var(--red)">COMING SOON</div></div>
   </div>
 
-  <!-- SETTINGS -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- NOTIFICATIONS                                            -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <div id="tab-notifications" class="section">
+    <h2>Notifications</h2>
+
+    <!-- Push permission card -->
+    <div id="pushCard">
+      <h3>🔔 Never miss an order</h3>
+      <p>Allow ForgeBot to send you alerts when a new order comes in or a customer asks about your products — even when your phone screen is off.</p>
+      <button class="btn btn-green" onclick="requestPushPermission()">Allow Notifications</button>
+      <button class="dismiss" onclick="dismissPushCard()">maybe later</button>
+    </div>
+
+    <div id="notifList"><p style="color:#64748b;font-size:.85rem">No notifications yet.</p></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- SETTINGS                                                 -->
+  <!-- ════════════════════════════════════════════════════════ -->
   <div id="tab-settings" class="section">
     <h2>Settings</h2>
     <div id="msgSettings" class="msg"></div>
 
+    <!-- Profile -->
     <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--green)">Your Notification Number</h3>
-      <div class="notif-box">
-        This is your <b>personal WhatsApp number</b> where the bot sends you all alerts: payment claims, human handoff requests, and other notifications. Enter it in international format without the + sign.
+      <h3 style="margin-bottom:14px;color:var(--green)">Your Profile</h3>
+      <div class="row">
+        <div class="grow">
+          <label>Business Name</label>
+          <input id="settBizName" placeholder="Your business name"/>
+          <div class="lock-note" id="nameLockNote"></div>
+        </div>
+        <div class="grow">
+          <label>Email</label>
+          <input id="settEmail" disabled style="opacity:.5"/>
+        </div>
       </div>
-      <label>WhatsApp Number (e.g. 2348012345678)</label>
-      <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:12px"/>
-      <button class="btn btn-green" onclick="saveNotifNumber()">Save Number</button>
+      <div class="row">
+        <div class="grow">
+          <label>Business Type</label>
+          <select id="settBizType">
+            <option value="products">Sell Products</option>
+            <option value="services">Offer Services</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div class="grow">
+          <label>Plan</label>
+          <input id="settPlan" disabled style="opacity:.5"/>
+        </div>
+      </div>
+      <button class="btn btn-green" onclick="saveProfile()">Save Profile</button>
     </div>
 
+    <div class="section-sep"></div>
+
+    <!-- Notification number -->
     <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">Fallback Message</h3>
-      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">Sent when a customer message does not match any auto-reply rule.</p>
-      <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
-      <button class="btn btn-green" style="margin-top:12px" onclick="saveFallback()">Save Fallback</button>
+      <h3 style="margin-bottom:10px">Notification Number</h3>
+      <div class="notif-box">Your <b>personal WhatsApp number</b> where the bot sends all alerts — orders, payment claims, handoff requests.</div>
+      <label>Number (e.g. 2348012345678)</label>
+      <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:10px"/>
+      <button class="btn btn-green" onclick="saveNotifNumber()">Save</button>
     </div>
 
+    <div class="section-sep"></div>
+
+    <!-- Business hours -->
     <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">WhatsApp Connection</h3>
-      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">If your bot disconnects, click below to reconnect. Open the link on a computer to scan the QR code with your phone.</p>
+      <h3 style="margin-bottom:10px">Business Hours</h3>
+      <p style="font-size:.8rem;color:#64748b;margin-bottom:10px">Your bot will tell customers when you're open or closed based on these hours.</p>
+      <label>Hours</label>
+      <input id="bizHours" placeholder="e.g. Monday – Saturday, 8am – 6pm. Closed Sundays." style="margin-bottom:10px"/>
+      <button class="btn btn-green" onclick="saveBizHours()">Save</button>
+    </div>
+
+    <div class="section-sep"></div>
+
+    <!-- Fallback -->
+    <div class="card">
+      <h3 style="margin-bottom:10px">Fallback Message</h3>
+      <p style="font-size:.8rem;color:#64748b;margin-bottom:10px">Sent when your bot genuinely can't understand the customer's message.</p>
+      <textarea id="fallbackMsg" placeholder="e.g. Thanks for reaching out! Let me get someone to help you shortly. 😊"></textarea>
+      <button class="btn btn-green" style="margin-top:10px" onclick="saveFallback()">Save</button>
+    </div>
+
+    <div class="section-sep"></div>
+
+    <!-- WhatsApp -->
+    <div class="card">
+      <h3 style="margin-bottom:10px">WhatsApp Connection</h3>
+      <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">If your bot disconnects, click Reconnect. Open the link on a computer to scan the QR code.</p>
       <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
     </div>
   </div>
 
-</div>
+</div><!-- /container -->
 
 <script>
+// ── Constants & auth ─────────────────────────────────────────
 const API = '';
 let TOKEN = localStorage.getItem('forgebot_token');
 if (!TOKEN) {
@@ -233,127 +548,553 @@ if (!TOKEN) {
 }
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
 
+let CLIENT = {};           // client data from /api/client/me
+let BIZ_TYPE = 'products'; // updated from CLIENT
+let currentOrderFilter = 'all';
+let lastOrderCount = 0;
+let lastInquiryCount = 0;
+
+// ── Tab switching ─────────────────────────────────────────────
 function switchTab(id, btn) {
   document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
   document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
   document.getElementById('tab-'+id).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'orders')     loadOrders();
+  if (id === 'inquiries')  loadLeads();
+  if (id === 'customers')  loadCustomers();
+  if (id === 'broadcast')  loadBroadcastLogs();
+  if (id === 'autoreplies')loadFlows();
+  if (id === 'status')     loadStatusPosts();
+  if (id === 'notifications') loadNotifications();
+  if (id === 'settings')   loadSettings();
+  if (id === 'products')   loadItems();
+  // Clear badge
+  if (id === 'orders')     { document.getElementById('ordersBadge').classList.remove('show'); }
+  if (id === 'notifications') { document.getElementById('notifDot').classList.remove('show'); }
 }
 
 function showMsg(id, text, type) {
   var el = document.getElementById(id);
+  if (!el) return;
   el.textContent = text;
   el.className = 'msg show ' + type;
-  setTimeout(function(){ el.classList.remove('show'); }, 4000);
+  setTimeout(function(){ el.classList.remove('show'); }, 4500);
 }
 
-function logout() {
-  localStorage.removeItem('forgebot_token');
-  window.location.href = '/';
+function logout() { localStorage.removeItem('forgebot_token'); window.location.href = '/'; }
+function reconnectWA() { window.open('/onboard?token='+TOKEN,'_blank'); }
+
+// ── Image preview + upload ────────────────────────────────────
+function previewImage(input, previewId, labelId) {
+  var preview = document.getElementById(previewId);
+  if (!input.files || !input.files[0]) { preview.style.display='none'; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    if (labelId) document.getElementById(labelId).textContent = '📷  ' + input.files[0].name;
+  };
+  reader.readAsDataURL(input.files[0]);
 }
 
-function reconnectWA() {
-  window.open('/onboard?token=' + TOKEN, '_blank');
+async function uploadImage(fileInput) {
+  if (!fileInput.files || !fileInput.files[0]) return null;
+  var fd = new FormData();
+  fd.append('image', fileInput.files[0]);
+  try {
+    var r = await fetch(API+'/api/upload', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd });
+    if (r.ok) { var d = await r.json(); return d.url; }
+  } catch(e) {}
+  return null;
 }
 
-async function loadAll() {
-  await loadFlows();
-  await loadStatusPosts();
-  await loadBroadcastLogs();
+// ── Load on start ─────────────────────────────────────────────
+async function init() {
+  await loadClientData();
+  await loadItems();
   pollWaStatus();
+  startPolling();
+  initPWA();
 }
 
+async function loadClientData() {
+  try {
+    var r = await fetch(API+'/api/client/me', { headers:H });
+    if (!r.ok) return;
+    CLIENT = await r.json();
+    BIZ_TYPE = CLIENT.business_type || 'products';
+    applyBizType();
+    checkSetupBanner();
+    if (CLIENT.notification_number) document.getElementById('notifNumber').value = CLIENT.notification_number;
+    if (CLIENT.fallback_message)    document.getElementById('fallbackMsg').value    = CLIENT.fallback_message;
+    if (CLIENT.business_name)       document.getElementById('settBizName').value    = CLIENT.business_name;
+    if (CLIENT.email)               document.getElementById('settEmail').value       = CLIENT.email;
+    if (CLIENT.plan)                document.getElementById('settPlan').value        = CLIENT.plan;
+    if (CLIENT.business_hours)      document.getElementById('bizHours').value        = CLIENT.business_hours;
+    document.getElementById('settBizType').value = BIZ_TYPE;
+    checkNameLock();
+  } catch(e) {}
+}
+
+function applyBizType() {
+  var label = document.getElementById('navProdLabel');
+  var addTitle = document.getElementById('addItemTitle');
+  var durField = document.getElementById('durationField');
+  if (BIZ_TYPE === 'services') {
+    label.textContent = 'Services';
+    addTitle.textContent = 'Add Service';
+    durField.style.display = 'block';
+  } else if (BIZ_TYPE === 'both') {
+    label.textContent = 'Products & Services';
+    addTitle.textContent = 'Add Product / Service';
+    durField.style.display = 'block';
+  } else {
+    label.textContent = 'Products';
+    addTitle.textContent = 'Add Product';
+    durField.style.display = 'none';
+  }
+}
+
+function checkSetupBanner() {
+  var missing = !CLIENT.notification_number || !CLIENT.business_hours || !CLIENT.setup_completed;
+  document.getElementById('setupBanner').classList.toggle('show', missing);
+}
+
+function checkNameLock() {
+  var note = document.getElementById('nameLockNote');
+  if (!CLIENT.name_last_changed) { note.textContent = ''; return; }
+  var last = new Date(CLIENT.name_last_changed);
+  var unlock = new Date(last.getTime() + 30*24*60*60*1000);
+  var now = new Date();
+  if (now < unlock) {
+    var days = Math.ceil((unlock - now) / (24*60*60*1000));
+    document.getElementById('settBizName').disabled = true;
+    note.textContent = '🔒 Name locked for ' + days + ' more day' + (days>1?'s':'') + '.';
+  }
+}
+
+// ── WA status polling ─────────────────────────────────────────
 async function pollWaStatus() {
   try {
-    var r = await fetch(API+'/api/client/me', { headers: H });
+    var r = await fetch(API+'/api/client/me', { headers:H });
     if (r.ok) {
       var c = await r.json();
       var badge = document.getElementById('waBadge');
-      if (c.whatsapp_status === 'connected') {
-        badge.textContent = 'Connected';
-        badge.className = 'status-badge';
-      } else {
-        badge.textContent = 'Disconnected';
-        badge.className = 'status-badge disc';
-      }
-      if (c.notification_number) document.getElementById('notifNumber').value = c.notification_number;
-      if (c.fallback_message) document.getElementById('fallbackMsg').value = c.fallback_message;
+      badge.textContent = c.whatsapp_status === 'connected' ? '⬤ Connected' : '⬤ Disconnected';
+      badge.className = 'status-badge' + (c.whatsapp_status === 'connected' ? '' : ' disc');
     }
   } catch(e) {}
-  setTimeout(pollWaStatus, 10000);
+  setTimeout(pollWaStatus, 12000);
 }
 
+// ── Background polling for new orders / inquiries ─────────────
+function startPolling() {
+  setInterval(async function() {
+    try {
+      var r = await fetch(API+'/api/client/orders?status=pending', { headers:H });
+      if (r.ok) {
+        var data = await r.json();
+        var count = (data||[]).length;
+        if (count > lastOrderCount) {
+          playNotifSound();
+          document.getElementById('ordersBadge').textContent = count;
+          document.getElementById('ordersBadge').classList.add('show');
+          document.getElementById('notifDot').classList.add('show');
+        }
+        lastOrderCount = count;
+      }
+    } catch(e) {}
+    try {
+      var r2 = await fetch(API+'/api/client/inquiries?limit=1', { headers:H });
+      if (r2.ok) {
+        var d2 = await r2.json();
+        var total = d2.total || 0;
+        if (total > lastInquiryCount && lastInquiryCount > 0) {
+          document.getElementById('inquiriesBadge').textContent = '!';
+          document.getElementById('inquiriesBadge').classList.add('show');
+          playNotifSound();
+        }
+        lastInquiryCount = total;
+      }
+    } catch(e) {}
+  }, 20000); // every 20 seconds
+}
+
+// ── Notification sound ────────────────────────────────────────
+function playNotifSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.22);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTS & SERVICES
+// ═══════════════════════════════════════════════════════════════
+async function loadItems() {
+  var endpoint = BIZ_TYPE === 'services' ? 'services' : 'products';
+  var el = document.getElementById('itemList');
+  try {
+    var urls = BIZ_TYPE === 'both'
+      ? [fetch(API+'/api/client/products',{headers:H}), fetch(API+'/api/client/services',{headers:H})]
+      : [fetch(API+'/api/client/'+endpoint,{headers:H})];
+    var responses = await Promise.all(urls);
+    var datasets = await Promise.all(responses.map(function(r){ return r.ok ? r.json() : []; }));
+    var all = [];
+    if (BIZ_TYPE === 'both') {
+      (datasets[0]||[]).forEach(function(i){ i._type='product'; all.push(i); });
+      (datasets[1]||[]).forEach(function(i){ i._type='service'; all.push(i); });
+    } else {
+      (datasets[0]||[]).forEach(function(i){ i._type=endpoint.slice(0,-1); all.push(i); });
+    }
+    if (!all.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No items yet. Add your first one above.</p>'; return; }
+    el.innerHTML = all.map(function(item) {
+      var stockLabel = (BIZ_TYPE==='services'||item._type==='service')
+        ? (item.available ? 'Available' : 'Fully Booked')
+        : (item.in_stock  ? 'In Stock'  : 'Out of Stock');
+      var stockClass = (item.in_stock||item.available) ? 'in' : 'out';
+      var typeTag = BIZ_TYPE==='both' ? '<span style="font-size:.68rem;color:#64748b;margin-left:5px">['+item._type+']</span>' : '';
+      return '<div class="item-row">'+
+        '<div class="item-img">'+(item.image_url ? '<img src="'+item.image_url+'" alt=""/>' : '📦')+'</div>'+
+        '<div class="item-info">'+
+          '<div class="item-name">'+item.name+typeTag+'</div>'+
+          '<div class="item-price">₦'+Number(item.price).toLocaleString()+(item.duration?' &nbsp;·&nbsp; '+item.duration:'')+'</div>'+
+          (item.description?'<div class="item-desc">'+item.description+'</div>':'')+'</div>'+
+        '<div class="item-actions">'+
+          '<button class="toggle-stock '+stockClass+'" onclick="toggleStock(\''+item.id+'\',\''+item._type+'\',this)">'+stockLabel+'</button>'+
+          '<button class="btn btn-red" onclick="deleteItem(\''+item.id+'\',\''+item._type+'\')">✕</button>'+
+        '</div></div>';
+    }).join('');
+  } catch(e) { el.innerHTML='<p style="color:var(--red);font-size:.85rem">Error loading items.</p>'; }
+}
+
+async function addItem() {
+  var name  = document.getElementById('itemName').value.trim();
+  var price = document.getElementById('itemPrice').value.trim();
+  var desc  = document.getElementById('itemDesc').value.trim();
+  var dur   = document.getElementById('itemDuration').value.trim();
+  if (!name || !price) { showMsg('msgProducts','Please enter item name and price.','err'); return; }
+
+  var btn = document.getElementById('addItemBtn');
+  btn.textContent='Saving...'; btn.disabled=true;
+
+  var imageUrl = await uploadImage(document.getElementById('itemImageFile'));
+
+  // Determine endpoint based on biz type
+  // For 'both', user picks type via a toggle — for now default to 'product'
+  var isService = BIZ_TYPE === 'services';
+  var endpoint = isService ? 'services' : 'products';
+  var body = { name, price:parseFloat(price), description:desc };
+  if (imageUrl) body.image_url = imageUrl;
+  if (isService && dur) body.duration = dur;
+
+  var r = await fetch(API+'/api/client/'+endpoint, { method:'POST', headers:H, body:JSON.stringify(body) });
+  if (r.ok) {
+    document.getElementById('itemName').value='';
+    document.getElementById('itemPrice').value='';
+    document.getElementById('itemDesc').value='';
+    document.getElementById('itemDuration').value='';
+    document.getElementById('itemPreview').style.display='none';
+    document.getElementById('itemImageFile').value='';
+    showMsg('msgProducts','Item added!','ok');
+    loadItems();
+  } else showMsg('msgProducts','Failed to add item.','err');
+  btn.textContent='+ Add'; btn.disabled=false;
+}
+
+async function toggleStock(id, type, btn) {
+  var endpoint = type==='service' ? 'services' : 'products';
+  var field    = type==='service' ? 'available' : 'in_stock';
+  var current  = btn.classList.contains('in');
+  var r = await fetch(API+'/api/client/'+endpoint+'/'+id, {
+    method:'PATCH', headers:H, body:JSON.stringify({[field]: !current})
+  });
+  if (r.ok) loadItems();
+}
+
+async function deleteItem(id, type) {
+  if (!confirm('Delete this item?')) return;
+  var endpoint = type==='service' ? 'services' : 'products';
+  var r = await fetch(API+'/api/client/'+endpoint+'/'+id, { method:'DELETE', headers:H });
+  if (r.ok) loadItems();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORDERS
+// ═══════════════════════════════════════════════════════════════
+async function loadOrders() {
+  var el = document.getElementById('orderList');
+  var url = currentOrderFilter === 'all'
+    ? API+'/api/client/orders'
+    : API+'/api/client/orders?status='+currentOrderFilter;
+  try {
+    var r = await fetch(url, { headers:H });
+    var orders = r.ok ? await r.json() : [];
+    if (!orders.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No orders found.</p>'; return; }
+    el.innerHTML = orders.map(function(o) {
+      var items = (o.items||[]).map(function(i){ return i.qty+'× '+i.name+' (₦'+Number(i.price).toLocaleString()+')'; }).join(', ');
+      var statusCls = 'status-' + (o.status||'pending').replace(/_/g,'-');
+      var statusLabel = {pending:'⏳ Pending',accepted:'✅ Accepted',in_delivery:'🚚 In Delivery',delivered:'📦 Delivered',completed:'✅ Completed',cancelled:'❌ Cancelled'}[o.status] || o.status;
+      var addressLine = o.order_type==='booking'
+        ? '<div class="order-address">📅 Appointment: '+(o.appointment_time||'TBC')+'</div>'
+        : '<div class="order-address">📍 Delivery: '+(o.delivery_address||'Not provided')+'</div>';
+      var receiptHtml = o.receipt_url
+        ? '<div class="order-receipt"><img src="'+o.receipt_url+'" onclick="window.open(this.src)" title="Click to view full size"/><div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Payment receipt received</div></div>'
+        : '<div class="order-receipt"><div class="receipt-pending">⏳ Awaiting payment receipt...</div></div>';
+      var payBtns = o.receipt_url && o.payment_status==='unpaid'
+        ? '<button class="btn btn-green" onclick="confirmPayment(\''+o.id+'\',true)">✅ Confirm Payment</button>'+
+          '<button class="btn" style="background:#374151;color:#e2e8f0" onclick="confirmPayment(\''+o.id+'\',false)">❌ Reject Payment</button>'
+        : '';
+      var statusBtns = '';
+      if (o.status==='pending')      statusBtns='<button class="btn btn-green" onclick="updateOrderStatus(\''+o.id+'\',\'accepted\')">Accept Order</button><button class="btn btn-red" onclick="updateOrderStatus(\''+o.id+'\',\'cancelled\')">Decline</button>';
+      if (o.status==='accepted')     statusBtns='<button class="btn btn-blue" onclick="updateOrderStatus(\''+o.id+'\','+(o.order_type==='booking'?'\'completed\'':'\'in_delivery\'')+')">Mark '+(o.order_type==='booking'?'Completed':'In Delivery')+'</button>';
+      if (o.status==='in_delivery')  statusBtns='<button class="btn btn-green" onclick="updateOrderStatus(\''+o.id+'\',\'delivered\')">Mark Delivered</button>';
+      return '<div class="order-card">'+
+        '<div class="order-head">'+
+          '<div><div class="order-customer">👤 '+(o.customer_name||o.customer_jid)+'</div><div class="order-time">'+new Date(o.created_at).toLocaleString()+'</div></div>'+
+          '<div class="order-status '+statusCls+'">'+statusLabel+'</div>'+
+        '</div>'+
+        '<div class="order-items">🛒 '+items+'</div>'+
+        '<div class="order-total">Total: ₦'+Number(o.total||0).toLocaleString()+'</div>'+
+        addressLine+
+        receiptHtml+
+        '<div class="order-btns">'+statusBtns+' '+payBtns+'</div>'+
+        '</div>';
+    }).join('');
+  } catch(e) { el.innerHTML='<p style="color:var(--red);font-size:.85rem">Error loading orders.</p>'; }
+}
+
+function filterOrders(status) {
+  currentOrderFilter = status;
+  loadOrders();
+}
+
+async function updateOrderStatus(orderId, status) {
+  var r = await fetch(API+'/api/client/orders/'+orderId, { method:'PATCH', headers:H, body:JSON.stringify({status}) });
+  if (r.ok) loadOrders(); else alert('Update failed. Please try again.');
+}
+
+async function confirmPayment(orderId, confirmed) {
+  var r = await fetch(API+'/api/client/orders/'+orderId+'/payment', {
+    method:'POST', headers:H, body:JSON.stringify({confirmed})
+  });
+  if (r.ok) loadOrders(); else alert('Update failed.');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRICE INQUIRIES / LEADS
+// ═══════════════════════════════════════════════════════════════
+async function loadLeads() {
+  var el = document.getElementById('leadList');
+  try {
+    var r = await fetch(API+'/api/client/inquiries', { headers:H });
+    var leads = r.ok ? await r.json() : [];
+    if (!leads.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No inquiries yet.</p>'; return; }
+    el.innerHTML = leads.map(function(l) {
+      return '<div class="lead-row">'+
+        '<div class="lead-info">'+
+          '<div class="lead-name">👤 '+(l.customer_name||l.customer_jid)+'</div>'+
+          '<div class="lead-product">Asked about: '+l.product_name+' — ₦'+Number(l.product_price||0).toLocaleString()+'</div>'+
+          '<div class="lead-time">'+new Date(l.created_at).toLocaleString()+'</div>'+
+        '</div></div>';
+    }).join('');
+    document.getElementById('inquiriesBadge').textContent = leads.length;
+    document.getElementById('inquiriesBadge').classList.toggle('show', leads.length > 0);
+  } catch(e) {}
+}
+
+function broadcastToLeads() {
+  document.getElementById('bcTarget').value = 'inquiries';
+  switchTab('broadcast', document.querySelector('[data-tab=broadcast]'));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMERS
+// ═══════════════════════════════════════════════════════════════
+async function loadCustomers() {
+  var el = document.getElementById('customerList');
+  try {
+    var r = await fetch(API+'/api/client/customers', { headers:H });
+    var custs = r.ok ? await r.json() : [];
+    if (!custs.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No customers yet.</p>'; return; }
+    el.innerHTML = custs.map(function(c) {
+      var initials = (c.name||'?').split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+      return '<div class="customer-row">'+
+        '<div class="cust-avatar">'+initials+'</div>'+
+        '<div class="cust-info">'+
+          '<div class="cust-name">'+(c.name||'Unknown')+'</div>'+
+          '<div class="cust-meta">'+c.phone+' · Last contact: '+new Date(c.last_contact).toLocaleDateString()+'</div>'+
+        '</div>'+
+        '<div class="cust-orders">'+c.order_count+' order'+(c.order_count!==1?'s':'')+'</div>'+
+        '</div>';
+    }).join('');
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BROADCAST
+// ═══════════════════════════════════════════════════════════════
+async function sendBroadcast() {
+  var message = document.getElementById('bcMsg').value.trim();
+  var target  = document.getElementById('bcTarget').value;
+  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
+  if (!confirm('Send this to your '+(target==='all'?'all contacts':target)+'?')) return;
+  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message,target}) });
+  if (r.ok) { document.getElementById('bcMsg').value=''; showMsg('msgBroadcast','Broadcast sent!','ok'); loadBroadcastLogs(); }
+  else showMsg('msgBroadcast','Failed to send.','err');
+}
+
+async function loadBroadcastLogs() {
+  var r = await fetch(API+'/api/client/broadcasts', { headers:H });
+  var logs = r.ok ? await r.json() : [];
+  var el = document.getElementById('broadcastLog');
+  if (!logs.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No broadcasts sent yet.</p>'; return; }
+  el.innerHTML = logs.map(function(l){
+    return '<div class="bc-row">'+new Date(l.created_at).toLocaleString()+' · '+l.recipients+' recipients · "'+String(l.message).slice(0,55)+'..."</div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS POSTS
+// ═══════════════════════════════════════════════════════════════
+async function addStatusPost() {
+  var caption = document.getElementById('spCaption').value.trim();
+  var time    = document.getElementById('spTime').value.trim();
+  var days    = document.getElementById('spDays').value.trim();
+  if (!time || !days) { showMsg('msgStatus','Please enter time and days.','err'); return; }
+  var imageUrl = await uploadImage(document.getElementById('statusImageFile'));
+  if (!imageUrl) { showMsg('msgStatus','Please upload an image.','err'); return; }
+  var r = await fetch(API+'/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({mediaUrl:imageUrl,caption,scheduledTime:time,scheduledDays:days}) });
+  if (r.ok) {
+    document.getElementById('spCaption').value=''; document.getElementById('spTime').value=''; document.getElementById('spDays').value='';
+    document.getElementById('statusPreview').style.display='none';
+    showMsg('msgStatus','Post scheduled!','ok'); loadStatusPosts();
+  } else showMsg('msgStatus','Failed.','err');
+}
+
+async function loadStatusPosts() {
+  var r = await fetch(API+'/api/client/status-posts', { headers:H });
+  var posts = r.ok ? await r.json() : [];
+  var el = document.getElementById('postList');
+  if (!posts.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No scheduled posts.</p>'; return; }
+  el.innerHTML = posts.map(function(p){
+    return '<div class="post-item">'+
+      '<img class="post-thumb" src="'+(p.media_url||'')+'" alt=""/>'+
+      '<div class="post-info"><div class="post-caption">'+(p.caption||'(auto caption)')+'</div><div class="post-schedule">'+p.scheduled_time+' · '+p.scheduled_days+'</div></div>'+
+      '<button class="btn btn-red" onclick="deletePost(\''+p.id+'\')">✕</button>'+
+      '</div>';
+  }).join('');
+}
+
+async function deletePost(id) {
+  if (!confirm('Delete?')) return;
+  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
+  if (r.ok) loadStatusPosts();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-REPLIES
+// ═══════════════════════════════════════════════════════════════
 async function loadFlows() {
-  var r = await fetch(API+'/api/client/flows', { headers: H });
-  var flows = await r.json();
+  var r = await fetch(API+'/api/client/flows', { headers:H });
+  var flows = r.ok ? await r.json() : [];
   var el = document.getElementById('flowList');
-  if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return; }
-  el.innerHTML = flows.map(function(f) {
-    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">' + f.keywords + '</div><div class="flow-resp">' + f.response + '</div></div><button class="btn btn-red" onclick="deleteFlow('' + f.id + '')">Delete</button></div>';
+  if (!flows.length) { el.innerHTML='<p style="color:#64748b;font-size:.85rem">No custom rules yet.</p>'; return; }
+  el.innerHTML = flows.map(function(f){
+    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">'+f.keywords+'</div><div class="flow-resp">'+f.response+'</div></div><button class="btn btn-red" onclick="deleteFlow(\''+f.id+'\')">✕</button></div>';
   }).join('');
 }
 
 async function addFlow() {
-  var kw = document.getElementById('newKw').value.trim();
+  var kw   = document.getElementById('newKw').value.trim();
   var resp = document.getElementById('newResp').value.trim();
-  if (!kw || !resp) { showMsg('msgReplies','Please fill in keywords and reply.','err'); return; }
+  if (!kw||!resp) { showMsg('msgReplies','Please fill both fields.','err'); return; }
   var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:resp}) });
   if (r.ok) { document.getElementById('newKw').value=''; document.getElementById('newResp').value=''; showMsg('msgReplies','Rule added!','ok'); loadFlows(); }
-  else showMsg('msgReplies','Failed to add rule.','err');
+  else showMsg('msgReplies','Failed.','err');
 }
 
 async function deleteFlow(id) {
-  if (!confirm('Delete this rule?')) return;
+  if (!confirm('Delete?')) return;
   var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
-  if (r.ok) { showMsg('msgReplies','Rule deleted.','ok'); loadFlows(); }
+  if (r.ok) loadFlows();
 }
 
-async function loadStatusPosts() {
-  var r = await fetch(API+'/api/client/status-posts', { headers: H });
-  var posts = await r.json();
-  var el = document.getElementById('postList');
-  if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
-  el.innerHTML = posts.map(function(p) {
-    return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">' + (p.caption || '(auto caption)') + '</div><div style="font-size:.78rem;color:#64748b">' + p.scheduled_time + ' - ' + p.scheduled_days + '</div></div><button class="btn btn-red" onclick="deletePost('' + p.id + '')">Delete</button></div>';
-  }).join('');
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS TAB
+// ═══════════════════════════════════════════════════════════════
+async function loadNotifications() {
+  // Show push permission card if not yet granted
+  var pushGranted = localStorage.getItem('fb_push_granted');
+  var pushSupported = 'PushManager' in window && 'serviceWorker' in navigator;
+  var pushCard = document.getElementById('pushCard');
+  if (pushSupported && !pushGranted) {
+    pushCard.classList.add('show');
+  }
 }
 
-async function addStatusPost() {
-  var mediaUrl = document.getElementById('spMedia').value.trim();
-  var caption = document.getElementById('spCaption').value.trim();
-  var scheduledTime = document.getElementById('spTime').value.trim();
-  var scheduledDays = document.getElementById('spDays').value.trim();
-  if (!mediaUrl || !scheduledTime || !scheduledDays) { showMsg('msgStatus','Please fill media URL, time and days.','err'); return; }
-  var r = await fetch(API+'/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({mediaUrl:mediaUrl,caption:caption,scheduledTime:scheduledTime,scheduledDays:scheduledDays}) });
-  if (r.ok) {
-    document.getElementById('spMedia').value=''; document.getElementById('spCaption').value=''; document.getElementById('spTime').value=''; document.getElementById('spDays').value='';
-    showMsg('msgStatus','Post scheduled!','ok'); loadStatusPosts();
-  } else showMsg('msgStatus','Failed to schedule.','err');
+async function requestPushPermission() {
+  try {
+    var reg = await navigator.serviceWorker.ready;
+    var perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      // Subscribe to push (VAPID public key from backend)
+      var r = await fetch(API+'/api/push/vapid-key', { headers:H });
+      if (r.ok) {
+        var { publicKey } = await r.json();
+        var sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+        await fetch(API+'/api/push/subscribe', { method:'POST', headers:H, body:JSON.stringify(sub) });
+      }
+      localStorage.setItem('fb_push_granted','1');
+      document.getElementById('pushCard').classList.remove('show');
+      showMsg('msgSettings','🔔 Notifications enabled!','ok');
+    }
+  } catch(e) { console.warn('Push setup failed', e); }
 }
 
-async function deletePost(id) {
-  if (!confirm('Delete this scheduled post?')) return;
-  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
-  if (r.ok) { showMsg('msgStatus','Post deleted.','ok'); loadStatusPosts(); }
+function dismissPushCard() {
+  document.getElementById('pushCard').classList.remove('show');
+  // Remind tomorrow
+  localStorage.setItem('fb_push_snoozed', Date.now() + 86400000);
 }
 
-async function loadBroadcastLogs() {
-  var r = await fetch(API+'/api/client/broadcasts', { headers: H });
-  var logs = await r.json();
-  var el = document.getElementById('broadcastLog');
-  if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
-  el.innerHTML = logs.map(function(l) {
-    return '<div class="broadcast-log">' + new Date(l.created_at).toLocaleString() + ' - ' + l.recipients + ' recipients - "' + l.message.slice(0,60) + '..."</div>';
-  }).join('');
+function urlBase64ToUint8Array(base64String) {
+  var padding = '='.repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g,'+'). replace(/_/g,'/');
+  var rawData = window.atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for (var i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
 }
 
-async function sendBroadcast() {
-  var message = document.getElementById('bcMsg').value.trim();
-  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
-  if (!confirm('Send this to all recent contacts?')) return;
-  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message:message}) });
-  if (r.ok) { document.getElementById('bcMsg').value=''; showMsg('msgBroadcast','Broadcast sent!','ok'); loadBroadcastLogs(); }
-  else showMsg('msgBroadcast','Failed to send.','err');
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════
+async function loadSettings() { /* data already loaded in init */ }
+
+async function saveProfile() {
+  var name    = document.getElementById('settBizName').value.trim();
+  var bizType = document.getElementById('settBizType').value;
+  if (!name) { showMsg('msgSettings','Please enter a business name.','err'); return; }
+  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({business_name:name, business_type:bizType}) });
+  if (r.ok) { showMsg('msgSettings','Profile saved!','ok'); BIZ_TYPE=bizType; applyBizType(); }
+  else {
+    var d = await r.json().catch(function(){return{};});
+    showMsg('msgSettings', d.message||'Save failed.','err');
+  }
 }
 
 async function saveNotifNumber() {
@@ -364,15 +1105,86 @@ async function saveNotifNumber() {
   else showMsg('msgSettings','Save failed.','err');
 }
 
+async function saveBizHours() {
+  var hours = document.getElementById('bizHours').value.trim();
+  if (!hours) { showMsg('msgSettings','Please enter your business hours.','err'); return; }
+  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({business_hours:hours}) });
+  if (r.ok) { showMsg('msgSettings','Business hours saved!','ok'); checkSetupBanner(); }
+  else showMsg('msgSettings','Save failed.','err');
+}
+
 async function saveFallback() {
   var msg = document.getElementById('fallbackMsg').value.trim();
-  if (!msg) { showMsg('msgSettings','Please type a fallback message.','err'); return; }
+  if (!msg) { showMsg('msgSettings','Please enter a fallback message.','err'); return; }
   var r = await fetch(API+'/api/client/fallback', { method:'PUT', headers:H, body:JSON.stringify({fallback_message:msg}) });
   if (r.ok) showMsg('msgSettings','Fallback saved!','ok');
   else showMsg('msgSettings','Save failed.','err');
 }
 
-loadAll();
+// ═══════════════════════════════════════════════════════════════
+// PWA INSTALL LOGIC
+// ═══════════════════════════════════════════════════════════════
+function initPWA() {
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (isStandalone) {
+    // Already installed — show push card after short delay
+    setTimeout(function() {
+      var snoozed = localStorage.getItem('fb_push_snoozed');
+      if (!snoozed || Date.now() > parseInt(snoozed)) {
+        document.getElementById('pushCard').classList.add('show');
+        switchTab('notifications', document.querySelector('[data-tab=notifications]'));
+      }
+    }, 2000);
+    return;
+  }
+  if (localStorage.getItem('forgebot_pwa_installed')) return;
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
+
+  var overlay    = document.getElementById('pwa-overlay');
+  var androidSec = document.getElementById('android-section');
+  var iosSec     = document.getElementById('ios-section');
+  var installBtn = document.getElementById('pwa-install-btn');
+  var snoozeBtn  = document.getElementById('pwa-snooze-btn');
+  var doneBtn    = document.getElementById('pwa-done-btn');
+  var deferred   = null;
+  var isIOS      = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred = e; });
+
+  // Show on every load until installed
+  setTimeout(function() {
+    if (isIOS) { androidSec.style.display='none'; iosSec.style.display='block'; }
+    overlay.classList.add('show');
+  }, 1000);
+
+  installBtn && installBtn.addEventListener('click', function() {
+    if (deferred) {
+      deferred.prompt();
+      deferred.userChoice.then(function(r) {
+        if (r.outcome==='accepted') { localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show'); }
+        deferred = null;
+      });
+    } else { localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show'); }
+  });
+
+  doneBtn && doneBtn.addEventListener('click', function() {
+    localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show');
+  });
+
+  // Snooze 10 minutes only — never sets installed flag
+  snoozeBtn && snoozeBtn.addEventListener('click', function() {
+    overlay.classList.remove('show');
+    setTimeout(function(){ overlay.classList.add('show'); }, 10 * 60 * 1000);
+  });
+
+  window.addEventListener('appinstalled', function() {
+    localStorage.setItem('forgebot_pwa_installed','1'); overlay.classList.remove('show');
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+init();
 </script>
 </body>
 </html>

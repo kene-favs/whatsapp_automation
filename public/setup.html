@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Set Up Your Bot — ForgeBot</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
+:root{--green:#22c55e;--blue:#3b82f6;--card:#111827;--border:#1e2d3d;--red:#ef4444}
+
+header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px}
+header .logo{font-size:1.2rem;font-weight:700;color:var(--green)}
+header .logo span{color:#fff}
+header p{font-size:.82rem;color:#64748b}
+
+.progress-bar{background:#0d1526;border-bottom:1px solid var(--border);padding:12px 24px}
+.progress-track{max-width:600px;margin:0 auto;display:flex;align-items:center;gap:0}
+.prog-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.prog-dot{width:28px;height:28px;border-radius:50%;background:#1e2d3d;border:2px solid #1e2d3d;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#64748b;transition:.3s}
+.prog-dot.active{background:var(--green);border-color:var(--green);color:#000}
+.prog-dot.done{background:#14532d;border-color:var(--green);color:var(--green)}
+.prog-label{font-size:.68rem;color:#64748b;text-align:center;white-space:nowrap}
+.prog-line{flex:1;height:2px;background:#1e2d3d;margin-bottom:16px}
+.prog-line.done{background:var(--green)}
+
+.container{max-width:620px;margin:0 auto;padding:28px 20px 60px}
+
+.step{display:none}
+.step.active{display:block}
+
+.step-header{margin-bottom:24px}
+.step-header h2{font-size:1.15rem;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+.step-header p{font-size:.84rem;color:#64748b;line-height:1.5}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:16px}
+.card h3{font-size:.88rem;font-weight:700;color:var(--green);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+
+.field{margin-bottom:16px}
+.field:last-child{margin-bottom:0}
+label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
+label .req{color:var(--red);margin-left:2px}
+label .opt{color:#374151;font-size:.75rem;margin-left:4px}
+input,textarea,select{
+  width:100%;background:#0d1526;border:1px solid var(--border);
+  color:#e2e8f0;border-radius:7px;padding:10px 13px;font-size:.87rem;outline:none;
+  transition:.2s
+}
+input:focus,textarea:focus,select:focus{border-color:var(--blue)}
+input::placeholder,textarea::placeholder{color:#374151}
+textarea{min-height:70px;resize:vertical}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.row2{grid-template-columns:1fr}}
+
+.social-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.social-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.social-icon.ig{background:#e1306c22;color:#e1306c}
+.social-icon.fb{background:#1877f222;color:#1877f2}
+.social-icon.tt{background:#69c9d022;color:#69c9d0}
+.social-icon.wa{background:#25d36622;color:#25d366}
+.social-row input{margin:0}
+
+.biz-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:400px){.biz-type-grid{grid-template-columns:1fr}}
+.biz-card{background:#0d1526;border:2px solid var(--border);border-radius:10px;padding:16px 12px;text-align:center;cursor:pointer;transition:.2s}
+.biz-card:hover{border-color:#3b82f6}
+.biz-card.selected{border-color:var(--green);background:#0a1f0a}
+.biz-card .icon{font-size:1.8rem;margin-bottom:6px}
+.biz-card .label{font-size:.82rem;font-weight:600;color:#e2e8f0}
+.biz-card .sublabel{font-size:.72rem;color:#64748b;margin-top:3px}
+
+.msg{padding:10px 14px;border-radius:7px;font-size:.84rem;margin-bottom:14px;display:none}
+.msg.show{display:block}
+.msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+
+.btn-row{display:flex;gap:10px;justify-content:space-between;margin-top:24px}
+.btn{padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:700;transition:.2s}
+.btn-green{background:var(--green);color:#000;flex:1}
+.btn-green:hover{background:#16a34a}
+.btn-green:disabled{background:#374151;color:#64748b;cursor:not-allowed}
+.btn-back{background:#1e2d3d;color:#94a3b8;padding:12px 18px}
+.btn-back:hover{background:#253447}
+
+.notice{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:20px}
+.notice b{color:#fff}
+
+/* Business-type specific sections */
+.for-products,.for-services,.for-both{display:none}
+body.type-products .for-products,
+body.type-products .for-both{display:block}
+body.type-services .for-services,
+body.type-services .for-both{display:block}
+body.type-both .for-products,
+body.type-both .for-services,
+body.type-both .for-both{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Forge<span>Bot</span></div>
+    <p>Almost there — tell us about your business so your bot is ready to go</p>
+  </div>
+</header>
+
+<!-- Progress -->
+<div class="progress-bar">
+  <div class="progress-track">
+    <div class="prog-step">
+      <div class="prog-dot done" id="pd1">✓</div>
+      <div class="prog-label">Signed Up</div>
+    </div>
+    <div class="prog-line done"></div>
+    <div class="prog-step">
+      <div class="prog-dot done" id="pd2">✓</div>
+      <div class="prog-label">WhatsApp<br>Connected</div>
+    </div>
+    <div class="prog-line" id="pl3"></div>
+    <div class="prog-step">
+      <div class="prog-dot active" id="pd3">3</div>
+      <div class="prog-label">Bot<br>Setup</div>
+    </div>
+    <div class="prog-line" id="pl4"></div>
+    <div class="prog-step">
+      <div class="prog-dot" id="pd4">4</div>
+      <div class="prog-label">Dashboard</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="msgGlobal" class="msg err"></div>
+
+  <!-- ── STEP 1: Business Type ─────────────────────────────── -->
+  <div class="step active" id="step1">
+    <div class="step-header">
+      <h2>What does your business do?</h2>
+      <p>This determines how your bot handles conversations and what your dashboard looks like.</p>
+    </div>
+    <div class="biz-type-grid">
+      <div class="biz-card" onclick="selectType('products',this)">
+        <div class="icon">📦</div>
+        <div class="label">Sell Products</div>
+        <div class="sublabel">Physical items, fashion, food, gadgets, etc.</div>
+      </div>
+      <div class="biz-card" onclick="selectType('services',this)">
+        <div class="icon">💆</div>
+        <div class="label">Offer Services</div>
+        <div class="sublabel">Massage, hair, makeup, cleaning, tutoring, etc.</div>
+      </div>
+      <div class="biz-card" onclick="selectType('both',this)">
+        <div class="icon">🏪</div>
+        <div class="label">Both</div>
+        <div class="sublabel">I sell products AND offer services</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-green" id="step1Next" onclick="goStep(2)" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Delivery & Logistics ──────────────────────── -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <h2>Delivery & Logistics</h2>
+      <p>Your bot will use these answers to tell customers exactly how and when they'll receive their order.</p>
+    </div>
+
+    <!-- Products / Both -->
+    <div class="card for-products">
+      <h3>📦 Product Delivery</h3>
+      <div class="row2">
+        <div class="field">
+          <label>Where do you deliver to? <span class="req">*</span></label>
+          <input id="delivers_to" placeholder="e.g. All states in Nigeria"/>
+        </div>
+        <div class="field">
+          <label>Payment on delivery? <span class="req">*</span></label>
+          <input id="payment_on_delivery" placeholder="e.g. Yes, Lagos orders only"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Delivery fee within your city <span class="req">*</span></label>
+          <input id="delivery_fee_local" placeholder="e.g. ₦500 – ₦1,500"/>
+        </div>
+        <div class="field">
+          <label>Delivery fee outside your city <span class="req">*</span></label>
+          <input id="delivery_fee_outside" placeholder="e.g. ₦2,000 – ₦3,500"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Delivery time within your city <span class="req">*</span></label>
+          <input id="delivery_time_local" placeholder="e.g. Same day or next day"/>
+        </div>
+        <div class="field">
+          <label>Delivery time outside your city <span class="req">*</span></label>
+          <input id="delivery_time_outside" placeholder="e.g. 3-5 working days"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Minimum order amount <span class="req">*</span></label>
+        <input id="minimum_order" placeholder="e.g. ₦1,500 minimum / No minimum order"/>
+      </div>
+    </div>
+
+    <!-- Services / Both -->
+    <div class="card for-services">
+      <h3>💆 Service & Appointments</h3>
+      <div class="field">
+        <label>Where is your studio or workspace? <span class="req">*</span></label>
+        <input id="studio_location" placeholder="e.g. 5 Allen Avenue, Ikeja, Lagos"/>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Days & hours you're available <span class="req">*</span></label>
+          <input id="availability_days" placeholder="e.g. Tue – Sun, 9am – 7pm"/>
+        </div>
+        <div class="field">
+          <label>How long is each session? <span class="req">*</span></label>
+          <input id="session_duration" placeholder="e.g. 60 minutes per session"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Do you require a deposit to book? <span class="req">*</span></label>
+          <input id="deposit_required" placeholder="e.g. Yes, 50% upfront / No"/>
+        </div>
+        <div class="field">
+          <label>How far in advance should they book? <span class="req">*</span></label>
+          <input id="advance_booking" placeholder="e.g. At least 24 hours in advance"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Who do you serve? <span class="req">*</span></label>
+          <input id="who_do_you_serve" placeholder="e.g. Female clients only / Everyone welcome"/>
+        </div>
+        <div class="field">
+          <label>Do you offer home service? <span class="req">*</span></label>
+          <input id="home_service" placeholder="e.g. Yes, +₦3,000 / No, studio only"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-back" onclick="goStep(1)">← Back</button>
+      <button class="btn btn-green" onclick="validateStep2()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Policies ───────────────────────────────────── -->
+  <div class="step" id="step3">
+    <div class="step-header">
+      <h2>Your Policies</h2>
+      <p>When customers ask about returns, complaints or bulk orders, your bot will use these answers.</p>
+    </div>
+
+    <div class="card">
+      <h3>📋 Policies & Rules</h3>
+      <div class="field">
+        <label>Return or exchange policy <span class="req">*</span></label>
+        <textarea id="return_policy" placeholder="e.g. We accept returns within 3 days if the wrong item was sent or the item arrived damaged. No returns on custom orders."></textarea>
+      </div>
+      <div class="field">
+        <label>How do you handle complaints? <span class="req">*</span></label>
+        <textarea id="complaint_handling" placeholder="e.g. Send us a clear photo of the issue and we'll resolve it within 24 hours — either a replacement or a full refund."></textarea>
+      </div>
+      <div class="field">
+        <label>Do you take bulk or wholesale orders? <span class="req">*</span></label>
+        <input id="bulk_orders" placeholder="e.g. Yes, contact us directly for bulk pricing above 10 units / No bulk orders"/>
+      </div>
+      <div class="field">
+        <label>Payment methods you accept <span class="req">*</span></label>
+        <input id="payment_methods" placeholder="e.g. Bank transfer, POS on delivery, Opay, cash pickup"/>
+      </div>
+      <div class="field">
+        <label>Do you have a referral reward? <span class="opt">(optional)</span></label>
+        <input id="referral_reward" placeholder="e.g. Refer a friend and get ₦500 off your next order / No referral programme"/>
+      </div>
+      <div class="field">
+        <label>Any current promotion or offer? <span class="opt">(optional)</span></label>
+        <input id="current_promo" placeholder="e.g. Buy 2 get 1 free every Saturday / No ongoing promos right now"/>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-back" onclick="goStep(2)">← Back</button>
+      <button class="btn btn-green" onclick="validateStep3()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: Business-Specific Questions ───────────────── -->
+  <div class="step" id="step4">
+    <div class="step-header">
+      <h2>About Your Business</h2>
+      <p>These make your bot sound like it truly knows your business — not a generic chatbot.</p>
+    </div>
+
+    <div class="notice">
+      💡 <b>Tip:</b> Think about the questions your customers ask most. The more detail you add here, the smarter your bot sounds.
+    </div>
+
+    <div class="card" id="customQACard">
+      <h3>❓ Your Most Common Customer Questions</h3>
+      <p style="font-size:.8rem;color:#64748b;margin-bottom:14px">Add up to 3 questions your customers always ask, and your answers. Your bot will reply with these automatically.</p>
+
+      <div class="field">
+        <label>Question 1 <span class="req">*</span></label>
+        <input id="q1" placeholder="e.g. Do you do custom sizes?"/>
+        <div style="height:8px"></div>
+        <label>Answer 1 <span class="req">*</span></label>
+        <textarea id="a1" placeholder="e.g. Yes! Custom sizing is available for ₦500 extra and takes 5-7 working days. Just mention your measurements when ordering."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Question 2 <span class="opt">(optional)</span></label>
+        <input id="q2" placeholder="e.g. Are your fabrics original?"/>
+        <div style="height:8px"></div>
+        <label>Answer 2</label>
+        <textarea id="a2" placeholder="e.g. Yes, all our materials are 100% imported Ankara and Aso-oke — no local blends."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Question 3 <span class="opt">(optional)</span></label>
+        <input id="q3" placeholder="e.g. Do you cater for events?"/>
+        <div style="height:8px"></div>
+        <label>Answer 3</label>
+        <textarea id="a3" placeholder="e.g. Yes! We handle events of all sizes. Send us a message and we'll send you our event packages."></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-back" onclick="goStep(3)">← Back</button>
+      <button class="btn btn-green" onclick="validateStep4()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: Socials ────────────────────────────────────── -->
+  <div class="step" id="step5">
+    <div class="step-header">
+      <h2>Your Social Media</h2>
+      <p>When customers ask how to follow you online, your bot will send them your links. <b style="color:#f1f5f9">At least one is required.</b></p>
+    </div>
+
+    <div class="card">
+      <h3>📲 Social Links</h3>
+
+      <div class="social-row">
+        <div class="social-icon ig">📸</div>
+        <input id="instagram" placeholder="e.g. @adunolacloset (Instagram handle)"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon fb">👥</div>
+        <input id="facebook" placeholder="e.g. facebook.com/adunolacloset"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon tt">🎵</div>
+        <input id="tiktok" placeholder="e.g. @adunolacloset (TikTok handle)"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon wa">💬</div>
+        <input id="whatsapp_channel" placeholder="e.g. https://whatsapp.com/channel/... (optional)"/>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-back" onclick="goStep(4)">← Back</button>
+      <button class="btn btn-green" onclick="validateStep5()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 6: Done ───────────────────────────────────────── -->
+  <div class="step" id="step6">
+    <div style="text-align:center;padding:40px 0">
+      <div style="font-size:3.5rem;margin-bottom:16px">🎉</div>
+      <h2 style="font-size:1.4rem;color:var(--green);margin-bottom:10px">Your bot is ready!</h2>
+      <p style="color:#94a3b8;font-size:.9rem;max-width:380px;margin:0 auto 30px;line-height:1.6">
+        Everything is set. Your bot now knows your business, your prices, your policies and how to handle customers — all on its own.
+      </p>
+      <button class="btn btn-green" style="max-width:260px;margin:0 auto;display:block;font-size:1rem;padding:14px" onclick="goToDashboard()">
+        Open My Dashboard →
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(window.location.search).get('token')
+           || localStorage.getItem('forgebot_token');
+if (!TOKEN) window.location.href = '/';
+localStorage.setItem('forgebot_token', TOKEN);
+
+const H = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
+let bizType = '';
+let currentStep = 1;
+const TOTAL_STEPS = 5;
+
+// ── Business type selection ──────────────────────────────────
+function selectType(type, el) {
+  bizType = type;
+  document.querySelectorAll('.biz-card').forEach(function(c){ c.classList.remove('selected'); });
+  el.classList.add('selected');
+  document.getElementById('step1Next').disabled = false;
+  // Apply CSS class to body so sections show/hide
+  document.body.className = 'type-' + type;
+}
+
+// ── Step navigation ──────────────────────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('step' + n).classList.add('active');
+  currentStep = n;
+  window.scrollTo(0, 0);
+  updateProgress(n);
+}
+
+function updateProgress(n) {
+  // Steps 1-5 map to the "Bot Setup" circle (step 3 in the header)
+  // Just keep step 3 active until done
+}
+
+// ── Validation helpers ───────────────────────────────────────
+function val(id) { return (document.getElementById(id) || {}).value || ''; }
+function req(id) {
+  var el = document.getElementById(id);
+  if (!el) return true;
+  if (!el.offsetParent) return true; // hidden section — skip
+  return el.value.trim() !== '';
+}
+function showError(msg) {
+  var el = document.getElementById('msgGlobal');
+  el.textContent = msg;
+  el.className = 'msg err show';
+  window.scrollTo(0, 0);
+  setTimeout(function(){ el.classList.remove('show'); }, 5000);
+}
+
+// ── Step 2 validation ────────────────────────────────────────
+function validateStep2() {
+  if (bizType === 'products' || bizType === 'both') {
+    if (!req('delivers_to') || !req('delivery_fee_local') || !req('delivery_fee_outside') ||
+        !req('delivery_time_local') || !req('delivery_time_outside') || !req('payment_on_delivery') || !req('minimum_order')) {
+      showError('Please fill in all delivery fields marked with *'); return;
+    }
+  }
+  if (bizType === 'services' || bizType === 'both') {
+    if (!req('studio_location') || !req('availability_days') || !req('session_duration') ||
+        !req('deposit_required') || !req('advance_booking') || !req('who_do_you_serve') || !req('home_service')) {
+      showError('Please fill in all service fields marked with *'); return;
+    }
+  }
+  goStep(3);
+}
+
+// ── Step 3 validation ────────────────────────────────────────
+function validateStep3() {
+  if (!req('return_policy') || !req('complaint_handling') || !req('bulk_orders') || !req('payment_methods')) {
+    showError('Please fill in all required policy fields.'); return;
+  }
+  goStep(4);
+}
+
+// ── Step 4 validation ────────────────────────────────────────
+function validateStep4() {
+  if (!req('q1') || !req('a1')) {
+    showError('Please fill in at least Question 1 and its answer.'); return;
+  }
+  goStep(5);
+}
+
+// ── Step 5 validation + submit ───────────────────────────────
+function validateStep5() {
+  var ig = val('instagram').trim();
+  var fb = val('facebook').trim();
+  var tt = val('tiktok').trim();
+  var wa = val('whatsapp_channel').trim();
+  if (!ig && !fb && !tt && !wa) {
+    showError('Please add at least one social media link.'); return;
+  }
+  submitSetup();
+}
+
+// ── Submit all data ──────────────────────────────────────────
+async function submitSetup() {
+  var btn = document.querySelector('#step5 .btn-green');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  var payload = {
+    business_type:        bizType,
+    // Delivery
+    delivers_to:          val('delivers_to'),
+    delivery_fee_local:   val('delivery_fee_local'),
+    delivery_fee_outside: val('delivery_fee_outside'),
+    delivery_time_local:  val('delivery_time_local'),
+    delivery_time_outside:val('delivery_time_outside'),
+    payment_on_delivery:  val('payment_on_delivery'),
+    minimum_order:        val('minimum_order'),
+    // Services
+    studio_location:      val('studio_location'),
+    availability_days:    val('availability_days'),
+    session_duration:     val('session_duration'),
+    deposit_required:     val('deposit_required'),
+    advance_booking:      val('advance_booking'),
+    who_do_you_serve:     val('who_do_you_serve'),
+    home_service:         val('home_service'),
+    // Policies
+    return_policy:        val('return_policy'),
+    complaint_handling:   val('complaint_handling'),
+    bulk_orders:          val('bulk_orders'),
+    payment_methods:      val('payment_methods'),
+    referral_reward:      val('referral_reward'),
+    current_promo:        val('current_promo'),
+    // Custom Q&A
+    custom_service_1_q:   val('q1'),
+    custom_service_1_a:   val('a1'),
+    custom_service_2_q:   val('q2'),
+    custom_service_2_a:   val('a2'),
+    custom_service_3_q:   val('q3'),
+    custom_service_3_a:   val('a3'),
+    // Socials
+    instagram:            val('instagram'),
+    facebook:             val('facebook'),
+    tiktok:               val('tiktok'),
+    whatsapp_channel:     val('whatsapp_channel'),
+  };
+
+  try {
+    var r = await fetch('/api/client/setup', {
+      method: 'POST',
+      headers: H,
+      body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      goStep(6);
+    } else {
+      var err = await r.json().catch(function(){ return {}; });
+      showError(err.message || 'Something went wrong. Please try again.');
+      btn.textContent = 'Continue →';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showError('Network error. Please check your connection and try again.');
+    btn.textContent = 'Continue →';
+    btn.disabled = false;
+  }
+}
+
+function goToDashboard() {
+  window.location.href = '/dashboard?token=' + TOKEN;
+}
+</script>
+</body>
+</html>

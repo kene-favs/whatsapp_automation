@@ -83,11 +83,13 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
     </div>
   </div>
 
+  <!-- ── Success screen ── -->
   <div class="success-msg" id="successMsg">
     <div class="big">🎉</div>
-    <h2>Your Bot is Live!</h2>
-    <p>WhatsApp connected successfully. Your bot is now replying customers, posting status, and running 24/7.</p>
-    <a href="/dashboard" class="btn">Go to My Dashboard →</a>
+    <h2>WhatsApp Connected!</h2>
+    <p>One last step — tell us a little about your business so your bot knows exactly how to handle your customers.</p>
+    <!-- href is set dynamically below using the stored token -->
+    <a href="#" class="btn" id="setupLink">Set Up My Bot →</a>
   </div>
 </div>
 
@@ -99,6 +101,9 @@ document.head.appendChild(script);
 
 const token = localStorage.getItem('forgebot_token');
 if (!token) { window.location.href = '/'; }
+
+// Set the setup link with the token so the questionnaire page knows who the user is
+document.getElementById('setupLink').href = '/setup?token=' + token;
 
 function setStatus(type, text) {
   const badge = document.getElementById('statusBadge');
@@ -159,7 +164,7 @@ if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
   document.getElementById('mobileNotice').style.display = 'block';
 }
 
-// Show expire note after 25 seconds to reassure user QR will refresh
+// Show expire note after 25 seconds
 setTimeout(function() {
   var note = document.getElementById('expireNote');
   if (note) note.style.display = 'block';
