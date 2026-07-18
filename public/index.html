@@ -47,23 +47,39 @@ header{background:#111827;border-bottom:1px solid var(--border);padding:16px 32p
 .price-card .btn-primary{width:100%;font-size:.9rem;padding:11px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center;padding:20px}
 .overlay.open{display:flex}
-.modal{background:#111827;border:1px solid var(--border);border-radius:14px;width:100%;max-width:500px;max-height:92vh;overflow-y:auto}
-.modal-header{padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#111827;z-index:10;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.modal{background:#111827;border:1px solid var(--border);border-radius:14px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal-header{padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center}
 .modal-header h2{font-size:1.1rem;font-weight:700}
 .close-btn{background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer}
-.modal-body{padding:20px 24px 28px}
+.modal-body{padding:20px 24px 24px}
 .step-bar{display:flex;gap:6px;margin-bottom:22px}
 .step-dot{flex:1;height:4px;background:var(--border);border-radius:4px;transition:.3s}
 .step-dot.done{background:var(--green)}
 label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px;margin-top:12px}
 input,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
 input:focus,select:focus{border-color:var(--green)}
-input::placeholder{color:#374151}
 .info-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:6px;padding:10px 12px;font-size:.78rem;color:#93c5fd;margin-top:8px}
 .form-btn{width:100%;padding:12px;background:var(--green);color:#000;border:none;border-radius:8px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:18px}
 .form-btn:disabled{background:#374151;color:#64748b;cursor:not-allowed}
 .err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
 .err.show{display:block}
+/* Early Adopters */
+.early{padding:0 20px 60px;max-width:700px;margin:0 auto;text-align:center}
+.early-box{background:#0d1526;border:1px solid rgba(34,197,94,.25);border-radius:14px;padding:28px 24px}
+.early-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;padding:5px 14px;border-radius:100px;margin-bottom:14px}
+.early-title{font-size:1.15rem;font-weight:800;color:#f1f5f9;margin-bottom:6px}
+.early-sub{font-size:.82rem;color:#64748b;margin-bottom:20px}
+.early-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left}
+.early-feat{background:#111827;border:1px solid #1e2d3d;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.early-feat-icon{font-size:1.4rem;flex-shrink:0}
+.early-feat-name{font-size:.85rem;font-weight:700;color:#e2e8f0}
+.modal-early{background:#0a1628;border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px 16px;margin-top:16px}
+.modal-early-badge{display:inline-block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:100px;margin-bottom:8px}
+.modal-early-title{font-size:.82rem;font-weight:700;color:#f1f5f9;margin-bottom:3px}
+.modal-early-sub{font-size:.73rem;color:#64748b;margin-bottom:10px}
+.modal-early-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modal-early-item{font-size:.73rem;color:#94a3b8;display:flex;align-items:center;gap:6px}
+.modal-early-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;flex-shrink:0;opacity:.7}
 .pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .pay-card{background:#0d1526;border:2px solid var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:.2s}
 .pay-card:hover,.pay-card.selected{border-color:var(--green)}
@@ -74,12 +90,6 @@ input::placeholder{color:#374151}
 .processing{text-align:center;padding:20px 0}
 .spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* Bank section divider */
-.section-divider{border:none;border-top:1px solid var(--border);margin:18px 0 4px}
-.section-heading{font-size:.78rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
-.acct-info{font-size:.76rem;color:#64748b;margin-bottom:4px;line-height:1.4}
-
 footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-align:center;color:#64748b;font-size:.82rem}
 </style>
 </head>
@@ -105,10 +115,10 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
 <div class="section">
   <h2>How It Works</h2>
   <div class="steps">
-    <div class="step"><div class="step-num">01</div><h3>Sign Up</h3><p>Fill your business details, add your payment account, and complete the one-time &#8358;30,000 setup payment.</p></div>
+    <div class="step"><div class="step-num">01</div><h3>Sign Up</h3><p>Fill your business details and make the one-time &#8358;30,000 setup payment via Flutterwave.</p></div>
     <div class="step"><div class="step-num">02</div><h3>Scan QR Code</h3><p>Open the link on a computer, scan the QR with your WhatsApp phone and your bot goes live instantly.</p></div>
-    <div class="step"><div class="step-num">03</div><h3>Set Up Your Bot</h3><p>Answer a few quick questions about your business — delivery, policies, socials. Takes less than 3 minutes.</p></div>
-    <div class="step"><div class="step-num">04</div><h3>Make Sales 24/7</h3><p>Bot replies customers, handles orders, posts your status, and alerts you day and night automatically.</p></div>
+    <div class="step"><div class="step-num">03</div><h3>Set Up Replies</h3><p>Add keywords and replies from your dashboard. The bot handles everything automatically 24/7.</p></div>
+    <div class="step"><div class="step-num">04</div><h3>Make Sales 24/7</h3><p>Bot replies customers, posts your status, and alerts you on payment day and night.</p></div>
   </div>
 </div>
 
@@ -116,9 +126,9 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
   <div class="features-inner">
     <h2>Everything Your Business Needs</h2>
     <div class="feat-grid">
-      <div class="feat"><div class="feat-icon">&#129302;</div><h3>Smart Auto-Replies</h3><p>Bot knows your products, prices, delivery info, policies and answers customers intelligently — like a real sales rep.</p></div>
+      <div class="feat"><div class="feat-icon">&#129302;</div><h3>24/7 Auto-Replies</h3><p>Bot replies instantly using your keywords covering price, availability, delivery, payment and more.</p></div>
       <div class="feat"><div class="feat-icon">&#127908;</div><h3>Voice Note Transcription</h3><p>Customers send voice notes in Yoruba, Igbo, Hausa or Pidgin. Bot transcribes and replies in English.</p></div>
-      <div class="feat"><div class="feat-icon">&#128176;</div><h3>Order & Payment Flow</h3><p>Bot takes orders, asks for delivery address, collects payment receipt and links it to the order in your dashboard.</p></div>
+      <div class="feat"><div class="feat-icon">&#128176;</div><h3>Payment Alerts</h3><p>When a customer claims payment, bot alerts you on WhatsApp. Reply 1/2/3 to confirm, wait, or decline.</p></div>
       <div class="feat"><div class="feat-icon">&#128247;</div><h3>Status Post Scheduler</h3><p>Schedule product photos to post automatically to WhatsApp Status at the days and times you choose.</p></div>
       <div class="feat"><div class="feat-icon">&#128588;</div><h3>Human Handoff</h3><p>Bot detects when a customer wants a real person, pauses itself and alerts you immediately.</p></div>
       <div class="feat"><div class="feat-icon">&#128483;</div><h3>Weekly Business Memes</h3><p>Funny Nigerian business memes automatically post to your WhatsApp Status every Sunday evening.</p></div>
@@ -135,7 +145,7 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
       <div class="price-sub">One-time setup</div>
       <ul class="price-feats">
         <li>All features included</li>
-        <li>Smart order handling</li>
+        <li>24/7 auto-replies</li>
         <li>Payment alerts</li>
         <li>Voice transcription</li>
         <li>Status scheduler</li>
@@ -149,7 +159,7 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
       <div class="price-sub">One-time setup</div>
       <ul class="price-feats">
         <li>All features included</li>
-        <li>Smart order handling</li>
+        <li>24/7 auto-replies</li>
         <li>Payment alerts</li>
         <li>Voice transcription</li>
         <li>Status scheduler</li>
@@ -160,12 +170,26 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
   </div>
 </div>
 
+<div class="early">
+  <div class="early-box">
+    <div class="early-badge">🏷️ Early Adopters Only</div>
+    <div class="early-title">Join now — get all future upgrades FREE forever</div>
+    <div class="early-sub">4 features coming soon. Founding members pay nothing extra.</div>
+    <div class="early-grid">
+      <div class="early-feat"><div class="early-feat-icon">🧾</div><div class="early-feat-name">Fake Receipt Detection</div></div>
+      <div class="early-feat"><div class="early-feat-icon">📱</div><div class="early-feat-name">Social Media Bot</div></div>
+      <div class="early-feat"><div class="early-feat-icon">🚫</div><div class="early-feat-name">Fraud Blacklist</div></div>
+      <div class="early-feat"><div class="early-feat-icon">🎬</div><div class="early-feat-name">AI Video Creator</div></div>
+    </div>
+  </div>
+</div>
+
 <footer>
   <div style="font-size:1rem;font-weight:700;color:var(--green);margin-bottom:6px">ForgeBot by TheFavsForge</div>
   WhatsApp Automation for Nigerian Businesses &nbsp;|&nbsp; support@thefavsforge.com
 </footer>
 
-<!-- ── SIGNUP MODAL ── -->
+<!-- SIGNUP MODAL -->
 <div class="overlay" id="signupModal">
   <div class="modal">
     <div class="modal-header">
@@ -179,35 +203,29 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
         <div class="step-dot" id="dot3"></div>
       </div>
 
-      <!-- STEP 1: Account + Bank details -->
+      <!-- STEP 1: Account details -->
       <div id="step1">
-
         <label>Full Name</label>
         <input id="fullName" placeholder="Your full name"/>
 
         <label>Business Name</label>
         <input id="businessName" placeholder="Your business name"/>
 
-        <label>Business Category</label>
+        <label>Business Type</label>
         <select id="businessType">
           <option value="general">General / Other</option>
           <option value="food">Food &amp; Restaurant</option>
           <option value="fashion">Fashion &amp; Clothing</option>
-          <option value="salon">Salon, Spa &amp; Beauty</option>
+          <option value="salon">Salon &amp; Beauty</option>
           <option value="cosmetics">Cosmetics &amp; Skincare</option>
-          <option value="electronics">Electronics &amp; Gadgets</option>
-          <option value="health">Health &amp; Wellness</option>
-          <option value="photography">Photography &amp; Creative</option>
-          <option value="cleaning">Cleaning &amp; Home Services</option>
-          <option value="tutoring">Tutoring &amp; Education</option>
         </select>
 
-        <label>Business WhatsApp Number <span style="color:#64748b;font-size:.74rem">(customers message this)</span></label>
+        <label>Business WhatsApp Number (customers message this)</label>
         <input id="waNumber" placeholder="e.g. 2348012345678" type="tel"/>
 
-        <label>Your Personal WhatsApp <span style="color:#64748b;font-size:.74rem">(for bot alerts &amp; notifications)</span></label>
+        <label>Your Personal WhatsApp (for bot payment alerts &amp; notifications)</label>
         <input id="notifNumber" placeholder="e.g. 2348098765432" type="tel"/>
-        <div class="info-box">The bot sends payment alerts, order notifications and handoff alerts to this number. Can be the same as above.</div>
+        <div class="info-box">The bot sends payment alerts, human handoff alerts and other notifications to this number. Can be same as above or different.</div>
 
         <label>Country</label>
         <select id="country">
@@ -222,46 +240,6 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
 
         <label>Password</label>
         <input id="signupPassword" type="password" placeholder="Create a password (min 8 characters)"/>
-
-        <!-- ── Bank Account Section ── -->
-        <hr class="section-divider"/>
-        <div class="section-heading">Your Business Payment Account</div>
-        <div class="acct-info">When a customer is ready to pay, your bot automatically sends them these account details to transfer money to.</div>
-
-        <label>Bank Name</label>
-        <select id="bankName">
-          <option value="">— Select your bank —</option>
-          <option value="Access Bank">Access Bank</option>
-          <option value="First Bank">First Bank</option>
-          <option value="GTBank">GTBank</option>
-          <option value="UBA">UBA</option>
-          <option value="Zenith Bank">Zenith Bank</option>
-          <option value="Fidelity Bank">Fidelity Bank</option>
-          <option value="Union Bank">Union Bank</option>
-          <option value="Sterling Bank">Sterling Bank</option>
-          <option value="Stanbic IBTC">Stanbic IBTC</option>
-          <option value="Ecobank">Ecobank</option>
-          <option value="FCMB">FCMB</option>
-          <option value="Wema Bank">Wema Bank</option>
-          <option value="Polaris Bank">Polaris Bank</option>
-          <option value="Heritage Bank">Heritage Bank</option>
-          <option value="Keystone Bank">Keystone Bank</option>
-          <option value="Unity Bank">Unity Bank</option>
-          <option value="Providus Bank">Providus Bank</option>
-          <option value="Jaiz Bank">Jaiz Bank</option>
-          <option value="Opay">Opay</option>
-          <option value="Palmpay">Palmpay</option>
-          <option value="Moniepoint">Moniepoint</option>
-          <option value="Kuda Bank">Kuda Bank</option>
-          <option value="Carbon">Carbon</option>
-          <option value="VFD Microfinance">VFD Microfinance</option>
-        </select>
-
-        <label>Account Number</label>
-        <input id="accountNumber" placeholder="Your 10-digit account number" type="tel" maxlength="10"/>
-
-        <label>Account Name <span style="color:#64748b;font-size:.74rem">(exactly as it appears on the account)</span></label>
-        <input id="accountName" placeholder="e.g. Adunola Fatima Closet"/>
 
         <div class="err" id="errStep1"></div>
         <button class="form-btn" onclick="goStep2()">Continue &rarr;</button>
@@ -282,6 +260,17 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
             <div class="monthly">+ $10/month</div>
           </div>
         </div>
+        <div class="modal-early">
+          <div class="modal-early-badge">🏷️ Early Adopters Only</div>
+          <div class="modal-early-title">Join now — get all future upgrades FREE forever</div>
+          <div class="modal-early-sub">Founding members get these 4 upcoming features at no extra cost:</div>
+          <div class="modal-early-grid">
+            <div class="modal-early-item"><div class="modal-early-dot"></div>🧾 Fake Receipt Detection</div>
+            <div class="modal-early-item"><div class="modal-early-dot"></div>📱 Social Media Bot</div>
+            <div class="modal-early-item"><div class="modal-early-dot"></div>🚫 Fraud Blacklist</div>
+            <div class="modal-early-item"><div class="modal-early-dot"></div>🎬 AI Video Creator</div>
+          </div>
+        </div>
         <div class="err" id="errStep2"></div>
         <button class="form-btn" id="payBtn" onclick="processPayment()" disabled>Proceed to Payment</button>
         <button style="width:100%;margin-top:10px;background:none;border:none;color:#64748b;font-size:.82rem;cursor:pointer" onclick="goStep(1)">&larr; Back</button>
@@ -295,12 +284,11 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
           <p id="procMsg" style="font-size:.85rem;color:#64748b">Please wait, do not close this page.</p>
         </div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ── LOGIN MODAL ── -->
+<!-- LOGIN MODAL -->
 <div class="overlay" id="loginModal">
   <div class="modal">
     <div class="modal-header">
@@ -325,7 +313,7 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
 var selectedPayment = null;
 
 function openSignup() { document.getElementById('signupModal').classList.add('open'); goStep(1); }
-function openLogin()  { document.getElementById('loginModal').classList.add('open'); }
+function openLogin() { document.getElementById('loginModal').classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function goStep(n) {
@@ -345,33 +333,20 @@ function showErr(id, msg) {
 }
 
 function goStep2() {
-  var fullName     = document.getElementById('fullName').value.trim();
+  var fullName = document.getElementById('fullName').value.trim();
   var businessName = document.getElementById('businessName').value.trim();
-  var waNumber     = document.getElementById('waNumber').value.trim().replace(/\D/g, '');
-  var notifNumber  = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
-  var email        = document.getElementById('signupEmail').value.trim();
-  var password     = document.getElementById('signupPassword').value;
-  var bankName     = document.getElementById('bankName').value;
-  var accountNum   = document.getElementById('accountNumber').value.trim().replace(/\D/g, '');
-  var accountName  = document.getElementById('accountName').value.trim();
-
+  var waNumber = document.getElementById('waNumber').value.trim().replace(/\D/g, '');
+  var notifNumber = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
+  var email = document.getElementById('signupEmail').value.trim();
+  var password = document.getElementById('signupPassword').value;
   if (!fullName || !businessName || !waNumber || !email || !password) {
-    showErr('errStep1', 'Please fill in all account fields.'); return;
+    showErr('errStep1', 'Please fill in all fields.'); return;
   }
   if (password.length < 8) {
     showErr('errStep1', 'Password must be at least 8 characters.'); return;
   }
   if (!notifNumber) {
     showErr('errStep1', 'Please enter your personal WhatsApp number for bot alerts.'); return;
-  }
-  if (!bankName) {
-    showErr('errStep1', 'Please select your bank name.'); return;
-  }
-  if (accountNum.length !== 10) {
-    showErr('errStep1', 'Account number must be exactly 10 digits.'); return;
-  }
-  if (!accountName) {
-    showErr('errStep1', 'Please enter the account name as it appears on the account.'); return;
   }
   goStep(2);
 }
@@ -393,17 +368,14 @@ async function processPayment() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        full_name:           document.getElementById('fullName').value.trim(),
-        business_name:       document.getElementById('businessName').value.trim(),
-        business_type:       document.getElementById('businessType').value,
-        whatsapp_number:     document.getElementById('waNumber').value.trim().replace(/\D/g, ''),
+        full_name: document.getElementById('fullName').value.trim(),
+        business_name: document.getElementById('businessName').value.trim(),
+        business_type: document.getElementById('businessType').value,
+        whatsapp_number: document.getElementById('waNumber').value.trim().replace(/\D/g, ''),
         notification_number: document.getElementById('notifNumber').value.trim().replace(/\D/g, ''),
-        country:             document.getElementById('country').value,
-        email:               document.getElementById('signupEmail').value.trim(),
-        password:            document.getElementById('signupPassword').value,
-        bank_name:           document.getElementById('bankName').value,
-        account_number:      document.getElementById('accountNumber').value.trim().replace(/\D/g, ''),
-        account_name:        document.getElementById('accountName').value.trim()
+        country: document.getElementById('country').value,
+        email: document.getElementById('signupEmail').value.trim(),
+        password: document.getElementById('signupPassword').value
       })
     });
     var signupData = await signupResp.json();
@@ -439,7 +411,7 @@ async function processPayment() {
 }
 
 async function doLogin() {
-  var email    = document.getElementById('loginEmail').value.trim();
+  var email = document.getElementById('loginEmail').value.trim();
   var password = document.getElementById('loginPassword').value;
   if (!email || !password) { showErr('errLogin', 'Please fill in email and password.'); return; }
   try {
