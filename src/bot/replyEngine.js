@@ -13,10 +13,17 @@ const {
   notifyOwnerHumanRequest
 } = require('./paymentNotifier');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// ── Lazy Supabase client (avoids crash if env vars load after require) ────────
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('[ReplyEngine] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — add them to Railway Variables.');
+    }
+    _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  }
+  return _supabase;
+}
 
 // ── Conversation state ────────────────────────────────────────
 const STATE = {
@@ -105,6 +112,7 @@ function buildAccountMsg(client) {
 }
 
 async function getCatalog(clientId, bizType) {
+  const supabase = getSupabase();
   const items = [];
   if (bizType === 'products' || bizType === 'both') {
     const { data } = await supabase.from('products').select('*').eq('client_id', clientId).eq('in_stock', true);
@@ -143,6 +151,7 @@ function buildCatalogMsg(items, bizName) {
 }
 
 async function matchCustomQA(text, clientId) {
+  const supabase = getSupabase();
   const { data: setup } = await supabase.from('bot_setup')
     .select('custom_service_1_q,custom_service_1_a,custom_service_2_q,custom_service_2_a,custom_service_3_q,custom_service_3_a')
     .eq('client_id', clientId).single();
@@ -162,6 +171,7 @@ async function matchCustomQA(text, clientId) {
 }
 
 async function getOrCreateCustomer(clientId, jid, name) {
+  const supabase = getSupabase();
   const { data } = await supabase.from('customers').select('*').eq('client_id', clientId).eq('jid', jid).single();
   if (data) {
     await supabase.from('customers').update({ last_contact: new Date().toISOString(), name: name || data.name }).eq('id', data.id);
@@ -173,11 +183,12 @@ async function getOrCreateCustomer(clientId, jid, name) {
   return newCust;
 }
 
-async function saveReceiptImage(sock, msg, clientId, jid) {
+async function saveReceiptImage(sock, msg, clientId) {
   try {
     const { downloadMediaMessage } = require('@whiskeysockets/baileys');
     const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: { error: () => {}, warn: () => {}, info: () => {} } });
     const filename = 'receipts/' + clientId + '/' + Date.now() + '.jpg';
+    const supabase = getSupabase();
     const { error } = await supabase.storage.from('forgebot-receipts').upload(filename, buffer, { contentType: 'image/jpeg', upsert: false });
     if (error) throw error;
     const { data } = supabase.storage.from('forgebot-receipts').getPublicUrl(filename);
@@ -217,6 +228,7 @@ async function alertOwnerInquiry(sock, client, customerName, itemName, price) {
 async function handleOwnerPaymentReply(sock, text, clientId) {
   const t = text.trim();
   if (t !== '1' && t !== '2') return false;
+  const supabase = getSupabase();
   const { data: orders } = await supabase.from('orders').select('*').eq('client_id', clientId).eq('payment_status', 'unpaid').not('receipt_url', 'is', null).order('created_at', { ascending: false }).limit(1);
   if (!orders || !orders.length) return false;
   const order = orders[0];
@@ -237,6 +249,7 @@ async function handleMessage(sock, msg, clientId) {
     const jid = msg.key.remoteJid;
     if (jid === 'status@broadcast') return;
 
+    const supabase = getSupabase();
     const msgContent = msg.message;
     const isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
     const isAudio = !!(msgContent && msgContent.audioMessage);
@@ -278,7 +291,7 @@ async function handleMessage(sock, msg, clientId) {
     if (isImage && conv.state === STATE.AWAITING_RECEIPT && conv.orderId) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
-      const receiptUrl = await saveReceiptImage(sock, msg, clientId, jid);
+      const receiptUrl = await saveReceiptImage(sock, msg, clientId);
       if (receiptUrl) {
         await supabase.from('orders').update({ receipt_url: receiptUrl }).eq('id', conv.orderId);
         await sock.sendMessage(jid, { text: 'Thank you! Your receipt has been received. The owner will confirm your payment shortly. We will notify you right away!' });
