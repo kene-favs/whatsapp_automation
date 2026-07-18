@@ -1,75 +1,100 @@
+// ============================================================
+//  ForgeBot — Main Server Entry Point
+//  File: index.js  (project root)
+// ============================================================
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
+const path    = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
-const { startScheduler } = require('./src/bot/statusScheduler');
-const { createSession } = require('./src/sessions/sessionManager');
-const sessionManager    = require('./src/sessions/sessionManager');
-const db = require('./src/db/database');
-const adminRoutes = require('./src/admin/routes');
-const apiRoutes   = require('./routes');   // ← new client dashboard API
+const { startScheduler }  = require('./src/bot/statusScheduler');
+const sessionManager      = require('./src/sessions/sessionManager');
+const adminRoutes         = require('./src/admin/routes');
 
-const app = express();
+// ── Wire globals before any route file loads ────────────────
+global.getSock      = (clientId) => sessionManager.getSession(clientId);
+global.qrListeners  = new Map();
+
+// ── Client API routes (dashboard) ──────────────────────────
+// Only mount if the file exists (graceful if not deployed yet)
+let clientApiRoutes = null;
+try {
+  clientApiRoutes = require('./routes');
+} catch (_) {
+  console.warn('[ForgeBot] ./routes.js not found — client API not mounted');
+}
+
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── Global sock map (used by routes.js & replyEngine.js) ─────────────────
-// sessionManager already holds socks internally; we expose a simple getter
-// so routes.js can call getSock(clientId) → Baileys sock
-global.getSock = (clientId) => sessionManager.getSession(clientId);
-
-// ─── Global QR listener map (used by the /api/client/qr-stream SSE route) ─
-global.qrListeners = new Map();
-
-// ─── Middleware ────────────────────────────────────────────────────────────
+// ── Middleware ──────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve client-facing pages: index.html, onboard.html, dashboard.html,
-// setup.html, manifest.json, sw.js, icons/, etc.
+// Serve public folder (onboard.html, setup.html, dashboard, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve ForgeBot super-admin panel static files
+// Serve admin panel static files
 app.use(express.static(path.join(__dirname, 'src/admin/public')));
 
-// ─── Routes ────────────────────────────────────────────────────────────────
-app.use('/api', apiRoutes);      // ← client dashboard API  (NEW)
-app.use('/', adminRoutes);       // ← your existing admin panel
+// ── Mount routes ────────────────────────────────────────────
+if (clientApiRoutes) {
+  app.use('/api', clientApiRoutes);
+}
+app.use('/', adminRoutes);
 
-// ─── Boot ──────────────────────────────────────────────────────────────────
+// ── Boot ────────────────────────────────────────────────────
 async function start() {
   console.log('');
   console.log('╔══════════════════════════════════════╗');
-  console.log('║   WhatsApp Automation Platform       ║');
+  console.log('║        ForgeBot — Starting Up        ║');
   console.log('╚══════════════════════════════════════╝');
   console.log('');
 
-  // Start the status post scheduler
-  startScheduler();
+  // Start status post scheduler
+  try { startScheduler(); } catch (e) { console.warn('[ForgeBot] Scheduler error:', e.message); }
 
-  // Reconnect clients that were previously connected
-  const clients = db.getClients().filter(c =>
-    c.status === 'connected' || c.status === 'reconnecting'
-  );
+  // Reconnect previously active client sessions via Supabase
+  try {
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id, business_name, status, subscription_active')
+      .eq('status', 'active')
+      .eq('subscription_active', true);
 
-  if (clients.length > 0) {
-    console.log(`🔄 Reconnecting ${clients.length} existing client(s)...`);
-    for (const client of clients) {
-      await createSession(client.id, null);
-      await new Promise(r => setTimeout(r, 1500));
+    if (clients && clients.length > 0) {
+      console.log('[ForgeBot] Reconnecting ' + clients.length + ' active client(s)...');
+      for (const client of clients) {
+        try {
+          await sessionManager.startSession(client.id, {});
+          console.log('[ForgeBot] Started session for: ' + client.business_name);
+          await new Promise(r => setTimeout(r, 1500));
+        } catch (err) {
+          console.error('[ForgeBot] Failed to start session for ' + client.id + ':', err.message);
+        }
+      }
+    } else {
+      console.log('[ForgeBot] No active clients to reconnect.');
     }
+  } catch (err) {
+    console.warn('[ForgeBot] Could not load active clients from Supabase:', err.message);
+    console.warn('[ForgeBot] Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars.');
   }
 
   // Start server
   app.listen(PORT, () => {
     console.log('');
-    console.log(`🚀 Server running at: http://localhost:${PORT}`);
-    console.log(`📊 Admin panel:       http://localhost:${PORT}`);
+    console.log('[ForgeBot] Server running on port ' + PORT);
+    console.log('[ForgeBot] Admin panel: http://localhost:' + PORT);
     console.log('');
-    console.log('Press Ctrl+C to stop');
   });
 }
 
 start().catch(err => {
-  console.error('❌ Startup error:', err);
+  console.error('[ForgeBot] Startup error:', err.message);
   process.exit(1);
 });
