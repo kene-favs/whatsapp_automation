@@ -1,20 +1,28 @@
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const path = require('path');
+const fs   = require('fs');
 const pino = require('pino');
 const replyEngine = require('../bot/replyEngine');
 
-const sessions = {}; // clientId → { sock, cleanup }
+const sessions = {}; // clientId → { sock }
 const logger = pino({ level: 'silent' });
 
-// ── Helper: push an event to all SSE listeners waiting for this client's QR ──
-function notifyQRListeners(clientId, payload) {
-  const listeners = global.qrListeners?.get(clientId) || [];
-  listeners.forEach(fn => { try { fn(payload); } catch (_) {} });
+// ── Wipe session auth files so next connect gets a fresh QR ──────────────────
+function clearSessionFiles(clientId) {
+  const authDir = path.join(__dirname, '../../sessions', clientId);
+  try {
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      console.log('[ForgeBot] Cleared session files for', clientId);
+    }
+  } catch (e) {
+    console.error('[ForgeBot] clearSessionFiles error:', e.message);
+  }
 }
 
 async function startSession(clientId, callbacks = {}) {
-  // If already running, just return existing
+  // If already running, just return
   if (sessions[clientId]?.sock) {
     return () => {};
   }
@@ -39,34 +47,41 @@ async function startSession(clientId, callbacks = {}) {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
-      // Fire existing admin callback
-      if (callbacks.onQR) callbacks.onQR(qr);
-      // Fire SSE stream for onboard.html
-      notifyQRListeners(clientId, { type: 'qr', qr });
+    if (qr && callbacks.onQR) {
+      callbacks.onQR(qr);
     }
 
     if (connection === 'open') {
       console.log(`[ForgeBot] Client ${clientId} connected`);
       if (callbacks.onConnected) callbacks.onConnected();
-      // Tell onboard.html the scan succeeded → show "Set Up My Bot" button
-      notifyQRListeners(clientId, { type: 'connected' });
     }
 
     if (connection === 'close') {
       const code = lastDisconnect?.error instanceof Boom
         ? lastDisconnect.error.output?.statusCode
         : 0;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
-      console.log(`[ForgeBot] Client ${clientId} disconnected (code ${code}), reconnect=${shouldReconnect}`);
 
-      if (callbacks.onDisconnected) callbacks.onDisconnected();
-      // Tell onboard.html if still open
-      notifyQRListeners(clientId, { type: 'disconnected' });
+      // Codes that mean credentials are stale/invalid — must wipe and start fresh
+      const staleCodes = [
+        DisconnectReason.loggedOut,           // 401 — user logged out
+        DisconnectReason.connectionReplaced,  // 440 — another device took over
+        515,                                  // bad session / restart required
+      ];
+      const isStale = staleCodes.includes(code);
+
+      console.log(`[ForgeBot] Client ${clientId} disconnected (code ${code}), stale=${isStale}`);
+
+      if (callbacks.onDisconnected) callbacks.onDisconnected(isStale);
       delete sessions[clientId];
 
-      if (shouldReconnect) {
-        setTimeout(() => startSession(clientId, {}), 5000);
+      if (isStale) {
+        // Wipe stale creds then restart — will generate a fresh QR
+        clearSessionFiles(clientId);
+        setTimeout(() => startSession(clientId, callbacks), 2000);
+      } else {
+        // Network drop / normal close — reconnect with same creds
+        // NOTE: pass callbacks so QR/connected events still reach the client
+        setTimeout(() => startSession(clientId, callbacks), 5000);
       }
     }
   });
@@ -80,15 +95,23 @@ async function startSession(clientId, callbacks = {}) {
     }
   });
 
-  // Cleanup function (closes SSE stream without killing session)
   return () => {};
 }
 
 async function stopSession(clientId) {
   if (sessions[clientId]?.sock) {
-    await sessions[clientId].sock.logout();
+    try { await sessions[clientId].sock.logout(); } catch (e) {}
     delete sessions[clientId];
   }
+}
+
+// Force-clear session (stop + wipe files) — used by admin or on demand
+async function clearSession(clientId) {
+  if (sessions[clientId]?.sock) {
+    try { sessions[clientId].sock.end(undefined, { reconnect: false }); } catch (e) {}
+    delete sessions[clientId];
+  }
+  clearSessionFiles(clientId);
 }
 
 function getSession(clientId) {
@@ -99,7 +122,6 @@ function getAllSessions() {
   return Object.keys(sessions);
 }
 
-// Boot all active client sessions on server start
 async function bootAllSessions(activeClients) {
   console.log(`[ForgeBot] Booting ${activeClients.length} client session(s)...`);
   for (const client of activeClients) {
@@ -112,4 +134,4 @@ async function bootAllSessions(activeClients) {
   }
 }
 
-module.exports = { startSession, stopSession, getSession, getAllSessions, bootAllSessions };
+module.exports = { startSession, stopSession, clearSession, getSession, getAllSessions, bootAllSessions };

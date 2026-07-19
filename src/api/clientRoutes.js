@@ -112,7 +112,6 @@ router.post('/client/signup', async function(req, res) {
     var sb   = getSupabase();
     var hash = await bcrypt.hash('forgebot2025', 10);
 
-    // Create pending account
     var insert = await sb.from('clients').insert({
       email:           email,
       full_name:       full_name,
@@ -128,10 +127,9 @@ router.post('/client/signup', async function(req, res) {
     if (insert.error) throw new Error(insert.error.message);
     var clientId = insert.data.id;
 
-    // Initiate Flutterwave payment
-    var amount  = (plan === 'yearly') ? 24000 : 2500;
-    var appUrl  = process.env.APP_URL || 'https://forgebot.up.railway.app';
-    var txRef   = 'FB-' + clientId + '-' + Date.now();
+    var amount = (plan === 'yearly') ? 24000 : 2500;
+    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    var txRef  = 'FB-' + clientId + '-' + Date.now();
 
     var flwRes;
     try {
@@ -143,11 +141,8 @@ router.post('/client/signup', async function(req, res) {
         customer:     { email: email, name: full_name, phonenumber: whatsapp_number },
         meta:         { client_id: clientId },
         customizations: { title: 'ForgeBot Subscription', logo: appUrl + '/icons/icon-192.png' }
-      }, {
-        headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY }
-      });
+      }, { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } });
     } catch (e) {
-      // Payment init failed — delete pending account so user can retry
       await sb.from('clients').delete().eq('id', clientId);
       return res.status(502).json({ error: 'Payment gateway unavailable. Please try again.' });
     }
@@ -186,9 +181,8 @@ router.post('/client/login', async function(req, res) {
   }
 });
 
-// GET /api/client/qr-stream (SSE — must be PUBLIC, EventSource cannot send headers)
+// GET /api/client/qr-stream  — PUBLIC (EventSource cannot send headers)
 router.get('/client/qr-stream', async function(req, res) {
-  // Verify token from query param
   var token = req.query.token;
   var clientId;
   try {
@@ -201,18 +195,18 @@ router.get('/client/qr-stream', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // disable Railway nginx buffering
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   if (!global.qrListeners) global.qrListeners = new Map();
 
   function sendEvent(event, data) {
-    try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch(e) {}
+    try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
   }
 
   // Heartbeat every 20s to survive Railway's 30s idle timeout
   var heartbeat = setInterval(function() {
-    try { res.write(':heartbeat\n\n'); } catch(e) {}
+    try { res.write(':heartbeat\n\n'); } catch (e) {}
   }, 20000);
 
   // Already connected?
@@ -245,9 +239,14 @@ router.get('/client/qr-stream', async function(req, res) {
         all.forEach(function(fn) { fn('connected', { status: 'connected' }); });
         global.qrListeners.delete(clientId);
       },
-      onDisconnected: function() {
-        var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { fn('disconnected', { status: 'disconnected' }); });
+      onDisconnected: function(isStale) {
+        // isStale = true means sessionManager wiped creds and is restarting automatically.
+        // In that case, stay silent — the next QR will arrive through qrListeners shortly.
+        // Only forward 'disconnected' if it's a genuine post-scan disconnect (user was already connected).
+        if (!isStale) {
+          var all = global.qrListeners.get(clientId) || [];
+          all.forEach(function(fn) { fn('disconnected', { status: 'disconnected' }); });
+        }
       }
     });
   } catch (e) {
@@ -257,7 +256,7 @@ router.get('/client/qr-stream', async function(req, res) {
   }
 });
 
-// GET /api/client/pay/callback — Flutterwave redirects here after payment
+// GET /api/client/pay/callback
 router.get('/client/pay/callback', async function(req, res) {
   try {
     var { status, tx_ref, transaction_id } = req.query;
@@ -267,7 +266,6 @@ router.get('/client/pay/callback', async function(req, res) {
       return res.redirect(appUrl + '/?payment=failed');
     }
 
-    // Verify with Flutterwave
     var verify;
     try {
       verify = await axios.get('https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify', {
@@ -278,16 +276,13 @@ router.get('/client/pay/callback', async function(req, res) {
     }
 
     var txData = verify.data && verify.data.data;
-    if (!txData || txData.status !== 'successful') {
-      return res.redirect(appUrl + '/?payment=failed');
-    }
+    if (!txData || txData.status !== 'successful') return res.redirect(appUrl + '/?payment=failed');
 
     var clientId = txData.meta && txData.meta.client_id;
     if (!clientId) return res.redirect(appUrl + '/?payment=failed');
 
     await activateClient(clientId);
 
-    // Issue JWT so onboard.html can pick it up
     var token = jwt.sign({ id: clientId, clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     return res.redirect(appUrl + '/onboard?activated=1&token=' + token);
   } catch (e) {
@@ -296,7 +291,7 @@ router.get('/client/pay/callback', async function(req, res) {
   }
 });
 
-// POST /api/client/pay/webhook — Flutterwave webhook
+// POST /api/client/pay/webhook
 router.post('/client/pay/webhook', async function(req, res) {
   try {
     var hash = req.headers['verif-hash'];
@@ -336,8 +331,8 @@ router.post('/push/subscribe', async function(req, res) {
 });
 
 // POST /api/push/test
-router.post('/push/test', async function(req, res) {
-  res.json({ ok: true, message: 'Push test received' });
+router.post('/push/test', function(req, res) {
+  res.json({ ok: true });
 });
 
 // ── Apply auth + partner check to all client routes ───────────
@@ -845,9 +840,9 @@ router.put('/client/qualification-toggle', async function(req, res) {
 });
 
 
-// ── Bot Setup (questionnaire answers from onboard.html) ──────────────────────
+// ── Bot Setup ─────────────────────────────────────────────────────────────────
 
-// PUT /api/client/bot-setup
+// PUT /api/client/bot-setup  — saves questionnaire answers from onboard.html
 router.put('/client/bot-setup', async function(req, res) {
   try {
     var sb       = getSupabase();
@@ -863,37 +858,36 @@ router.put('/client/bot-setup', async function(req, res) {
       delivery_time_local, minimum_order, bulk_orders
     } = req.body;
 
-    // 1. Update occupation on clients table
     if (occupation) {
       await sb.from('clients')
         .update({ occupation: occupation, occupation_data: occupation_data || {} })
         .eq('id', clientId);
     }
 
-    // 2. Upsert all questionnaire answers into bot_setup
     var setupData = {
-      client_id:          clientId,
-      availability_days:  availability_days,
-      payment_methods:    payment_methods,
-      current_promo:      current_promo    || null,
-      instagram:          instagram        || null,
-      facebook:           facebook         || null,
-      tiktok:             tiktok           || null,
-      whatsapp_channel:   whatsapp_channel || null,
-      service_areas:      service_areas    || null,
-      studio_location:    studio_location  || null,
-      home_service:       home_service     || null,
-      advance_booking:    advance_booking  || null,
-      deposit_required:   deposit_required || null,
-      session_duration:   session_duration || null,
-      who_do_you_serve:   who_do_you_serve || null,
-      return_policy:      return_policy    || null,
-      delivers_to:        delivers_to      || null,
-      delivery_fee_local: delivery_fee_local  || null,
-      delivery_time_local:delivery_time_local || null,
-      minimum_order:      minimum_order    || null,
-      bulk_orders:        bulk_orders      || null,
-      updated_at:         new Date().toISOString()
+      client_id:           clientId,
+      availability_days:   availability_days   || null,
+      payment_methods:     payment_methods     || null,
+      current_promo:       current_promo       || null,
+      instagram:           instagram           || null,
+      facebook:            facebook            || null,
+      tiktok:              tiktok              || null,
+      whatsapp_channel:    whatsapp_channel    || null,
+      service_areas:       service_areas       || null,
+      studio_location:     studio_location     || null,
+      home_service:        home_service        || null,
+      advance_booking:     advance_booking     || null,
+      deposit_required:    deposit_required    || null,
+      session_duration:    session_duration    || null,
+      who_do_you_serve:    who_do_you_serve    || null,
+      free_consult:        free_consult        || null,
+      return_policy:       return_policy       || null,
+      delivers_to:         delivers_to         || null,
+      delivery_fee_local:  delivery_fee_local  || null,
+      delivery_time_local: delivery_time_local || null,
+      minimum_order:       minimum_order       || null,
+      bulk_orders:         bulk_orders         || null,
+      updated_at:          new Date().toISOString()
     };
 
     // Remove undefined keys
@@ -903,13 +897,9 @@ router.put('/client/bot-setup', async function(req, res) {
 
     var { error } = await sb.from('bot_setup')
       .upsert(setupData, { onConflict: 'client_id' });
-
     if (error) throw new Error(error.message);
 
-    // Mark setup as completed on clients table
-    await sb.from('clients')
-      .update({ setup_completed: true })
-      .eq('id', clientId);
+    await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
 
     res.json({ ok: true });
   } catch (e) {
