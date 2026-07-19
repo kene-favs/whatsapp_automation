@@ -1,302 +1,431 @@
-// ============================================================
-//  ForgeBot — Admin API Routes v2
-//  File location: src/admin/routes.js
-// ============================================================
-
-'use strict';
-
-const express  = require('express');
-const router   = express.Router();
-const path     = require('path');
-const bcrypt   = require('bcryptjs');
-const { createClient } = require('@supabase/supabase-js');
-
-const db             = require('../db/supabase');
+const express = require('express');
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const router = express.Router();
 const sessionManager = require('../sessions/sessionManager');
 
-// ── Lazy Supabase init ────────────────────────────────────────
+// ── Lazy Supabase ─────────────────────────────────────────────────────────────
 let _supabase = null;
 function getSupabase() {
   if (!_supabase) {
-    _supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const { createClient } = require('@supabase/supabase-js');
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+    if (!url || !key) throw new Error('Supabase env vars missing');
+    _supabase = createClient(url, key);
   }
   return _supabase;
 }
 
-// ── Admin auth middleware ─────────────────────────────────────
+// ── Admin auth middleware ─────────────────────────────────────────────────────
 function adminAuth(req, res, next) {
-  var email    = (req.headers.email || '').trim().toLowerCase();
-  var password = (req.headers.password || '').trim();
-  var adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  var adminPass  = (process.env.ADMIN_PASSWORD || '').trim();
-  if (email === adminEmail && password === adminPass) return next();
+  // Support both header-based and token-based auth
+  const token = req.headers['x-admin-token'] || req.headers['authorization'];
+  if (token && token.replace('Bearer ', '') === 'forgebot-admin-session') return next();
+
+  const email = (req.headers['email'] || '').trim();
+  const password = (req.headers['password'] || '').trim();
+  const adminEmail = (process.env.ADMIN_EMAIL || '').trim();
+  const adminPassword = (process.env.ADMIN_PASSWORD || '').trim();
+
+  if (email === adminEmail && password === adminPassword) return next();
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-// ── Serve admin panel HTML ────────────────────────────────────
-// admin.html lives in the root public/ folder
-router.get('/admin', function(req, res) {
+// ── Serve admin panel ─────────────────────────────────────────────────────────
+router.get('/admin', (req, res) => {
   res.sendFile(path.join(process.cwd(), 'public', 'admin.html'));
 });
 
-// ══════════════════════════════════════════════════════════════
-//  EXISTING CLIENT ROUTES
-// ══════════════════════════════════════════════════════════════
-
-router.get('/clients', adminAuth, async function(req, res) {
+// ── Admin login endpoint ──────────────────────────────────────────────────────
+router.post('/admin/login', (req, res) => {
   try {
-    var clients  = await db.getAllClients();
-    var sessions = sessionManager.getAllSessions();
-    var out = clients.map(function(c) {
-      return Object.assign({}, c, {
-        session_active: sessions.includes(c.id),
-        password_hash: undefined
-      });
-    });
-    res.json(out);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const email = (req.body.email || '').trim();
+    const password = (req.body.password || '').trim();
+    const adminEmail = (process.env.ADMIN_EMAIL || '').trim();
+    const adminPassword = (process.env.ADMIN_PASSWORD || '').trim();
+
+    if (email === adminEmail && password === adminPassword) {
+      return res.json({ ok: true, token: 'forgebot-admin-session' });
+    }
+    return res.status(401).json({ error: 'Incorrect email or password' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/clients/:id', adminAuth, async function(req, res) {
+// ── GET all clients ───────────────────────────────────────────────────────────
+router.get('/clients', adminAuth, async (req, res) => {
   try {
-    var client = await db.getClientById(req.params.id);
-    if (!client) return res.status(404).json({ error: 'Not found' });
-    var { password_hash, ...safe } = client;
+    const supabase = getSupabase();
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const sessions = sessionManager.getAllSessions ? sessionManager.getAllSessions() : [];
+    const withStatus = (clients || []).map(c => ({
+      ...c,
+      password_hash: undefined,
+      session_active: sessions.includes(c.id)
+    }));
+    res.json(withStatus);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET single client ─────────────────────────────────────────────────────────
+router.get('/clients/:id', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (error) return res.status(404).json({ error: 'Not found' });
+    const { password_hash, ...safe } = data;
     res.json(safe);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/clients/:id', adminAuth, async function(req, res) {
+// ── PATCH client (admin override) ─────────────────────────────────────────────
+router.patch('/clients/:id', adminAuth, async (req, res) => {
   try {
-    var updated = await db.updateClient(req.params.id, req.body);
-    res.json(updated);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('clients')
+      .update(req.body)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/clients/:id/connect', adminAuth, async function(req, res) {
+// ── Activate / deactivate client ──────────────────────────────────────────────
+router.post('/clients/:id/activate', adminAuth, async (req, res) => {
   try {
-    var client = await db.getClientById(req.params.id);
+    const supabase = getSupabase();
+    await supabase.from('clients').update({ subscription_active: true, status: 'active' }).eq('id', req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/clients/:id/deactivate', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    await supabase.from('clients').update({ subscription_active: false, status: 'inactive' }).eq('id', req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Connect / disconnect session ──────────────────────────────────────────────
+router.post('/clients/:id/connect', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    const { data: client } = await supabase.from('clients').select('*').eq('id', req.params.id).single();
     if (!client) return res.status(404).json({ error: 'Not found' });
-    await sessionManager.startSession(client.id, {});
+    if (sessionManager.startSession) await sessionManager.startSession(client.id, {});
+    else if (sessionManager.createSession) await sessionManager.createSession(client.id, null);
     res.json({ ok: true, message: 'Session start initiated' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/clients/:id/disconnect', adminAuth, async function(req, res) {
+router.post('/clients/:id/disconnect', adminAuth, async (req, res) => {
   try {
-    await sessionManager.stopSession(req.params.id);
+    if (sessionManager.stopSession) await sessionManager.stopSession(req.params.id);
+    else if (sessionManager.removeSession) sessionManager.removeSession(req.params.id);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/clients/:id/flows', adminAuth, async function(req, res) {
+// ── GET flows for client ──────────────────────────────────────────────────────
+router.get('/clients/:id/flows', adminAuth, async (req, res) => {
   try {
-    var flows = await db.getFlows(req.params.id, false);
-    res.json(flows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('flows')
+      .select('*')
+      .eq('client_id', req.params.id)
+      .order('priority', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/clients/:id/flows', adminAuth, async function(req, res) {
+// ── POST flow for client ──────────────────────────────────────────────────────
+router.post('/clients/:id/flows', adminAuth, async (req, res) => {
   try {
-    var { flow_name, keywords, response_type, response, media_url, priority } = req.body;
-    var flow = await db.addFlow(req.params.id, flow_name, keywords, response_type, response, media_url, priority);
-    res.json(flow);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const supabase = getSupabase();
+    const { flow_name, keywords, response_type, response, media_url, priority } = req.body;
+    const { data, error } = await supabase
+      .from('flows')
+      .insert({ client_id: req.params.id, flow_name, keywords, response_type, response, media_url, priority: priority || 0 })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.delete('/flows/:id', adminAuth, async function(req, res) {
+// ── DELETE flow ───────────────────────────────────────────────────────────────
+router.delete('/flows/:id', adminAuth, async (req, res) => {
   try {
-    await db.deleteFlow(req.params.id);
+    const supabase = getSupabase();
+    await supabase.from('flows').delete().eq('id', req.params.id);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.get('/clients/:id/status-posts', adminAuth, async function(req, res) {
+// ── Status posts ──────────────────────────────────────────────────────────────
+router.get('/clients/:id/status-posts', adminAuth, async (req, res) => {
   try {
-    var posts = await db.getStatusPosts(req.params.id);
-    res.json(posts);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('status_posts')
+      .select('*')
+      .eq('client_id', req.params.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/clients/:id/status-posts', adminAuth, async function(req, res) {
+router.post('/clients/:id/status-posts', adminAuth, async (req, res) => {
   try {
-    var { caption, media_url, post_time, repeat_daily } = req.body;
-    var post = await db.addStatusPost(req.params.id, caption, media_url, post_time, repeat_daily);
-    res.json(post);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const supabase = getSupabase();
+    const { caption, media_url, post_time, repeat_daily, days, scheduled_time } = req.body;
+    const { data, error } = await supabase
+      .from('status_posts')
+      .insert({ client_id: req.params.id, caption, media_url, post_time: post_time || scheduled_time, repeat_daily, days, scheduled_time: scheduled_time || post_time })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/clients/:id/broadcast', adminAuth, async function(req, res) {
+// ── Broadcast ─────────────────────────────────────────────────────────────────
+router.post('/clients/:id/broadcast', adminAuth, async (req, res) => {
   try {
-    var { message, numbers } = req.body;
-    var sock = sessionManager.getSession(req.params.id);
+    const { message, numbers } = req.body;
+    const sock = sessionManager.getSession ? sessionManager.getSession(req.params.id)
+               : sessionManager.sessions ? sessionManager.sessions.get(req.params.id) : null;
     if (!sock) return res.status(400).json({ error: 'Client not connected' });
-    var sent = 0;
-    for (var i = 0; i < numbers.length; i++) {
+
+    let sent = 0;
+    for (const number of numbers) {
       try {
-        var jid = numbers[i].replace(/\D/g, '') + '@s.whatsapp.net';
+        const jid = number.replace(/\D/g, '') + '@s.whatsapp.net';
         await sock.sendMessage(jid, { text: message });
         sent++;
-        await new Promise(function(r) { setTimeout(r, 1200); });
-      } catch (e) { console.error('[Admin] Broadcast failed for ' + numbers[i]); }
+        await new Promise(r => setTimeout(r, 1200));
+      } catch (err) {
+        console.error('Broadcast failed for ' + number + ':', err.message);
+      }
     }
-    await db.logBroadcast(req.params.id, message, sent);
-    res.json({ sent: sent, total: numbers.length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ sent, total: numbers.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  PARTNER / INFLUENCER MANAGEMENT
-// ══════════════════════════════════════════════════════════════
-
-router.get('/partners', adminAuth, async function(req, res) {
+// ── Keywords ──────────────────────────────────────────────────────────────────
+router.get('/keywords', adminAuth, (req, res) => {
   try {
-    var sb     = getSupabase();
-    var result = await sb.from('clients')
-      .select('id,business_name,email,whatsapp_number,occupation,subscription_active,is_partner,partner_expires_at,trial_notified,created_at')
+    const { KEYWORDS } = require('../bot/keywords');
+    res.json(KEYWORDS);
+  } catch {
+    res.json([]);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARTNER / INFLUENCER MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── GET all partners ──────────────────────────────────────────────────────────
+router.get('/partners', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, business_name, email, whatsapp_number, occupation, status, subscription_active, is_partner, partner_expires_at, trial_notified, created_at')
       .eq('is_partner', true)
       .order('created_at', { ascending: false });
+    if (error) throw error;
 
-    var now      = new Date();
-    var partners = (result.data || []).map(function(p) {
-      var expiresAt = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
-      var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
-      return Object.assign({}, p, {
-        days_left: daysLeft,
-        expired:   expiresAt ? expiresAt < now : false
-      });
+    const now = new Date();
+    const partners = (data || []).map(p => {
+      const expires = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
+      const days_left = expires ? Math.ceil((expires - now) / (1000 * 60 * 60 * 24)) : null;
+      return { ...p, days_left };
     });
     res.json(partners);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post('/partners', adminAuth, async function(req, res) {
+// ── POST create partner ───────────────────────────────────────────────────────
+router.post('/partners', adminAuth, async (req, res) => {
   try {
-    var { business_name, email, whatsapp_number, occupation, trial_days } = req.body;
+    const supabase = getSupabase();
+    const { business_name, email, whatsapp_number, occupation, trial_days } = req.body;
     if (!business_name || !email || !whatsapp_number) {
       return res.status(400).json({ error: 'business_name, email, and whatsapp_number are required' });
     }
-    var days    = parseInt(trial_days) || 7;
-    var expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
-    var rawPassword = Math.random().toString(36).slice(2, 10).toUpperCase();
-    var hashedPw    = await bcrypt.hash(rawPassword, 10);
+    const days = parseInt(trial_days) || 30;
+    const expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
-    var sb     = getSupabase();
-    var result = await sb.from('clients').insert({
-      business_name:       business_name,
-      email:               email.toLowerCase().trim(),
-      whatsapp_number:     whatsapp_number.replace(/\D/g, ''),
-      occupation:          occupation || 'general',
-      password_hash:       hashedPw,
-      status:              'active',
-      subscription_active: true,
-      is_partner:          true,
-      partner_expires_at:  expires,
-      trial_notified:      false,
-      setup_completed:     false
-    }).select('id,business_name,email,occupation,partner_expires_at').single();
+    // Generate a random password
+    const rawPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase() + '!';
+    const password_hash = await bcrypt.hash(rawPassword, 10);
 
-    if (result.error) throw new Error(result.error.message);
+    const { data: partner, error } = await supabase
+      .from('clients')
+      .insert({
+        business_name,
+        email,
+        whatsapp_number,
+        occupation: occupation || 'general',
+        password_hash,
+        status: 'active',
+        subscription_active: true,
+        is_partner: true,
+        partner_expires_at: expires_at,
+        trial_notified: false
+      })
+      .select()
+      .single();
 
-    await sb.from('partner_log').insert({
-      client_id: result.data.id,
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'Email already exists' });
+      throw error;
+    }
+
+    // Log the creation
+    await supabase.from('partner_log').insert({
+      client_id: partner.id,
       action: 'created',
-      note: 'Trial period: ' + days + ' days. Expires: ' + expires
+      note: "Trial account created. Expires in " + days + " days."
     });
 
     res.json({
-      ok:         true,
-      client:     result.data,
-      password:   rawPassword,
-      trial_days: days,
-      expires_at: expires,
-      login_url:  (process.env.APP_URL || 'https://forgebot.net') + '/'
+      ok: true,
+      partner_id: partner.id,
+      email,
+      password: rawPassword,
+      expires_at,
+      login_url: (process.env.APP_URL || '') + '/dashboard'
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/partners/:id/extend', adminAuth, async function(req, res) {
+// ── PATCH extend partner trial ────────────────────────────────────────────────
+router.patch('/partners/:id/extend', adminAuth, async (req, res) => {
   try {
-    var days    = parseInt(req.body.extra_days) || 7;
-    var sb      = getSupabase();
-    var current = await sb.from('clients')
-      .select('partner_expires_at,subscription_active')
-      .eq('id', req.params.id).single();
+    const supabase = getSupabase();
+    const extra_days = parseInt(req.body.days) || 7;
 
-    if (current.error || !current.data) return res.status(404).json({ error: 'Partner not found' });
+    const { data: partner } = await supabase.from('clients').select('partner_expires_at').eq('id', req.params.id).single();
+    if (!partner) return res.status(404).json({ error: 'Partner not found' });
 
-    var base      = (current.data.partner_expires_at && new Date(current.data.partner_expires_at) > new Date())
-      ? new Date(current.data.partner_expires_at) : new Date();
-    var newExpiry = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+    const current = partner.partner_expires_at ? new Date(partner.partner_expires_at) : new Date();
+    const new_expiry = new Date(Math.max(current.getTime(), Date.now()) + extra_days * 24 * 60 * 60 * 1000).toISOString();
 
-    await sb.from('clients').update({
-      partner_expires_at:  newExpiry,
+    await supabase.from('clients').update({ partner_expires_at: new_expiry, status: 'active', subscription_active: true }).eq('id', req.params.id);
+    await supabase.from('partner_log').insert({ client_id: req.params.id, action: 'extended', note: "Extended by " + extra_days + " days. New expiry: " + new_expiry });
+
+    res.json({ ok: true, new_expiry });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH revoke partner ──────────────────────────────────────────────────────
+router.patch('/partners/:id/revoke', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    await supabase.from('clients').update({ subscription_active: false, status: 'inactive' }).eq('id', req.params.id);
+    await supabase.from('partner_log').insert({ client_id: req.params.id, action: 'revoked', note: 'Access revoked by admin' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH convert partner to paid ─────────────────────────────────────────────
+router.patch('/partners/:id/convert', adminAuth, async (req, res) => {
+  try {
+    const supabase = getSupabase();
+    await supabase.from('clients').update({
+      is_partner: false,
+      partner_expires_at: null,
       subscription_active: true,
-      trial_notified:      false
+      status: 'active'
     }).eq('id', req.params.id);
-
-    await sb.from('partner_log').insert({
-      client_id: req.params.id,
-      action: 'extended',
-      note: 'Extended by ' + days + ' days. New expiry: ' + newExpiry
-    });
-
-    res.json({ ok: true, new_expiry: newExpiry, extra_days: days });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-router.patch('/partners/:id/revoke', adminAuth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('clients').update({ subscription_active: false }).eq('id', req.params.id);
-    await sb.from('partner_log').insert({
-      client_id: req.params.id,
-      action: 'revoked',
-      note: req.body.reason || 'Manually revoked by admin'
-    });
+    await supabase.from('partner_log').insert({ client_id: req.params.id, action: 'converted', note: 'Converted to paid client' });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.patch('/partners/:id/convert', adminAuth, async function(req, res) {
+// ── DELETE partner ────────────────────────────────────────────────────────────
+router.delete('/partners/:id', adminAuth, async (req, res) => {
   try {
-    var sb = getSupabase();
-    await sb.from('clients').update({
-      is_partner:          false,
-      partner_expires_at:  null,
-      trial_notified:      false,
-      subscription_active: true,
-      setup_completed:     true
-    }).eq('id', req.params.id);
-    await sb.from('partner_log').insert({
-      client_id: req.params.id,
-      action: 'converted',
-      note: 'Converted to full paying client by admin'
-    });
+    const supabase = getSupabase();
+    await supabase.from('clients').delete().eq('id', req.params.id);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.delete('/partners/:id', adminAuth, async function(req, res) {
+// ── GET partner log ───────────────────────────────────────────────────────────
+router.get('/partners/:id/log', adminAuth, async (req, res) => {
   try {
-    var sb = getSupabase();
-    await sb.from('clients').delete().eq('id', req.params.id);
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-router.get('/partners/:id/log', adminAuth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('partner_log')
-      .select('*').eq('client_id', req.params.id)
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('partner_log')
+      .select('*')
+      .eq('client_id', req.params.id)
       .order('created_at', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

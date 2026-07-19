@@ -1,7 +1,19 @@
 const cron = require('node-cron');
-const db = require('../db/supabase');
 const { getCaption } = require('./captions');
 const { sessions } = require('../sessions/sessionManager');
+
+// ── Lazy Supabase init ────────────────────────────────────────────────────────
+let _supabase = null;
+function getSupabase() {
+  if (!_supabase) {
+    const { createClient } = require('@supabase/supabase-js');
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+    if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+    _supabase = createClient(url, key);
+  }
+  return _supabase;
+}
 
 // ── Nigerian Business Memes (rotate weekly) ──────────────────────────────────
 const MEMES = [
@@ -44,7 +56,6 @@ async function postStatus(clientId, mediaUrl, caption) {
         caption: caption || ''
       });
     } else {
-      // Text-only status
       await sock.sendMessage('status@broadcast', { text: caption });
     }
     console.log('[StatusScheduler] Posted status for client ' + clientId);
@@ -53,26 +64,40 @@ async function postStatus(clientId, mediaUrl, caption) {
   }
 }
 
-// ── Main scheduler: runs every minute, checks due status posts ────────────────
+// ── Main scheduler ────────────────────────────────────────────────────────────
 function startScheduler() {
   cron.schedule('* * * * *', async () => {
     try {
+      const supabase = getSupabase();
       const now = new Date();
       const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const today = days[now.getDay()];
       const todayDate = now.toISOString().split('T')[0];
 
-      const duePosts = await db.getDueStatusPosts(timeStr, todayDate);
+      // Fetch due status posts with client info
+      const { data: duePosts, error } = await supabase
+        .from('status_posts')
+        .select('*, clients(*)')
+        .eq('scheduled_time', timeStr)
+        .ilike('days', '%' + today + '%');
+
+      if (error) throw error;
+      if (!duePosts || duePosts.length === 0) return;
 
       for (const post of duePosts) {
-        if (post.last_posted_date === todayDate) continue; // already posted today
+        if (post.last_posted_date === todayDate) continue;
         const client = post.clients;
         if (!client || client.status !== 'active' || !client.subscription_active) continue;
 
         const caption = post.caption || getCaption(client.business_type || 'general');
         await postStatus(client.id, post.media_url, caption);
-        await db.markStatusPosted(post.id, todayDate);
+
+        // Mark as posted today
+        await supabase
+          .from('status_posts')
+          .update({ last_posted_date: todayDate })
+          .eq('id', post.id);
       }
     } catch (err) {
       console.error('[StatusScheduler] Cron error:', err.message);
@@ -83,11 +108,19 @@ function startScheduler() {
   cron.schedule('0 20 * * 0', async () => {
     console.log('[StatusScheduler] Posting weekly meme to all active clients...');
     try {
-      const clients = await db.getActiveClients();
+      const supabase = getSupabase();
+      const { data: clients, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('status', 'active')
+        .eq('subscription_active', true);
+
+      if (error) throw error;
+      if (!clients || clients.length === 0) return;
+
       const meme = getWeeklyMeme();
 
       for (const client of clients) {
-        if (!client.subscription_active) continue;
         const sock = sessions.get(client.id);
         if (!sock) continue;
 
@@ -98,7 +131,6 @@ function startScheduler() {
           console.error('[StatusScheduler] Meme failed for client ' + client.id + ':', err.message);
         }
 
-        // Small delay between clients to avoid rate limits
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
     } catch (err) {
