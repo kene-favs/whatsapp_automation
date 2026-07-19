@@ -1,11 +1,12 @@
 // ============================================================
 //  ForgeBot — Status Scheduler
 //  File location: src/scheduler/statusScheduler.js
+//
 //  Jobs:
-//    1. Every minute  → check & post due status posts
-//    2. Sunday 8pm    → post weekly Nigerian business meme
-//    3. 1st of month, 9am → send monthly analytics summary to
-//       each client's notification_number via WhatsApp
+//    1. Every minute → check & post due status posts  [BUG FIXED]
+//    2. Mon/Wed/Fri/Sat/Sun 8pm → Nigerian business meme
+//    3. 1st of month, 9am → monthly analytics WhatsApp summary
+//    4. Every minute → run client bot errands (auto-outreach tasks)
 // ============================================================
 
 'use strict';
@@ -15,7 +16,7 @@ const db   = require('../db/supabase');
 const { getCaption } = require('./captions');
 const { sessions }   = require('../sessions/sessionManager');
 
-// ── Nigerian Business Memes (rotate weekly) ──────────────────
+// ── Nigerian Business Memes (rotate by day) ──────────────────
 const MEMES = [
   "Me before ForgeBot: reading 200 unread WhatsApp messages at midnight 😭\nMe after ForgeBot: sleeping peacefully while bot closes sales 🤖💰 #SmallBusinessNaija",
   "Customer: Are you available?\nMe at 3am: 💤💤💤\nForgeBot: YES! We are open 24/7! How can I help you today? 😊\n\nThis bot dey do pass me 😭🔥 #ForgeBot",
@@ -44,9 +45,8 @@ function getWeeklyMeme() {
   return MEMES[weekNumber % MEMES.length];
 }
 
-// ── Helper: get session sock for a clientId ──────────────────
+// ── Helper: get session sock ──────────────────────────────────
 function getSock(clientId) {
-  // sessions may be a Map or a plain object depending on sessionManager
   if (sessions && typeof sessions.get === 'function') return sessions.get(clientId);
   if (sessions && typeof sessions === 'object')        return sessions[clientId];
   return null;
@@ -62,70 +62,69 @@ async function postStatus(clientId, mediaUrl, caption) {
     } else {
       await sock.sendMessage('status@broadcast', { text: caption });
     }
-    console.log('[StatusScheduler] Posted status for client', clientId);
+    console.log('[StatusScheduler] Status posted for client', clientId);
   } catch (err) {
-    console.error('[StatusScheduler] Failed for client', clientId + ':', err.message);
+    console.error('[StatusScheduler] Status post failed for client', clientId + ':', err.message);
   }
 }
 
-// ── Send text to a phone number JID ──────────────────────────
-async function sendWhatsApp(sock, phone, message) {
+// ── Send WhatsApp to a phone number ──────────────────────────
+async function sendToPhone(sock, phone, message) {
   const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
   await sock.sendMessage(jid, { text: message });
 }
 
-// ── Build monthly analytics report message ────────────────────
+// ── Build monthly analytics report ───────────────────────────
 function buildMonthlyReport(client, stats, month) {
   const [year, monthNum] = month.split('-');
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthLabel = monthNames[parseInt(monthNum) - 1] + ' ' + year;
+  const revenue = stats.total_revenue ? '₦' + Number(stats.total_revenue).toLocaleString() : '₦0';
 
-  const revenue = stats.total_revenue
-    ? '₦' + Number(stats.total_revenue).toLocaleString()
-    : '₦0';
-
-  let report =
+  return (
     '📊 *ForgeBot Monthly Report — ' + monthLabel + '*\n' +
     '━━━━━━━━━━━━━━━━━━━━━━\n' +
     '*Business:* ' + (client.business_name || 'Your Business') + '\n\n' +
-    '👥 *New Customers:* ' + (stats.new_customers || 0) + '\n' +
-    '🎯 *Price Inquiries (Leads):* ' + (stats.leads || 0) + '\n' +
-    '🛒 *Orders Placed:* ' + (stats.orders_placed || 0) + '\n' +
-    '✅ *Orders Confirmed:* ' + (stats.orders_confirmed || 0) + '\n' +
-    '💰 *Revenue Confirmed:* ' + revenue + '\n' +
-    '━━━━━━━━━━━━━━━━━━━━━━\n';
-
-  if (stats.orders_placed > 0 && stats.orders_confirmed > 0) {
-    const conv = Math.round((stats.orders_confirmed / stats.orders_placed) * 100);
-    report += '📈 *Conversion Rate:* ' + conv + '% of orders confirmed\n';
-  }
-
-  report += '\n_View full analytics on your dashboard: ' +
-    (process.env.APP_URL || 'https://forgebot.ng') + '/dashboard_\n\n' +
-    'Keep going! 💪 Your ForgeBot is working hard for your business. 🤖';
-
-  return report;
+    '👥 *New Customers:* '         + (stats.new_customers  || 0) + '\n' +
+    '🎯 *Price Inquiries (Leads):* ' + (stats.leads          || 0) + '\n' +
+    '🛒 *Orders Placed:* '         + (stats.orders_placed  || 0) + '\n' +
+    '✅ *Orders Confirmed:* '       + (stats.orders_confirmed || 0) + '\n' +
+    '💰 *Revenue Confirmed:* '      + revenue + '\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '_View full analytics: ' + (process.env.APP_URL || 'https://forgebot.ng') + '/dashboard_\n\n' +
+    'Keep going! 💪 Your ForgeBot is working hard for your business. 🤖'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
-//  MAIN SCHEDULER INIT
+//  MAIN SCHEDULER
 // ══════════════════════════════════════════════════════════════
 
 function startScheduler() {
 
-  // ── JOB 1: Every minute — check & send due status posts ────
+  // ── JOB 1: Every minute — due status posts ─────────────────
+  // BUG FIX: was passing `today` (day name "Sun") to getDueStatusPosts
+  //          which used it in a date comparison → PostgreSQL crash.
+  //          Now correctly passes `todayDate` (YYYY-MM-DD).
   cron.schedule('* * * * *', async function() {
     try {
-      const now      = new Date();
-      const timeStr  = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-      const days     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const today    = days[now.getDay()];
-      const todayDate = now.toISOString().split('T')[0];
+      const now       = new Date();
+      const timeStr   = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today     = dayNames[now.getDay()];          // "Sun" — used for day-of-week check only
+      const todayDate = now.toISOString().split('T')[0]; // "2026-07-19" — used for date comparisons
 
-      const duePosts = await db.getDueStatusPosts(timeStr, today);
+      // ✅ FIXED: pass todayDate (YYYY-MM-DD), NOT today (day name)
+      const duePosts = await db.getDueStatusPosts(timeStr, todayDate);
 
       for (const post of duePosts) {
-        if (post.last_posted_date === todayDate) continue;
+        // ✅ FIXED: column is `last_posted`, not `last_posted_date`
+        if (post.last_posted === todayDate) continue;
+
+        // Check if this post is scheduled for today's day of week
+        const scheduledDays = (post.scheduled_days || post.days || '').toLowerCase();
+        if (scheduledDays && !scheduledDays.includes(today.toLowerCase())) continue;
+
         const client = post.clients;
         if (!client || client.status !== 'active' || !client.subscription_active) continue;
 
@@ -138,63 +137,51 @@ function startScheduler() {
     }
   });
 
-  // ── JOB 2: Mon / Wed / Fri / Sat / Sun at 8:00pm — post meme
+  // ── JOB 2: Mon/Wed/Fri/Sat/Sun at 8pm — post meme ─────────
   cron.schedule('0 20 * * 0,1,3,5,6', async function() {
     console.log('[StatusScheduler] Posting meme to all active clients...');
     try {
       const clients = await db.getActiveClients();
       const meme    = getWeeklyMeme();
-
       for (const client of clients) {
         if (!client.subscription_active) continue;
         const sock = getSock(client.id);
         if (!sock) continue;
-
         try {
           await sock.sendMessage('status@broadcast', { text: meme });
-          console.log('[StatusScheduler] Weekly meme posted for client', client.id);
+          console.log('[StatusScheduler] Meme posted for client', client.id);
         } catch (err) {
           console.error('[StatusScheduler] Meme failed for client', client.id + ':', err.message);
         }
-
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
     } catch (err) {
-      console.error('[StatusScheduler] Weekly meme error:', err.message);
+      console.error('[StatusScheduler] Meme cron error:', err.message);
     }
   });
 
-  // ── JOB 3: 1st of every month at 9:00am — monthly analytics
-  // Sends each client their previous month's performance summary
-  // to their notification_number on WhatsApp.
+  // ── JOB 3: 1st of month at 9am — monthly analytics report ──
   cron.schedule('0 9 1 * *', async function() {
     console.log('[StatusScheduler] Running monthly analytics reports...');
     try {
-      const clients = await db.getActiveClients();
-
-      // We're on the 1st of the current month — report on LAST month
+      const clients   = await db.getActiveClients();
       const now       = new Date();
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const month     = lastMonth.getFullYear() + '-' +
                         String(lastMonth.getMonth() + 1).padStart(2, '0');
 
       for (const client of clients) {
-        if (!client.subscription_active) continue;
-        if (!client.notification_number)  continue;
-
+        if (!client.subscription_active || !client.notification_number) continue;
         const sock = getSock(client.id);
         if (!sock) continue;
-
         try {
           const stats  = await db.getMonthlyStats(client.id, month);
           const report = buildMonthlyReport(client, stats, month);
-          await sendWhatsApp(sock, client.notification_number, report);
-          console.log('[StatusScheduler] Monthly report sent for client', client.id, 'month:', month);
+          await sendToPhone(sock, client.notification_number, report);
+          console.log('[StatusScheduler] Monthly report sent for client', client.id);
         } catch (err) {
           console.error('[StatusScheduler] Monthly report failed for client', client.id + ':', err.message);
         }
-
-        // Spread out messages across clients
         await new Promise(function(r) { setTimeout(r, 3000); });
       }
     } catch (err) {
@@ -202,7 +189,100 @@ function startScheduler() {
     }
   });
 
-  console.log('[StatusScheduler] Started. Status posts: every minute. Memes: Mon/Wed/Fri/Sat/Sun 8pm. Monthly reports: 1st of month 9am.');
+  // ── JOB 4: Every minute — run due bot errands ──────────────
+  // Bot errands are scheduled auto-outreach tasks that clients create
+  // from their dashboard. The bot sends messages to a filtered group
+  // of customers at a set time on chosen days — no manual work needed.
+  cron.schedule('* * * * *', async function() {
+    try {
+      const now       = new Date();
+      const timeStr   = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today     = dayNames[now.getDay()];
+      const todayDate = now.toISOString().split('T')[0];
+
+      const tasks = await db.getDueBotTasks(timeStr);
+
+      for (const task of tasks) {
+        // Skip if already ran today
+        if (task.last_run_date === todayDate) continue;
+
+        // Check if today is a scheduled day
+        const scheduledDays = (task.schedule_days || '').toLowerCase();
+        if (scheduledDays && !scheduledDays.includes(today.toLowerCase())) continue;
+
+        const client = task.clients;
+        if (!client || !client.subscription_active) continue;
+
+        const sock = getSock(task.client_id);
+        if (!sock) continue;
+
+        // Get target customers based on filter type
+        const sb   = db.getSupabase();
+        let jids   = [];
+        const cutoff = new Date();
+
+        if (task.filter_type === 'all_customers') {
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+
+        } else if (task.filter_type === 'pending_orders') {
+          const { data } = await sb.from('orders')
+            .select('customer_jid')
+            .eq('client_id', task.client_id)
+            .in('status', ['pending', 'awaiting_receipt', 'confirmed'])
+            .eq('payment_status', 'unpaid');
+          jids = [...new Set((data || []).map(function(o) { return o.customer_jid; }).filter(Boolean))];
+
+        } else if (task.filter_type === 'inactive_14d') {
+          cutoff.setDate(cutoff.getDate() - 14);
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id)
+            .lt('last_contact', cutoff.toISOString()).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+
+        } else if (task.filter_type === 'inactive_7d') {
+          cutoff.setDate(cutoff.getDate() - 7);
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id)
+            .lt('last_contact', cutoff.toISOString()).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+        }
+
+        if (!jids.length) {
+          // Mark ran even if no targets — avoid re-checking this minute
+          await db.updateBotTask(task.id, { last_run_date: todayDate });
+          continue;
+        }
+
+        // Send to each customer with a short delay
+        let sent = 0;
+        for (const jid of jids) {
+          try {
+            await sock.sendMessage(jid, { text: task.message });
+            sent++;
+            // 1.5s between messages to respect WhatsApp rate limits
+            await new Promise(function(r) { setTimeout(r, 1500); });
+          } catch (e) {
+            console.error('[BotErrands] Failed for', jid + ':', e.message);
+          }
+        }
+
+        // Mark task as completed for today + increment run count
+        await db.updateBotTask(task.id, {
+          last_run_date: todayDate,
+          run_count:     (task.run_count || 0) + 1
+        });
+
+        console.log('[BotErrands] Task "' + task.name + '" sent to ' + sent + '/' + jids.length + ' customers for client', task.client_id);
+      }
+    } catch (err) {
+      console.error('[BotErrands] Cron error:', err.message);
+    }
+  });
+
+  console.log('[StatusScheduler] Started. Status posts: every minute. Memes: Mon/Wed/Fri/Sat/Sun 8pm. Monthly reports: 1st of month 9am. Bot errands: every minute.');
 }
 
 module.exports = { startScheduler };

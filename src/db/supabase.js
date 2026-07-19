@@ -2,7 +2,12 @@
 //  ForgeBot — Supabase client (lazy initialization)
 //  Lazy init prevents Railway startup crash when env vars
 //  aren't loaded yet at require() time.
+//
+//  ⚠️  NEVER call createClient() at the top level of this file.
+//      Always call getSupabase() inside functions.
 // ============================================================
+
+'use strict';
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -22,20 +27,14 @@ function getSupabase() {
 
 async function createClient_(data) {
   const { data: row, error } = await getSupabase()
-    .from('clients')
-    .insert([data])
-    .select()
-    .single();
+    .from('clients').insert([data]).select().single();
   if (error) throw error;
   return row;
 }
 
 async function getClientByEmail(email) {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .select('*')
-    .eq('email', email)
-    .single();
+    .from('clients').select('*').eq('email', email).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
@@ -43,22 +42,16 @@ async function getClientByEmail(email) {
 
 async function getClientById(id) {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .select('*')
-    .eq('id', id)
-    .single();
+    .from('clients').select('*').eq('id', id).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
 }
 
-// Fetches client + bot_setup joined — used by replyEngine for full context
+// Fetches client + bot_setup joined — used by replyEngine
 async function getClientWithSetup(id) {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .select('*, bot_setup(*)')
-    .eq('id', id)
-    .single();
+    .from('clients').select('*, bot_setup(*)').eq('id', id).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
@@ -66,37 +59,29 @@ async function getClientWithSetup(id) {
 
 async function getAllClients() {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .from('clients').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   return data;
 }
 
 async function updateClient(id, updates) {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+    .from('clients').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
 
 async function getActiveClients() {
   const { data, error } = await getSupabase()
-    .from('clients')
-    .select('*')
-    .eq('status', 'active')
-    .eq('subscription_active', true);
+    .from('clients').select('*').eq('status', 'active').eq('subscription_active', true);
   if (error) throw error;
   return data;
 }
 
 // ── FLOWS ─────────────────────────────────────────────────────
 
-async function getFlows(clientId, activeOnly = true) {
+async function getFlows(clientId, activeOnly) {
+  if (activeOnly === undefined) activeOnly = true;
   let q = getSupabase().from('flows').select('*').eq('client_id', clientId);
   if (activeOnly) q = q.eq('active', true);
   const { data, error } = await q.order('priority', { ascending: false });
@@ -106,19 +91,10 @@ async function getFlows(clientId, activeOnly = true) {
 
 async function addFlow(clientId, flowName, keywords, responseType, response, mediaUrl, priority) {
   if (priority === undefined) priority = 0;
-  const { data, error } = await getSupabase()
-    .from('flows')
-    .insert([{
-      client_id: clientId,
-      flow_name: flowName,
-      keywords,
-      response_type: responseType,
-      response,
-      media_url: mediaUrl,
-      priority
-    }])
-    .select()
-    .single();
+  const { data, error } = await getSupabase().from('flows').insert([{
+    client_id: clientId, flow_name: flowName, keywords,
+    response_type: responseType, response, media_url: mediaUrl, priority
+  }]).select().single();
   if (error) throw error;
   return data;
 }
@@ -132,9 +108,7 @@ async function deleteFlow(id) {
 
 async function getStatusPosts(clientId) {
   const { data, error } = await getSupabase()
-    .from('status_posts')
-    .select('*')
-    .eq('client_id', clientId)
+    .from('status_posts').select('*').eq('client_id', clientId)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data;
@@ -142,37 +116,31 @@ async function getStatusPosts(clientId) {
 
 async function addStatusPost(clientId, caption, mediaUrl, postTime, repeatDaily) {
   if (repeatDaily === undefined) repeatDaily = true;
-  const { data, error } = await getSupabase()
-    .from('status_posts')
-    .insert([{
-      client_id: clientId,
-      caption,
-      media_url: mediaUrl,
-      post_time: postTime,
-      repeat_daily: repeatDaily
-    }])
-    .select()
-    .single();
+  const { data, error } = await getSupabase().from('status_posts').insert([{
+    client_id: clientId, caption, media_url: mediaUrl,
+    post_time: postTime, repeat_daily: repeatDaily
+  }]).select().single();
   if (error) throw error;
   return data;
 }
 
-async function getDueStatusPosts(currentTime, today) {
+async function getDueStatusPosts(currentTime, todayDate) {
+  // todayDate must be YYYY-MM-DD format (e.g. "2026-07-19")
+  // NOT a day name like "Sun" — that causes PostgreSQL date type error
   const { data, error } = await getSupabase()
     .from('status_posts')
     .select('*, clients(*)')
     .eq('active', true)
     .eq('post_time', currentTime)
-    .or('last_posted.is.null,last_posted.lt.' + today);
+    .or('last_posted.is.null,last_posted.lt.' + todayDate);
   if (error) throw error;
   return data;
 }
 
 async function markStatusPosted(id, date) {
+  // date should be YYYY-MM-DD
   const { error } = await getSupabase()
-    .from('status_posts')
-    .update({ last_posted: date })
-    .eq('id', id);
+    .from('status_posts').update({ last_posted: date }).eq('id', id);
   if (error) throw error;
 }
 
@@ -181,39 +149,26 @@ async function deleteStatusPost(id) {
   if (error) throw error;
 }
 
-// ── PAYMENTS (Flutterwave subscription payments) ───────────────
+// ── PAYMENTS ──────────────────────────────────────────────────
 
 async function createPayment(clientId, paymentType, amount, currency, provider, reference) {
-  const { data, error } = await getSupabase()
-    .from('payments')
-    .insert([{
-      client_id: clientId,
-      payment_type: paymentType,
-      amount,
-      currency,
-      provider,
-      reference
-    }])
-    .select()
-    .single();
+  const { data, error } = await getSupabase().from('payments').insert([{
+    client_id: clientId, payment_type: paymentType,
+    amount, currency, provider, reference
+  }]).select().single();
   if (error) throw error;
   return data;
 }
 
 async function updatePaymentStatus(reference, status) {
   const { error } = await getSupabase()
-    .from('payments')
-    .update({ status })
-    .eq('reference', reference);
+    .from('payments').update({ status }).eq('reference', reference);
   if (error) throw error;
 }
 
 async function getPaymentByReference(reference) {
   const { data, error } = await getSupabase()
-    .from('payments')
-    .select('*')
-    .eq('reference', reference)
-    .single();
+    .from('payments').select('*').eq('reference', reference).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
@@ -223,46 +178,36 @@ async function getPaymentByReference(reference) {
 
 async function logBroadcast(clientId, message, recipients) {
   const { error } = await getSupabase()
-    .from('broadcast_logs')
-    .insert([{ client_id: clientId, message, recipients }]);
+    .from('broadcast_logs').insert([{ client_id: clientId, message, recipients }]);
   if (error) throw error;
 }
 
 async function getBroadcastLogs(clientId) {
   const { data, error } = await getSupabase()
-    .from('broadcast_logs')
-    .select('*')
-    .eq('client_id', clientId)
-    .order('sent_at', { ascending: false })
-    .limit(50);
+    .from('broadcast_logs').select('*').eq('client_id', clientId)
+    .order('sent_at', { ascending: false }).limit(50);
   if (error) throw error;
   return data;
 }
 
-// ── CUSTOMERS (WhatsApp contacts the bot has served) ──────────
+// ── CUSTOMERS ─────────────────────────────────────────────────
 
 async function getCustomer(clientId, jid) {
   const { data, error } = await getSupabase()
-    .from('customers')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('jid', jid)
-    .single();
+    .from('customers').select('*').eq('client_id', clientId).eq('jid', jid).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
 }
 
 async function upsertCustomer(clientId, jid, name, phone) {
-  const { error } = await getSupabase()
-    .from('customers')
-    .upsert({
-      client_id: clientId,
-      jid,
-      name: name || null,
-      phone: phone || jid.replace('@s.whatsapp.net', ''),
-      last_contact: new Date().toISOString()
-    }, { onConflict: 'client_id,jid' });
+  const { error } = await getSupabase().from('customers').upsert({
+    client_id:    clientId,
+    jid,
+    name:         name || null,
+    phone:        phone || jid.replace('@s.whatsapp.net', ''),
+    last_contact: new Date().toISOString()
+  }, { onConflict: 'client_id,jid' });
   if (error) throw error;
 }
 
@@ -270,9 +215,7 @@ async function upsertCustomer(clientId, jid, name, phone) {
 
 async function getProducts(clientId) {
   const { data, error } = await getSupabase()
-    .from('products')
-    .select('*')
-    .eq('client_id', clientId)
+    .from('products').select('*').eq('client_id', clientId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data || []).map(function(p) { p._type = 'product'; return p; });
@@ -280,17 +223,14 @@ async function getProducts(clientId) {
 
 async function getServices(clientId) {
   const { data, error } = await getSupabase()
-    .from('services')
-    .select('*')
-    .eq('client_id', clientId)
+    .from('services').select('*').eq('client_id', clientId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data || []).map(function(s) { s._type = 'service'; return s; });
 }
 
 async function addProduct(clientId, name, price, description, imageUrl) {
-  const { data, error } = await getSupabase()
-    .from('products')
+  const { data, error } = await getSupabase().from('products')
     .insert([{ client_id: clientId, name, price, description, image_url: imageUrl }])
     .select().single();
   if (error) throw error;
@@ -299,10 +239,7 @@ async function addProduct(clientId, name, price, description, imageUrl) {
 
 async function updateProduct(id, updates) {
   const { data, error } = await getSupabase()
-    .from('products')
-    .update(updates)
-    .eq('id', id)
-    .select().single();
+    .from('products').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
@@ -313,8 +250,7 @@ async function deleteProduct(id) {
 }
 
 async function addService(clientId, name, price, description, duration) {
-  const { data, error } = await getSupabase()
-    .from('services')
+  const { data, error } = await getSupabase().from('services')
     .insert([{ client_id: clientId, name, price, description, duration }])
     .select().single();
   if (error) throw error;
@@ -330,10 +266,7 @@ async function deleteService(id) {
 
 async function createOrder(orderData) {
   const { data, error } = await getSupabase()
-    .from('orders')
-    .insert([orderData])
-    .select()
-    .single();
+    .from('orders').insert([orderData]).select().single();
   if (error) throw error;
   return data;
 }
@@ -341,20 +274,13 @@ async function createOrder(orderData) {
 async function updateOrder(id, updates) {
   updates.updated_at = new Date().toISOString();
   const { data, error } = await getSupabase()
-    .from('orders')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+    .from('orders').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }
 
 async function getOrders(clientId, status) {
-  let q = getSupabase()
-    .from('orders')
-    .select('*')
-    .eq('client_id', clientId);
+  let q = getSupabase().from('orders').select('*').eq('client_id', clientId);
   if (status) q = q.eq('status', status);
   const { data, error } = await q.order('created_at', { ascending: false }).limit(100);
   if (error) throw error;
@@ -363,20 +289,15 @@ async function getOrders(clientId, status) {
 
 async function getOrderById(id) {
   const { data, error } = await getSupabase()
-    .from('orders')
-    .select('*')
-    .eq('id', id)
-    .single();
+    .from('orders').select('*').eq('id', id).single();
   if (error && error.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
 }
 
-// Get the most recent unpaid order with a receipt for a customer
 async function getPendingOrderForCustomer(clientId, customerJid) {
   const { data, error } = await getSupabase()
-    .from('orders')
-    .select('*')
+    .from('orders').select('*')
     .eq('client_id', clientId)
     .eq('customer_jid', customerJid)
     .eq('payment_status', 'unpaid')
@@ -390,100 +311,73 @@ async function getPendingOrderForCustomer(clientId, customerJid) {
 // ── PRICE INQUIRIES (LEADS) ───────────────────────────────────
 
 async function logPriceInquiry(clientId, customerJid, customerName, productName, productPrice, itemType) {
-  await getSupabase()
-    .from('price_inquiries')
-    .insert([{
-      client_id: clientId,
-      customer_jid: customerJid,
-      customer_name: customerName || null,
-      product_name: productName,
-      product_price: productPrice || null,
-      item_type: itemType || 'product'
-    }]);
-  // Intentionally not throwing — analytics logging should never break the bot
+  await getSupabase().from('price_inquiries').insert([{
+    client_id:     clientId,
+    customer_jid:  customerJid,
+    customer_name: customerName || null,
+    product_name:  productName,
+    product_price: productPrice || null,
+    item_type:     itemType || 'product'
+  }]);
+  // Intentionally not throwing — lead logging must never crash the bot
 }
 
-// ── ANALYTICS ────────────────────────────────────────────────
+// ── ANALYTICS ─────────────────────────────────────────────────
 
-// Returns aggregated monthly stats for a client
-// month = 'YYYY-MM' e.g. '2025-06'
 async function getMonthlyStats(clientId, month) {
   const start = month + '-01T00:00:00.000Z';
   const d = new Date(start);
   d.setMonth(d.getMonth() + 1);
   const end = d.toISOString().slice(0, 10) + 'T00:00:00.000Z';
-
   const supabase = getSupabase();
 
-  // New customers this month
-  const { count: newCustomers } = await supabase
-    .from('customers')
+  const { count: newCustomers } = await supabase.from('customers')
     .select('*', { count: 'exact', head: true })
-    .eq('client_id', clientId)
-    .gte('first_contact', start)
-    .lt('first_contact', end);
+    .eq('client_id', clientId).gte('first_contact', start).lt('first_contact', end);
 
-  // Price inquiries (leads)
-  const { count: leads } = await supabase
-    .from('price_inquiries')
+  const { count: leads } = await supabase.from('price_inquiries')
     .select('*', { count: 'exact', head: true })
-    .eq('client_id', clientId)
-    .gte('created_at', start)
-    .lt('created_at', end);
+    .eq('client_id', clientId).gte('created_at', start).lt('created_at', end);
 
-  // Orders placed this month
-  const { count: ordersPlaced } = await supabase
-    .from('orders')
+  const { count: ordersPlaced } = await supabase.from('orders')
     .select('*', { count: 'exact', head: true })
-    .eq('client_id', clientId)
-    .gte('created_at', start)
-    .lt('created_at', end);
+    .eq('client_id', clientId).gte('created_at', start).lt('created_at', end);
 
-  // Confirmed orders + revenue
-  const { data: confirmedOrders } = await supabase
-    .from('orders')
-    .select('total')
-    .eq('client_id', clientId)
-    .eq('payment_status', 'confirmed')
-    .gte('created_at', start)
-    .lt('created_at', end);
+  const { data: confirmedOrders } = await supabase.from('orders')
+    .select('total').eq('client_id', clientId).eq('payment_status', 'confirmed')
+    .gte('created_at', start).lt('created_at', end);
 
   const confirmedCount = (confirmedOrders || []).length;
-  const totalRevenue = (confirmedOrders || []).reduce(function(sum, o) {
+  const totalRevenue   = (confirmedOrders || []).reduce(function(sum, o) {
     return sum + (parseFloat(o.total) || 0);
   }, 0);
 
   return {
     month,
-    new_customers: newCustomers || 0,
-    leads: leads || 0,
-    orders_placed: ordersPlaced || 0,
+    new_customers:    newCustomers    || 0,
+    leads:            leads           || 0,
+    orders_placed:    ordersPlaced    || 0,
     orders_confirmed: confirmedCount,
-    total_revenue: totalRevenue
+    total_revenue:    totalRevenue
   };
 }
 
 // ── BOT SETUP ─────────────────────────────────────────────────
 
 async function upsertBotSetup(clientId, setupData) {
-  setupData.client_id = clientId;
+  setupData.client_id  = clientId;
   setupData.updated_at = new Date().toISOString();
-  // Remove undefined/empty keys
   Object.keys(setupData).forEach(function(k) {
-    if (setupData[k] === undefined || setupData[k] === '') delete setupData[k];
+    if ((setupData[k] === undefined || setupData[k] === '') && k !== 'client_id') delete setupData[k];
   });
   const { error } = await getSupabase()
-    .from('bot_setup')
-    .upsert(setupData, { onConflict: 'client_id' });
+    .from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
   if (error) throw error;
 }
 
 async function getBotSetup(clientId) {
   const { data, error } = await getSupabase()
-    .from('bot_setup')
-    .select('*')
-    .eq('client_id', clientId)
-    .single();
+    .from('bot_setup').select('*').eq('client_id', clientId).single();
   if (error && error.code === 'PGRST116') return {};
   if (error) throw error;
   return data || {};
@@ -492,17 +386,58 @@ async function getBotSetup(clientId) {
 // ── PUSH SUBSCRIPTIONS ────────────────────────────────────────
 
 async function savePushSubscription(clientId, endpoint, p256dh, auth) {
-  const { error } = await getSupabase()
-    .from('push_subscriptions')
-    .upsert({ client_id: clientId, endpoint, p256dh, auth }, { onConflict: 'client_id,endpoint' });
+  const { error } = await getSupabase().from('push_subscriptions').upsert(
+    { client_id: clientId, endpoint, p256dh, auth },
+    { onConflict: 'client_id,endpoint' }
+  );
   if (error) throw error;
 }
 
 async function getPushSubscriptions(clientId) {
   const { data, error } = await getSupabase()
-    .from('push_subscriptions')
-    .select('*')
-    .eq('client_id', clientId);
+    .from('push_subscriptions').select('*').eq('client_id', clientId);
+  if (error) throw error;
+  return data || [];
+}
+
+// ── BOT TASKS (scheduled auto-outreach / bot errands) ─────────
+
+async function getBotTasks(clientId, activeOnly) {
+  let q = getSupabase().from('bot_tasks').select('*').eq('client_id', clientId);
+  if (activeOnly) q = q.eq('active', true);
+  const { data, error } = await q.order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createBotTask(taskData) {
+  taskData.updated_at = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from('bot_tasks').insert([taskData]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateBotTask(id, updates) {
+  updates.updated_at = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from('bot_tasks').update(updates).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteBotTask(id) {
+  const { error } = await getSupabase().from('bot_tasks').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Used by the scheduler — gets all active tasks due at the given time
+async function getDueBotTasks(scheduleTime) {
+  const { data, error } = await getSupabase()
+    .from('bot_tasks')
+    .select('*, clients(*)')
+    .eq('active', true)
+    .eq('schedule_time', scheduleTime);
   if (error) throw error;
   return data || [];
 }
@@ -510,7 +445,7 @@ async function getPushSubscriptions(clientId) {
 // ── EXPORTS ───────────────────────────────────────────────────
 
 module.exports = {
-  // Raw client access for direct queries in replyEngine
+  // Raw client access for direct Supabase queries in replyEngine
   getSupabase,
 
   // Clients
@@ -546,5 +481,8 @@ module.exports = {
   upsertBotSetup, getBotSetup,
 
   // Push notifications
-  savePushSubscription, getPushSubscriptions
+  savePushSubscription, getPushSubscriptions,
+
+  // Bot tasks (scheduled auto-outreach / bot errands)
+  getBotTasks, createBotTask, updateBotTask, deleteBotTask, getDueBotTasks
 };

@@ -1,1098 +1,943 @@
 // ============================================================
-//  ForgeBot — Client API Routes (complete)
-//  File location: src/api/clientRoutes.js
-//  Mounted at: /api  (app.use('/api', clientRoutes))
+//  ForgeBot — Client API Routes
+//  File location: src/routes/clientRoutes.js
 //
-//  ⚠️  CRITICAL AUTH RULE:
-//  Public routes (signup, login, payment callback, webhook, vapid-key)
-//  must have NO auth middleware — they are called before a token exists.
-//  All other /client/* routes use auth per-route.
-//  NEVER use router.use('/client', auth) — that blocks signup.
+//  ⚠️  CRITICAL: Auth middleware is applied PER-ROUTE.
+//      NEVER use router.use('/client', auth) — that blocks
+//      signup and login which must remain public.
 // ============================================================
 
 'use strict';
 
-const express = require('express');
-const router  = express.Router();
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const multer  = require('multer');
-const webpush = require('web-push');
-const { createClient } = require('@supabase/supabase-js');
+const express    = require('express');
+const bcrypt     = require('bcryptjs');
+const jwt        = require('jsonwebtoken');
+const multer     = require('multer');
+const axios      = require('axios');
+const webpush    = require('web-push');
+const router     = express.Router();
+const db         = require('../db/supabase');
+const { sessions } = require('../sessions/sessionManager');
 
-const sessionManager = require('../sessions/sessionManager');
-const db = require('../db/supabase');
+// ── Multer (in-memory uploads) ────────────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ── Lazy Supabase init ────────────────────────────────────────
-function getSupabase() {
-  return db.getSupabase();
-}
-
-// ── Multer: memory storage for file uploads ───────────────────
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }  // 50 MB
-});
-
-// ── JWT auth middleware ───────────────────────────────────────
-// Applied INDIVIDUALLY to routes that require login.
+// ── Auth middleware ───────────────────────────────────────────
 function auth(req, res, next) {
+  const header = req.headers['authorization'] || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorised' });
   try {
-    var header = req.headers.authorization || '';
-    var token  = header.replace('Bearer ', '').trim();
-    if (!token) return res.status(401).json({ error: 'No token' });
-    var decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.clientId = decoded.clientId || decoded.id;
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.clientId  = payload.id || payload.clientId;
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 }
 
-// ── Partner expiry auto-check ─────────────────────────────────
+// ── Partner expiry guard (soft block) ────────────────────────
 async function checkPartnerExpiry(clientId) {
   try {
-    var sb     = getSupabase();
-    var result = await sb.from('clients')
-      .select('is_partner,partner_expires_at,subscription_active')
-      .eq('id', clientId)
-      .single();
-    if (result.error || !result.data) return;
-    var c = result.data;
-    if (c.is_partner && c.partner_expires_at && c.subscription_active) {
-      if (new Date(c.partner_expires_at) < new Date()) {
-        await sb.from('clients').update({ subscription_active: false }).eq('id', clientId);
-        await sb.from('partner_log').insert({
-          client_id: clientId,
-          action: 'expired',
-          note: 'Auto-expired on API request check'
-        });
-      }
+    const client = await db.getClientById(clientId);
+    if (!client) return;
+    if (client.trial_ends_at && new Date(client.trial_ends_at) < new Date() && !client.subscription_active) {
+      // Soft expiry — just log, don't hard block (can be upgraded later)
+      console.log('[PartnerExpiry] Client', clientId, 'trial expired. Status:', client.status);
     }
   } catch (e) {
-    console.error('[ClientAPI] Partner check error:', e.message);
+    // Non-fatal
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  PUBLIC ROUTES — no auth required
-//  These come FIRST and have no auth middleware.
-// ══════════════════════════════════════════════════════════════
+// ── Session helper ────────────────────────────────────────────
+function getSessionSock(clientId) {
+  if (sessions && typeof sessions.get === 'function') return sessions.get(clientId);
+  if (sessions && typeof sessions === 'object')        return sessions[clientId];
+  return null;
+}
 
-// POST /api/client/signup
+// ── WhatsApp send helper ──────────────────────────────────────
+async function sendWhatsApp(clientId, phone, message) {
+  const sock = getSessionSock(clientId);
+  if (!sock) return;
+  const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
+  await sock.sendMessage(jid, { text: message });
+}
+
+// ── Status update message builder ────────────────────────────
+function buildStatusMessage(order, newStatus, bizName) {
+  const statusMessages = {
+    confirmed:  '✅ Great news! Your order has been *confirmed*.',
+    packaging:  '📦 Your order is now being *packaged*.',
+    shipped:    '🚚 Your order has been *shipped* and is on its way!',
+    delivered:  '🎉 Your order has been *delivered*! Thank you for shopping with us.',
+    rejected:   '❌ Unfortunately, we could not process your order. Please contact us for details.'
+  };
+  return (
+    '🛍 *Order Update — ' + (bizName || 'ForgeBot') + '*\n\n' +
+    (statusMessages[newStatus] || 'Your order status has been updated to: ' + newStatus) +
+    '\n\nOrder ref: ' + (order.id || '').toString().slice(-8).toUpperCase() +
+    (order.total ? '\nTotal: ₦' + Number(order.total).toLocaleString() : '') +
+    '\n\nThank you for your business! 🙏'
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+//  PUBLIC ROUTES — NO AUTH REQUIRED
+// ════════════════════════════════════════════════════════════════
+
+// ── POST /client/signup ───────────────────────────────────────
 router.post('/client/signup', async function(req, res) {
   try {
-    var {
-      full_name, business_name, business_type, whatsapp_number,
-      notification_number, country,
-      bank_name, account_number, account_name,
-      email, password
-    } = req.body;
-
-    if (!full_name || !business_name || !email || !password || !whatsapp_number) {
-      return res.status(400).json({ error: 'Required fields missing' });
+    const { email, password, business_name, phone, occupation, business_type } = req.body;
+    if (!email || !password || !business_name) {
+      return res.status(400).json({ error: 'email, password, business_name required' });
     }
+    const existing = await db.getClientByEmail(email);
+    if (existing) return res.status(409).json({ error: 'Email already registered' });
 
-    var sb = getSupabase();
+    const hash   = await bcrypt.hash(password, 10);
+    const client = await db.createClient_({
+      email, password_hash: hash, business_name,
+      phone: phone || null,
+      occupation: occupation || null,
+      business_type: business_type || 'both',
+      status: 'active',
+      subscription_active: true,  // starts trial
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    });
 
-    // Check email uniqueness
-    var existing = await sb.from('clients').select('id').eq('email', email.toLowerCase()).single();
-    if (existing.data) return res.status(409).json({ error: 'Email already registered' });
-
-    var hash = await bcrypt.hash(password, 10);
-
-    var insert = await sb.from('clients').insert({
-      full_name:           full_name,
-      business_name:       business_name,
-      business_type:       business_type || 'products',
-      whatsapp_number:     whatsapp_number.replace(/\D/g, ''),
-      notification_number: notification_number ? notification_number.replace(/\D/g, '') : null,
-      country:             country || 'Nigeria',
-      bank_name:           bank_name || null,
-      account_number:      account_number || null,
-      account_name:        account_name || null,
-      email:               email.toLowerCase(),
-      password_hash:       hash,
-      status:              'active',
-      subscription_active: false  // activated after payment
-    }).select().single();
-
-    if (insert.error) throw new Error(insert.error.message);
-
-    var clientId = insert.data.id;
-    var token    = jwt.sign({ clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
-
-    res.json({ token: token, clientId: clientId, business_name: business_name });
-  } catch (e) {
-    console.error('[signup]', e.message);
-    res.status(500).json({ error: e.message });
+    const token = jwt.sign({ id: client.id }, process.env.JWT_SECRET, { expiresIn: '90d' });
+    return res.json({ token, client: { id: client.id, email: client.email, business_name: client.business_name, occupation: client.occupation, business_type: client.business_type } });
+  } catch (err) {
+    console.error('[Signup] Error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/client/login
+// ── POST /client/login ────────────────────────────────────────
 router.post('/client/login', async function(req, res) {
   try {
-    var { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
-    var sb = getSupabase();
-    var result = await sb.from('clients').select('*').eq('email', email.toLowerCase()).single();
-    if (result.error || !result.data) return res.status(401).json({ error: 'Invalid credentials' });
+    const client = await db.getClientByEmail(email);
+    if (!client) return res.status(401).json({ error: 'Invalid credentials' });
 
-    var client = result.data;
-    var match  = await bcrypt.compare(password, client.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    const ok = await bcrypt.compare(password, client.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    var token = jwt.sign({ clientId: client.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token: token, clientId: client.id, business_name: client.business_name });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const token = jwt.sign({ id: client.id }, process.env.JWT_SECRET, { expiresIn: '90d' });
+    return res.json({ token, client: { id: client.id, email: client.email, business_name: client.business_name, occupation: client.occupation, business_type: client.business_type, subscription_active: client.subscription_active } });
+  } catch (err) {
+    console.error('[Login] Error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/push/vapid-key  — public, needed before auth
+// ── GET /push/vapid-key ───────────────────────────────────────
 router.get('/push/vapid-key', function(req, res) {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-// ── Flutterwave payment routes ────────────────────────────────
-
-// POST /api/client/pay/flutterwave  — auth required (user is logged in to initiate)
-router.post('/client/pay/flutterwave', auth, async function(req, res) {
-  try {
-    var Flutterwave = require('flutterwave-node-v3');
-    var flw = new Flutterwave(process.env.FLW_PUBLIC_KEY, process.env.FLW_SECRET_KEY);
-
-    var sb     = getSupabase();
-    var result = await sb.from('clients').select('*').eq('id', req.clientId).single();
-    if (result.error || !result.data) return res.status(404).json({ error: 'Client not found' });
-    var client = result.data;
-
-    var reference = 'FGB-' + req.clientId.slice(0,8) + '-' + Date.now();
-
-    await sb.from('payments').insert({
-      client_id:    req.clientId,
-      payment_type: 'subscription',
-      amount:       9900,
-      currency:     'NGN',
-      provider:     'flutterwave',
-      reference:    reference
-    });
-
-    var payload = {
-      tx_ref:        reference,
-      amount:        '9900',
-      currency:      'NGN',
-      redirect_url:  (process.env.APP_URL || '') + '/api/client/pay/callback',
-      customer:      { email: client.email, name: client.business_name || client.full_name },
-      customizations:{ title: 'ForgeBot Subscription', logo: (process.env.APP_URL || '') + '/icons/icon-192.png' }
-    };
-
-    if (process.env.FLW_MONTHLY_PLAN_ID) {
-      payload.payment_plan = process.env.FLW_MONTHLY_PLAN_ID;
-    }
-
-    var response = await flw.Charge.card(payload);
-    if (response.status === 'success') {
-      return res.json({ paymentLink: response.data.link || response.meta.authorization.redirect });
-    }
-    throw new Error(response.message || 'Payment initiation failed');
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/client/pay/callback  — Flutterwave redirect after payment (NO auth)
+// ── GET /client/pay/callback — Flutterwave redirect ──────────
 router.get('/client/pay/callback', async function(req, res) {
   try {
-    var { transaction_id, tx_ref, status } = req.query;
-    if (status !== 'successful' || !transaction_id) {
-      return res.redirect('/?payment=failed');
-    }
+    const { transaction_id, tx_ref } = req.query;
+    if (!transaction_id || !tx_ref) return res.redirect('/dashboard?pay=failed');
 
-    var axios = require('axios');
-    var verify = await axios.get(
+    const verifyRes = await axios.get(
       'https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify',
       { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } }
     );
+    const tx = verifyRes.data && verifyRes.data.data;
+    if (!tx || tx.status !== 'successful') return res.redirect('/dashboard?pay=failed');
 
-    if (verify.data.status === 'success' && verify.data.data.status === 'successful') {
-      var sb = getSupabase();
-      var pmtResult = await sb.from('payments').select('client_id').eq('reference', tx_ref).single();
-      if (pmtResult.data) {
-        var clientId = pmtResult.data.client_id;
-        await sb.from('clients').update({ subscription_active: true }).eq('id', clientId);
-        await sb.from('payments').update({ status: 'paid' }).eq('reference', tx_ref);
-
-        // Generate JWT so user lands on dashboard
-        var token = jwt.sign({ clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        return res.redirect('/onboard?token=' + token);
-      }
+    const payment = await db.getPaymentByReference(tx_ref);
+    if (payment && payment.status !== 'completed') {
+      await db.updatePaymentStatus(tx_ref, 'completed');
+      await db.updateClient(payment.client_id, { subscription_active: true });
     }
-    res.redirect('/?payment=failed');
-  } catch (e) {
-    console.error('[payment callback]', e.message);
-    res.redirect('/?payment=error');
+    return res.redirect('/dashboard?pay=success');
+  } catch (err) {
+    console.error('[Pay callback] Error:', err.message);
+    return res.redirect('/dashboard?pay=error');
   }
 });
 
-// POST /api/client/pay/webhook  — Flutterwave server webhook (NO auth)
+// ── POST /client/pay/webhook — Flutterwave webhook ───────────
 router.post('/client/pay/webhook', async function(req, res) {
   try {
-    var hash = req.headers['verif-hash'];
-    if (hash !== process.env.FLW_HASH) return res.status(401).json({ error: 'Invalid hash' });
-
-    var event = req.body;
-    if (event.event === 'charge.completed' && event.data && event.data.status === 'successful') {
-      var tx_ref = event.data.tx_ref;
-      var sb     = getSupabase();
-      var pmtRes = await sb.from('payments').select('client_id').eq('reference', tx_ref).single();
-      if (pmtRes.data) {
-        await sb.from('clients').update({ subscription_active: true }).eq('id', pmtRes.data.client_id);
-        await sb.from('payments').update({ status: 'paid' }).eq('reference', tx_ref);
+    const hash = req.headers['verif-hash'];
+    if (hash !== process.env.FLW_HASH) return res.sendStatus(401);
+    const { event, data } = req.body;
+    if (event === 'charge.completed' && data.status === 'successful') {
+      const payment = await db.getPaymentByReference(data.tx_ref);
+      if (payment && payment.status !== 'completed') {
+        await db.updatePaymentStatus(data.tx_ref, 'completed');
+        await db.updateClient(payment.client_id, { subscription_active: true });
       }
     }
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error('[Pay webhook] Error:', err.message);
+    return res.sendStatus(500);
   }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  AUTHENTICATED ROUTES — auth middleware on every route
-// ══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+//  PROTECTED ROUTES — AUTH REQUIRED PER ROUTE
+// ════════════════════════════════════════════════════════════════
 
-// GET /api/client/me
+// ── GET /client/me ────────────────────────────────────────────
 router.get('/client/me', auth, async function(req, res) {
   try {
+    const client = await db.getClientWithSetup(req.clientId);
+    if (!client) return res.status(404).json({ error: 'Not found' });
     await checkPartnerExpiry(req.clientId);
-    var sb     = getSupabase();
-    var result = await sb.from('clients').select('*').eq('id', req.clientId).single();
-    if (result.error || !result.data) return res.status(404).json({ error: 'Not found' });
-    var client = result.data;
-    var sock   = sessionManager.getSession ? sessionManager.getSession(req.clientId)
-               : (sessionManager.sessions ? sessionManager.sessions[req.clientId] : null);
-    var { password_hash, ...safe } = client;
-    safe.whatsapp_status = sock ? 'connected' : 'disconnected';
-    res.json(safe);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json(client);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ── Auto-Reply Flows ──────────────────────────────────────────
-
-router.get('/client/flows', auth, async function(req, res) {
+// ── POST /client/pay/flutterwave — initiate subscription ─────
+router.post('/client/pay/flutterwave', auth, async function(req, res) {
   try {
-    var sb     = getSupabase();
-    var result = await sb.from('flows')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('priority', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/flows', auth, async function(req, res) {
-  try {
-    var { keywords, response, response_type, media_url } = req.body;
-    if (!keywords || !response) return res.status(400).json({ error: 'keywords and response are required' });
-    var sb     = getSupabase();
-    var result = await sb.from('flows').insert({
-      client_id:     req.clientId,
-      flow_name:     'Custom',
-      keywords:      keywords,
-      response_type: response_type || 'text',
-      response:      response,
-      media_url:     media_url || null,
-      priority:      0
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.delete('/client/flows/:id', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('flows').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Status Posts ──────────────────────────────────────────────
-
-router.get('/client/status-posts', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('status_posts')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false });
-    // Normalise column names for dashboard compatibility
-    var posts = (result.data || []).map(function(p) {
-      return Object.assign({}, p, {
-        scheduled_time: p.scheduled_time || p.post_time || '',
-        scheduled_days: p.scheduled_days || p.days || ''
-      });
-    });
-    res.json(posts);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/status-posts', auth, async function(req, res) {
-  try {
-    var { mediaUrl, caption, scheduledTime, scheduledDays } = req.body;
-    if (!mediaUrl || !scheduledTime || !scheduledDays) return res.status(400).json({ error: 'Missing fields' });
-    var sb     = getSupabase();
-    var result = await sb.from('status_posts').insert({
-      client_id:      req.clientId,
-      caption:        caption || null,
-      media_url:      mediaUrl,
-      post_time:      scheduledTime,
-      days:           scheduledDays,
-      scheduled_time: scheduledTime,
-      scheduled_days: scheduledDays
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.delete('/client/status-posts/:id', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('status_posts').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Broadcasts ────────────────────────────────────────────────
-
-router.get('/client/broadcasts', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('broadcast_logs')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/broadcasts', auth, async function(req, res) {
-  try {
-    var { message } = req.body;
-    if (!message) return res.status(400).json({ error: 'message required' });
-
-    var sock = sessionManager.getSession ? sessionManager.getSession(req.clientId) : null;
-    if (!sock) return res.status(400).json({ error: 'WhatsApp not connected' });
-
-    var sb     = getSupabase();
-    var result = await sb.from('customers').select('jid').eq('client_id', req.clientId).limit(200);
-    var jids   = (result.data || []).map(function(c) { return c.jid; });
-
-    var sent = 0;
-    for (var i = 0; i < jids.length; i++) {
-      try {
-        await sock.sendMessage(jids[i], { text: message });
-        sent++;
-        await new Promise(function(r) { setTimeout(r, 1200); });
-      } catch (e) {
-        console.error('[broadcast] failed for', jids[i]);
-      }
-    }
-
-    await sb.from('broadcast_logs').insert({ client_id: req.clientId, message: message, recipients: sent });
-    res.json({ sent: sent, total: jids.length });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Settings ──────────────────────────────────────────────────
-
-// PUT /api/client/settings — saves client-level settings
-router.put('/client/settings', auth, async function(req, res) {
-  try {
-    var allowed = [
-      'notification_number', 'business_name', 'bank_name',
-      'account_number', 'account_name', 'business_hours',
-      'welcome_message', 'fallback_message', 'business_type'
-    ];
-    var update = {};
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var sb     = getSupabase();
-    var result = await sb.from('clients').update(update).eq('id', req.clientId).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PUT /api/client/fallback — backwards compatibility
-router.put('/client/fallback', auth, async function(req, res) {
-  try {
-    var { fallback_message } = req.body;
-    if (!fallback_message) return res.status(400).json({ error: 'fallback_message required' });
-    var sb     = getSupabase();
-    var result = await sb.from('clients').update({ fallback_message: fallback_message }).eq('id', req.clientId).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Bot Setup / Questionnaire ─────────────────────────────────
-
-// PUT /api/client/bot-setup — saves questionnaire from onboard.html
-router.put('/client/bot-setup', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    var clientId = req.clientId;
-    var {
-      occupation, occupation_data,
-      availability_days, payment_methods, current_promo,
-      instagram, facebook, tiktok, whatsapp_channel,
-      service_areas, property_types, studio_location,
-      advance_booking, deposit_required, home_service,
-      return_policy, delivers_to, minimum_order,
-      delivery_time_local, delivery_fee_local,
-      session_duration, session_type, who_do_you_serve,
-      free_consult, bulk_orders, event_services,
-      visa_service, home_visits, fashion_type,
-      deal_type, viewings, photography_types
-    } = req.body;
-
-    // 1. Update occupation on clients table
-    if (occupation) {
-      await sb.from('clients').update({
-        occupation:      occupation,
-        occupation_data: occupation_data || {}
-      }).eq('id', clientId);
-    }
-
-    // 2. Build bot_setup upsert payload (only include defined values)
-    var setup = {
-      client_id:          clientId,
-      availability_days:  availability_days || null,
-      payment_methods:    payment_methods || null,
-      current_promo:      current_promo || null,
-      instagram:          instagram || null,
-      facebook:           facebook || null,
-      tiktok:             tiktok || null,
-      whatsapp_channel:   whatsapp_channel || null,
-      service_areas:      service_areas || property_types || null,
-      studio_location:    studio_location || null,
-      advance_booking:    advance_booking || null,
-      deposit_required:   deposit_required || null,
-      home_service:       home_service || null,
-      return_policy:      return_policy || null,
-      delivers_to:        delivers_to || null,
-      minimum_order:      minimum_order || null,
-      delivery_time_local: delivery_time_local || null,
-      delivery_fee_local:  delivery_fee_local || null,
-      session_duration:    session_duration || session_type || null,
-      who_do_you_serve:    who_do_you_serve || null,
-      bulk_orders:         bulk_orders || null,
-      updated_at:          new Date().toISOString()
+    const client    = await db.getClientById(req.clientId);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    const ref       = 'fb_' + req.clientId.slice(0, 8) + '_' + Date.now();
+    await db.createPayment(req.clientId, 'subscription', 5000, 'NGN', 'flutterwave', ref);
+    const payload   = {
+      tx_ref:       ref,
+      amount:       5000,
+      currency:     'NGN',
+      redirect_url: (process.env.APP_URL || '') + '/api/client/pay/callback',
+      customer: { email: client.email, name: client.business_name, phonenumber: client.phone || '' },
+      customizations: { title: 'ForgeBot Subscription', logo: '' },
+      payment_plan: process.env.FLW_MONTHLY_PLAN_ID || undefined
     };
-
-    // Remove nulls to avoid overwriting existing data
-    Object.keys(setup).forEach(function(k) {
-      if ((setup[k] === null || setup[k] === undefined || setup[k] === '') && k !== 'client_id') {
-        delete setup[k];
-      }
-    });
-
-    var { error } = await sb.from('bot_setup').upsert(setup, { onConflict: 'client_id' });
-    if (error) throw new Error(error.message);
-
-    // Mark setup as completed
-    await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
-
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const flwRes = await axios.post('https://api.flutterwave.com/v3/payments', payload,
+      { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } });
+    return res.json({ link: flwRes.data.data.link });
+  } catch (err) {
+    console.error('[Pay init] Error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/client/bot-setup — gets questionnaire answers for Settings tab
-router.get('/client/bot-setup', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('bot_setup').select('*').eq('client_id', req.clientId).single();
-    if (result.error && result.error.code === 'PGRST116') return res.json({});
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data || {});
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PUT /api/client/occupation
-router.put('/client/occupation', auth, async function(req, res) {
-  try {
-    var { occupation, answers } = req.body;
-    if (!occupation) return res.status(400).json({ error: 'occupation required' });
-    var sb = getSupabase();
-    await sb.from('clients').update({
-      occupation:      occupation,
-      occupation_data: answers || {}
-    }).eq('id', req.clientId);
-    await sb.from('bot_setup').upsert({
-      client_id:          req.clientId,
-      occupation_answers: answers || {},
-      updated_at:         new Date().toISOString()
-    }, { onConflict: 'client_id' });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Location ──────────────────────────────────────────────────
-
-router.put('/client/location', auth, async function(req, res) {
-  try {
-    var { location_address, location_maps_url } = req.body;
-    var sb = getSupabase();
-    await sb.from('clients').update({
-      location_address:  location_address || null,
-      location_maps_url: location_maps_url || null
-    }).eq('id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Service Listings ──────────────────────────────────────────
-
-router.get('/client/listings', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('service_listings')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/listings', auth, async function(req, res) {
-  try {
-    var { name, description, price, price_label, location, category, keywords } = req.body;
-    if (!name || !keywords) return res.status(400).json({ error: 'name and keywords are required' });
-    var sb     = getSupabase();
-    var result = await sb.from('service_listings').insert({
-      client_id:   req.clientId,
-      name:        name,
-      description: description || null,
-      price:       price || null,
-      price_label: price_label || null,
-      location:    location || null,
-      category:    category || null,
-      keywords:    keywords,
-      available:   true
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.patch('/client/listings/:id', auth, async function(req, res) {
-  try {
-    var allowed = ['name','description','price','price_label','location','category','keywords','available'];
-    var update  = {};
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var sb     = getSupabase();
-    var result = await sb.from('service_listings')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.delete('/client/listings/:id', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('service_listings').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Listing Media ─────────────────────────────────────────────
-
-router.get('/client/listings/:id/media', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('listing_media')
-      .select('*')
-      .eq('listing_id', req.params.id)
-      .eq('client_id', req.clientId)
-      .order('sort_order', { ascending: true });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/listings/:id/media', auth, async function(req, res) {
-  try {
-    var { url, media_type, caption, filename, sort_order } = req.body;
-    if (!url || !media_type) return res.status(400).json({ error: 'url and media_type required' });
-    var sb     = getSupabase();
-    var result = await sb.from('listing_media').insert({
-      listing_id:  req.params.id,
-      client_id:   req.clientId,
-      url:         url,
-      media_type:  media_type,
-      caption:     caption || null,
-      filename:    filename || null,
-      sort_order:  sort_order || 0
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.delete('/client/media/:id', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('listing_media').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── File Upload → Supabase Storage ───────────────────────────
-
-router.post('/client/upload', auth, upload.single('file'), async function(req, res) {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    var sb       = getSupabase();
-    var ext      = req.file.originalname.split('.').pop().toLowerCase();
-    var filename = req.clientId + '/' + Date.now() + '.' + ext;
-    var bucket   = 'forgebot-listings';
-    var result   = await sb.storage.from(bucket).upload(filename, req.file.buffer, {
-      contentType: req.file.mimetype,
-      upsert: false
-    });
-    if (result.error) throw new Error(result.error.message);
-    var urlResult = sb.storage.from(bucket).getPublicUrl(filename);
-    res.json({ url: urlResult.data.publicUrl, filename: req.file.originalname });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Business FAQ ──────────────────────────────────────────────
-
-router.get('/client/faq', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('business_faq')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('sort_order', { ascending: true });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.post('/client/faq', auth, async function(req, res) {
-  try {
-    var { question, answer, keywords, sort_order } = req.body;
-    if (!question || !answer) return res.status(400).json({ error: 'question and answer required' });
-    var sb     = getSupabase();
-    var result = await sb.from('business_faq').insert({
-      client_id:  req.clientId,
-      question:   question,
-      answer:     answer,
-      keywords:   keywords || null,
-      sort_order: sort_order || 0
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.patch('/client/faq/:id', auth, async function(req, res) {
-  try {
-    var update = {};
-    ['question','answer','keywords','sort_order'].forEach(function(k) {
-      if (req.body[k] !== undefined) update[k] = req.body[k];
-    });
-    var sb     = getSupabase();
-    var result = await sb.from('business_faq')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.delete('/client/faq/:id', auth, async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('business_faq').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Partner / Trial Status ────────────────────────────────────
-
-router.get('/client/partner-status', auth, async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('clients')
-      .select('is_partner,partner_expires_at,subscription_active')
-      .eq('id', req.clientId).single();
-    if (result.error || !result.data) return res.json({ is_partner: false });
-    var c         = result.data;
-    var now       = new Date();
-    var expiresAt = c.partner_expires_at ? new Date(c.partner_expires_at) : null;
-    var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
-    res.json({
-      is_partner:   c.is_partner || false,
-      expires_at:   c.partner_expires_at || null,
-      days_left:    daysLeft,
-      expired:      expiresAt ? expiresAt < now : false,
-      still_active: c.subscription_active
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PUT /api/client/qualification-toggle
-router.put('/client/qualification-toggle', auth, async function(req, res) {
-  try {
-    var { enabled } = req.body;
-    var sb          = getSupabase();
-    var current     = await sb.from('clients').select('occupation_data').eq('id', req.clientId).single();
-    var occData     = (current.data && current.data.occupation_data) || {};
-    occData.qualification_enabled = !!enabled;
-    await sb.from('clients').update({ occupation_data: occData }).eq('id', req.clientId);
-    res.json({ ok: true, qualification_enabled: !!enabled });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── WhatsApp QR Stream (SSE) ──────────────────────────────────
-
-router.get('/client/qr-stream', async function(req, res) {
-  var token = req.query.token;
-  var clientId;
-  try {
-    var decoded = jwt.verify(token, process.env.JWT_SECRET);
-    clientId = decoded.clientId || decoded.id;
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-
+// ── GET /client/qr-stream — SSE stream of WhatsApp QR ────────
+router.get('/client/qr-stream', auth, function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  if (!global.qrListeners) global.qrListeners = new Map();
+  const { startSession } = require('../sessions/sessionManager');
+  const clientId = req.clientId;
+  let closed = false;
 
-  function sendEvent(event, data) {
-    try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch(e) {}
+  function send(event, data) {
+    if (!closed) res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
   }
 
-  var existingSock = sessionManager.getSession ? sessionManager.getSession(clientId) : null;
-  if (existingSock) {
-    sendEvent('connected', { status: 'connected' });
-    res.end();
-    return;
-  }
-
-  var listeners = global.qrListeners.get(clientId) || [];
-  listeners.push(sendEvent);
-  global.qrListeners.set(clientId, listeners);
-
-  await sessionManager.startSession(clientId, {
-    onQR: function(qr) {
-      (global.qrListeners.get(clientId) || []).forEach(function(fn) { fn('qr', { qr: qr }); });
-    },
+  startSession(clientId, {
+    onQR: function(qr) { send('qr', { qr: qr }); },
     onConnected: function() {
-      (global.qrListeners.get(clientId) || []).forEach(function(fn) { fn('connected', { status: 'connected' }); });
-      global.qrListeners.delete(clientId);
+      send('connected', { message: 'WhatsApp connected!' });
+      if (!closed) { closed = true; res.end(); }
     },
-    onDisconnected: function() {
-      (global.qrListeners.get(clientId) || []).forEach(function(fn) { fn('disconnected', { status: 'disconnected' }); });
-    }
+    onError: function(err) { send('error', { message: err.message || err }); }
   });
 
-  req.on('close', function() {
-    var all = global.qrListeners.get(clientId) || [];
-    global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
-  });
+  req.on('close', function() { closed = true; });
 });
 
-// ══════════════════════════════════════════════════════════════
-//  ORDERS — customer orders + payment confirmation + delivery
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/orders  — list all orders (optionally filter by status)
-router.get('/client/orders', auth, async function(req, res) {
+// ── GET /client/session-status ────────────────────────────────
+router.get('/client/session-status', auth, async function(req, res) {
   try {
-    var { status } = req.query;
-    var sb     = getSupabase();
-    var q      = sb.from('orders').select('*').eq('client_id', req.clientId);
-    if (status) q = q.eq('status', status);
-    var result = await q.order('created_at', { ascending: false }).limit(100);
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const sock = getSessionSock(req.clientId);
+    return res.json({ connected: !!sock, clientId: req.clientId });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/client/orders/:id  — single order detail
-router.get('/client/orders/:id', auth, async function(req, res) {
+// ── GET /client/flows ─────────────────────────────────────────
+router.get('/client/flows', auth, async function(req, res) {
   try {
-    var sb     = getSupabase();
-    var result = await sb.from('orders').select('*').eq('id', req.params.id).eq('client_id', req.clientId).single();
-    if (result.error || !result.data) return res.status(404).json({ error: 'Order not found' });
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    await checkPartnerExpiry(req.clientId);
+    const flows = await db.getFlows(req.clientId, false);
+    return res.json(flows || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/client/orders/:id  — update order status + notify customer via WhatsApp
-router.put('/client/orders/:id', auth, async function(req, res) {
+// ── POST /client/flows ────────────────────────────────────────
+router.post('/client/flows', auth, async function(req, res) {
   try {
-    var { status, notes } = req.body;
-    if (!status) return res.status(400).json({ error: 'status required' });
+    const { flow_name, keywords, response_type, response, media_url, priority } = req.body;
+    if (!flow_name || !keywords || !response) return res.status(400).json({ error: 'flow_name, keywords, response required' });
+    const flow = await db.addFlow(req.clientId, flow_name, keywords, response_type || 'text', response, media_url || null, priority || 0);
+    return res.json(flow);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    var sb = getSupabase();
+// ── DELETE /client/flows/:id ──────────────────────────────────
+router.delete('/client/flows/:id', auth, async function(req, res) {
+  try {
+    await db.deleteFlow(req.params.id);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    // Get order (verify it belongs to this client)
-    var orderResult = await sb.from('orders').select('*').eq('id', req.params.id).eq('client_id', req.clientId).single();
-    if (orderResult.error || !orderResult.data) return res.status(404).json({ error: 'Order not found' });
-    var order = orderResult.data;
+// ── GET /client/status-posts ──────────────────────────────────
+router.get('/client/status-posts', auth, async function(req, res) {
+  try {
+    const posts = await db.getStatusPosts(req.clientId);
+    return res.json(posts || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    // Map status to payment_status if needed
-    var update = { status: status, updated_at: new Date().toISOString() };
-    if (notes) update.notes = notes;
-    if (status === 'confirmed') update.payment_status = 'confirmed';
-    if (status === 'rejected')  update.payment_status = 'rejected';
+// ── POST /client/status-posts ─────────────────────────────────
+router.post('/client/status-posts', auth, async function(req, res) {
+  try {
+    const { caption, media_url, post_time, repeat_daily } = req.body;
+    if (!caption || !post_time) return res.status(400).json({ error: 'caption and post_time required' });
+    const post = await db.addStatusPost(req.clientId, caption, media_url || null, post_time, repeat_daily !== false);
+    return res.json(post);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    await sb.from('orders').update(update).eq('id', req.params.id);
+// ── DELETE /client/status-posts/:id ──────────────────────────
+router.delete('/client/status-posts/:id', auth, async function(req, res) {
+  try {
+    await db.deleteStatusPost(req.params.id);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    // Get client for bot name
-    var clientResult = await sb.from('clients').select('business_name,notification_number').eq('id', req.clientId).single();
-    var bizName      = clientResult.data ? (clientResult.data.business_name || 'us') : 'us';
+// ── POST /client/broadcast ────────────────────────────────────
+router.post('/client/broadcast', auth, async function(req, res) {
+  try {
+    const { message, phones } = req.body;
+    if (!message || !Array.isArray(phones) || !phones.length) {
+      return res.status(400).json({ error: 'message and phones[] required' });
+    }
+    const sock = getSessionSock(req.clientId);
+    if (!sock) return res.status(503).json({ error: 'WhatsApp not connected' });
 
-    // Send WhatsApp message to customer
-    var sock = sessionManager.getSession ? sessionManager.getSession(req.clientId) : null;
-    if (sock && order.customer_jid) {
-      var custName = order.customer_name || 'there';
-      var message  = null;
-
-      if (status === 'confirmed') {
-        message =
-          '✅ Great news *' + custName + '*! Your payment has been *confirmed*. 🎉\n\n' +
-          'Do you need delivery? If yes, please type your *full delivery address* so we can send your order to you. 📍\n\n' +
-          '(Reply *"pickup"* if you want to collect it yourself.)';
-      } else if (status === 'rejected') {
-        message =
-          'Hi *' + custName + '*, we could not verify your payment. 🙏\n\n' +
-          'Please check and resend your receipt, or contact us for help.';
-      } else if (status === 'packaging' || status === 'preparing') {
-        message =
-          '📦 Hi *' + custName + '*! Great news — your order is now being *prepared and packaged* for you!\n\n' +
-          'We\'ll notify you as soon as it\'s on its way. 🚀';
-      } else if (status === 'shipped' || status === 'out_for_delivery') {
-        message =
-          '🚚 *' + custName + '*, your order is *on its way*!\n\n' +
-          'Your package is out for delivery now. You\'ll receive it soon. Thank you for shopping with *' + bizName + '*! ❤️';
-      } else if (status === 'delivered') {
-        message =
-          '✅ *' + custName + '*, your order has been *delivered*! 🎉\n\n' +
-          'We hope you love it! If you have any issues, please don\'t hesitate to reach out. Thank you for choosing *' + bizName + '*! 🙏';
-      }
-
-      if (message) {
-        try {
-          await sock.sendMessage(order.customer_jid, { text: message });
-        } catch (e) {
-          console.error('[orders] WhatsApp notify failed:', e.message);
-        }
+    let sent = 0;
+    for (const phone of phones) {
+      try {
+        await sendWhatsApp(req.clientId, phone, message);
+        sent++;
+        await new Promise(function(r) { setTimeout(r, 1500); });
+      } catch (e) {
+        console.error('[Broadcast] Failed for', phone, e.message);
       }
     }
-
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    await db.logBroadcast(req.clientId, message, phones);
+    return res.json({ sent, total: phones.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ── Analytics ─────────────────────────────────────────────────
-
-// GET /api/client/analytics?month=YYYY-MM
-router.get('/client/analytics', auth, async function(req, res) {
+// ── GET /client/broadcast-logs ────────────────────────────────
+router.get('/client/broadcast-logs', auth, async function(req, res) {
   try {
-    var month = req.query.month;
-    if (!month) {
-      var now = new Date();
-      month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    }
-    var stats = await db.getMonthlyStats(req.clientId, month);
-    res.json(stats);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const logs = await db.getBroadcastLogs(req.clientId);
+    return res.json(logs || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ── Products ──────────────────────────────────────────────────
+// ── GET /client/settings ──────────────────────────────────────
+router.get('/client/settings', auth, async function(req, res) {
+  try {
+    const client   = await db.getClientById(req.clientId);
+    const botSetup = await db.getBotSetup(req.clientId);
+    return res.json({ ...client, bot_setup: botSetup });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /client/settings ──────────────────────────────────────
+router.put('/client/settings', auth, async function(req, res) {
+  try {
+    const allowed = ['business_name', 'phone', 'notification_number', 'welcome_message', 'fallback_message', 'bank_name', 'account_number', 'account_name', 'business_hours'];
+    const updates = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    const client = await db.updateClient(req.clientId, updates);
+    return res.json(client);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /client/bot-setup ─────────────────────────────────────
+router.put('/client/bot-setup', auth, async function(req, res) {
+  try {
+    await db.upsertBotSetup(req.clientId, req.body);
+    const setup = await db.getBotSetup(req.clientId);
+    return res.json(setup);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/bot-setup ─────────────────────────────────────
+router.get('/client/bot-setup', auth, async function(req, res) {
+  try {
+    const setup = await db.getBotSetup(req.clientId);
+    return res.json(setup);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/fallback ──────────────────────────────────────
+router.get('/client/fallback', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    return res.json({ fallback_message: client.fallback_message });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /client/fallback ──────────────────────────────────────
+router.put('/client/fallback', auth, async function(req, res) {
+  try {
+    const client = await db.updateClient(req.clientId, { fallback_message: req.body.fallback_message });
+    return res.json({ fallback_message: client.fallback_message });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/occupation ────────────────────────────────────
+router.get('/client/occupation', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    return res.json({ occupation: client.occupation, business_type: client.business_type });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /client/occupation ────────────────────────────────────
+router.put('/client/occupation', auth, async function(req, res) {
+  try {
+    const { occupation, business_type } = req.body;
+    const client = await db.updateClient(req.clientId, { occupation, business_type });
+    return res.json({ occupation: client.occupation, business_type: client.business_type });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/location ──────────────────────────────────────
+router.get('/client/location', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    return res.json({ city: client.city, state: client.state, country: client.country });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /client/location ──────────────────────────────────────
+router.put('/client/location', auth, async function(req, res) {
+  try {
+    const { city, state, country } = req.body;
+    const client = await db.updateClient(req.clientId, { city, state, country });
+    return res.json({ city: client.city, state: client.state, country: client.country });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/qualification ─────────────────────────────────
+router.get('/client/qualification', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    return res.json({ qualification_complete: client.qualification_complete });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /client/qualification-toggle ────────────────────────
+router.post('/client/qualification-toggle', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    const toggled = await db.updateClient(req.clientId, { qualification_complete: !client.qualification_complete });
+    return res.json({ qualification_complete: toggled.qualification_complete });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /client/partner-status ────────────────────────────────
+router.get('/client/partner-status', auth, async function(req, res) {
+  try {
+    const client = await db.getClientById(req.clientId);
+    return res.json({
+      status: client.status,
+      subscription_active: client.subscription_active,
+      trial_ends_at: client.trial_ends_at
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PRODUCTS CRUD ─────────────────────────────────────────────
 
 router.get('/client/products', auth, async function(req, res) {
   try {
-    var products = await db.getProducts(req.clientId);
-    res.json(products);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const products = await db.getProducts(req.clientId);
+    return res.json(products);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
 router.post('/client/products', auth, async function(req, res) {
   try {
-    var { name, price, description, image_url } = req.body;
+    const { name, price, description, image_url } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'name and price required' });
-    var product = await db.addProduct(req.clientId, name, price, description, image_url);
-    res.json(product);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const product = await db.addProduct(req.clientId, name, price, description || '', image_url || null);
+    return res.json(product);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-router.patch('/client/products/:id', auth, async function(req, res) {
+router.put('/client/products/:id', auth, async function(req, res) {
   try {
-    var product = await db.updateProduct(req.params.id, req.body);
-    res.json(product);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const product = await db.updateProduct(req.params.id, req.body);
+    return res.json(product);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
 router.delete('/client/products/:id', auth, async function(req, res) {
   try {
     await db.deleteProduct(req.params.id);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ── Services ──────────────────────────────────────────────────
+// ── SERVICES CRUD ─────────────────────────────────────────────
 
 router.get('/client/services', auth, async function(req, res) {
   try {
-    var services = await db.getServices(req.clientId);
-    res.json(services);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const services = await db.getServices(req.clientId);
+    return res.json(services);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
 router.post('/client/services', auth, async function(req, res) {
   try {
-    var { name, price, description, duration } = req.body;
+    const { name, price, description, duration } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'name and price required' });
-    var service = await db.addService(req.clientId, name, price, description, duration);
-    res.json(service);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    const service = await db.addService(req.clientId, name, price, description || '', duration || null);
+    return res.json(service);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
 router.delete('/client/services/:id', auth, async function(req, res) {
   try {
     await db.deleteService(req.params.id);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ── Push Notifications ────────────────────────────────────────
+// ── LISTINGS CRUD ─────────────────────────────────────────────
 
-router.post('/push/subscribe', auth, async function(req, res) {
+router.get('/client/listings', auth, async function(req, res) {
   try {
-    var { endpoint, keys } = req.body;
-    if (!endpoint || !keys) return res.status(400).json({ error: 'subscription data required' });
+    const { data, error } = await db.getSupabase()
+      .from('service_listings').select('*, listing_media(*)')
+      .eq('client_id', req.clientId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/client/listings', auth, async function(req, res) {
+  try {
+    const { title, description, price, category, tags } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+    const { data, error } = await db.getSupabase().from('service_listings')
+      .insert([{ client_id: req.clientId, title, description, price, category, tags, active: true }])
+      .select().single();
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/client/listings/:id', auth, async function(req, res) {
+  try {
+    const { data, error } = await db.getSupabase().from('service_listings')
+      .update(req.body).eq('id', req.params.id).eq('client_id', req.clientId).select().single();
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/client/listings/:id', auth, async function(req, res) {
+  try {
+    const { error } = await db.getSupabase().from('service_listings')
+      .delete().eq('id', req.params.id).eq('client_id', req.clientId);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── LISTING MEDIA ─────────────────────────────────────────────
+
+router.post('/client/listings/:id/media', auth, upload.single('file'), async function(req, res) {
+  try {
+    const { type, url } = req.body;
+    let mediaUrl = url || null;
+
+    if (req.file) {
+      const ext      = req.file.originalname.split('.').pop() || 'jpg';
+      const path     = 'listings/' + req.clientId + '/' + req.params.id + '/' + Date.now() + '.' + ext;
+      const { data: upData, error: upErr } = await db.getSupabase().storage
+        .from('forgebot-listings').upload(path, req.file.buffer, { contentType: req.file.mimetype });
+      if (upErr) throw upErr;
+      const { data: urlData } = db.getSupabase().storage.from('forgebot-listings').getPublicUrl(path);
+      mediaUrl = urlData.publicUrl;
+    }
+
+    if (!mediaUrl) return res.status(400).json({ error: 'file or url required' });
+
+    const { data, error } = await db.getSupabase().from('listing_media')
+      .insert([{ listing_id: req.params.id, type: type || 'image', url: mediaUrl }]).select().single();
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/client/listings/:id/media/:mediaId', auth, async function(req, res) {
+  try {
+    const { error } = await db.getSupabase().from('listing_media').delete().eq('id', req.params.mediaId);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── FAQ CRUD ─────────────────────────────────────────────────
+
+router.get('/client/faq', auth, async function(req, res) {
+  try {
+    const { data, error } = await db.getSupabase()
+      .from('business_faq').select('*').eq('client_id', req.clientId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/client/faq', auth, async function(req, res) {
+  try {
+    const { question, answer } = req.body;
+    if (!question || !answer) return res.status(400).json({ error: 'question and answer required' });
+    const { data, error } = await db.getSupabase().from('business_faq')
+      .insert([{ client_id: req.clientId, question, answer }]).select().single();
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/client/faq/:id', auth, async function(req, res) {
+  try {
+    const { data, error } = await db.getSupabase().from('business_faq')
+      .update(req.body).eq('id', req.params.id).eq('client_id', req.clientId).select().single();
+    if (error) throw error;
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/client/faq/:id', auth, async function(req, res) {
+  try {
+    const { error } = await db.getSupabase().from('business_faq')
+      .delete().eq('id', req.params.id).eq('client_id', req.clientId);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── FILE UPLOAD (receipt images, etc.) ───────────────────────
+router.post('/client/upload', auth, upload.single('file'), async function(req, res) {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const ext    = req.file.originalname.split('.').pop() || 'jpg';
+    const folder = req.body.folder || 'receipts';
+    const path   = folder + '/' + req.clientId + '/' + Date.now() + '.' + ext;
+    const bucket = folder === 'receipts' ? 'forgebot-receipts' : 'forgebot-listings';
+    const { error: upErr } = await db.getSupabase().storage
+      .from(bucket).upload(path, req.file.buffer, { contentType: req.file.mimetype });
+    if (upErr) throw upErr;
+    const { data: urlData } = db.getSupabase().storage.from(bucket).getPublicUrl(path);
+    return res.json({ url: urlData.publicUrl });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── ORDERS ────────────────────────────────────────────────────
+
+// GET /client/orders — list orders (optionally filter by status)
+router.get('/client/orders', auth, async function(req, res) {
+  try {
+    const { status } = req.query;
+    const orders = await db.getOrders(req.clientId, status || null);
+    return res.json(orders || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /client/orders/:id — single order
+router.get('/client/orders/:id', auth, async function(req, res) {
+  try {
+    const order = await db.getOrderById(req.params.id);
+    if (!order || order.client_id !== req.clientId) return res.status(404).json({ error: 'Order not found' });
+    return res.json(order);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /client/orders/:id — update order status + notify customer via WhatsApp
+router.put('/client/orders/:id', auth, async function(req, res) {
+  try {
+    const order = await db.getOrderById(req.params.id);
+    if (!order || order.client_id !== req.clientId) return res.status(404).json({ error: 'Order not found' });
+
+    const { status, payment_status, notes, delivery_address } = req.body;
+    const updates = {};
+    if (status          !== undefined) updates.status          = status;
+    if (payment_status  !== undefined) updates.payment_status  = payment_status;
+    if (notes           !== undefined) updates.notes           = notes;
+    if (delivery_address !== undefined) updates.delivery_address = delivery_address;
+
+    // Map legacy actions to status
+    if (req.body.action === 'confirm')  { updates.status = 'confirmed';  updates.payment_status = 'confirmed'; }
+    if (req.body.action === 'reject')   { updates.status = 'rejected'; }
+    if (req.body.action === 'ship')     { updates.status = 'shipped'; }
+    if (req.body.action === 'deliver')  { updates.status = 'delivered'; }
+
+    const updated = await db.updateOrder(order.id, updates);
+
+    // Notify customer on WhatsApp when status changes to notable states
+    const notifyStatuses = ['confirmed', 'packaging', 'shipped', 'delivered', 'rejected'];
+    const newStatus = updates.status;
+    if (newStatus && notifyStatuses.includes(newStatus) && order.customer_jid) {
+      try {
+        const client    = await db.getClientById(req.clientId);
+        const message   = buildStatusMessage(order, newStatus, client && client.business_name);
+        const phone     = order.customer_jid.replace('@s.whatsapp.net', '');
+        await sendWhatsApp(req.clientId, phone, message);
+      } catch (e) {
+        console.error('[Orders] WhatsApp notify failed:', e.message);
+        // Non-fatal — order was still updated
+      }
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── ANALYTICS ────────────────────────────────────────────────
+
+// GET /client/analytics?month=YYYY-MM
+router.get('/client/analytics', auth, async function(req, res) {
+  try {
+    const now        = new Date();
+    const defaultMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const month      = req.query.month || defaultMonth;
+    const stats      = await db.getMonthlyStats(req.clientId, month);
+    return res.json(stats);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUSH NOTIFICATIONS ────────────────────────────────────────
+
+// POST /client/push/subscribe
+router.post('/client/push/subscribe', auth, async function(req, res) {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+      return res.status(400).json({ error: 'endpoint and keys (p256dh, auth) required' });
+    }
     await db.savePushSubscription(req.clientId, endpoint, keys.p256dh, keys.auth);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/push/test', auth, async function(req, res) {
+// POST /client/push/test
+router.post('/client/push/test', auth, async function(req, res) {
   try {
+    const subs = await db.getPushSubscriptions(req.clientId);
+    if (!subs || !subs.length) return res.status(404).json({ error: 'No push subscriptions found' });
+
     webpush.setVapidDetails(
-      'mailto:support@forgebot.ng',
+      'mailto:' + (process.env.VAPID_EMAIL || 'admin@forgebot.ng'),
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY
     );
-    var subs = await db.getPushSubscriptions(req.clientId);
-    if (!subs.length) return res.status(400).json({ error: 'No push subscriptions found' });
-    for (var s of subs) {
-      await webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ title: 'ForgeBot', body: 'Push notifications are working!' })
-      );
+
+    const payload = JSON.stringify({ title: 'ForgeBot', body: 'Push notifications are working! 🤖' });
+    let sent = 0;
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+        sent++;
+      } catch (e) {
+        console.error('[Push] Failed:', e.message);
+      }
     }
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    return res.json({ sent, total: subs.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
+
+// ════════════════════════════════════════════════════════════════
+//  BOT TASKS — Scheduled auto-outreach ("Bot Errands")
+// ════════════════════════════════════════════════════════════════
+
+// GET /client/bot-tasks — list all tasks for this client
+router.get('/client/bot-tasks', auth, async function(req, res) {
+  try {
+    const activeOnly = req.query.active === 'true';
+    const tasks = await db.getBotTasks(req.clientId, activeOnly);
+    return res.json(tasks || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /client/bot-tasks — create a new scheduled task
+router.post('/client/bot-tasks', auth, async function(req, res) {
+  try {
+    const { name, message, schedule_time, schedule_days, filter_type } = req.body;
+    if (!name || !message || !schedule_time) {
+      return res.status(400).json({ error: 'name, message, schedule_time required' });
+    }
+    // schedule_time must be HH:MM format
+    if (!/^\d{2}:\d{2}$/.test(schedule_time)) {
+      return res.status(400).json({ error: 'schedule_time must be HH:MM (e.g. "09:00")' });
+    }
+    const validFilters = ['all_customers', 'pending_orders', 'inactive_7d', 'inactive_14d'];
+    const filterType   = validFilters.includes(filter_type) ? filter_type : 'all_customers';
+
+    const task = await db.createBotTask({
+      client_id:     req.clientId,
+      name,
+      message,
+      schedule_time,
+      schedule_days: schedule_days || 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
+      filter_type:   filterType,
+      active:        true,
+      run_count:     0
+    });
+    return res.json(task);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /client/bot-tasks/:id — edit or toggle task
+router.patch('/client/bot-tasks/:id', auth, async function(req, res) {
+  try {
+    // Verify task belongs to this client
+    const existing = await db.getSupabase()
+      .from('bot_tasks').select('*').eq('id', req.params.id).eq('client_id', req.clientId).single();
+    if (existing.error || !existing.data) return res.status(404).json({ error: 'Task not found' });
+
+    const allowed = ['name', 'message', 'schedule_time', 'schedule_days', 'filter_type', 'active'];
+    const updates = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+
+    const task = await db.updateBotTask(req.params.id, updates);
+    return res.json(task);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /client/bot-tasks/:id — delete task
+router.delete('/client/bot-tasks/:id', auth, async function(req, res) {
+  try {
+    // Verify task belongs to this client
+    const existing = await db.getSupabase()
+      .from('bot_tasks').select('id').eq('id', req.params.id).eq('client_id', req.clientId).single();
+    if (existing.error || !existing.data) return res.status(404).json({ error: 'Task not found' });
+
+    await db.deleteBotTask(req.params.id);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
 
 module.exports = router;

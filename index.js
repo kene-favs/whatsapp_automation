@@ -1,162 +1,108 @@
-// ============================================================
-//  ForgeBot — Server Entry Point v2
-//  File location: index.js  (project root)
-// ============================================================
-
-'use strict';
-
 require('dotenv').config();
 
-const express        = require('express');
-const path           = require('path');
-const { createClient } = require('@supabase/supabase-js');
+const express = require('express');
+const path    = require('path');
+const app     = express();
+const PORT    = process.env.PORT || 3000;
 
+// ── Core dependencies ───────────────────────────────────────────
+const db             = require('./src/db/supabase');
+const adminRoutes    = require('./src/admin/routes');
+const clientRoutes   = require('./src/api/clientRoutes');
+const sessionManager = require('./src/sessions/sessionManager');
 const { startScheduler } = require('./src/bot/statusScheduler');
-const sessionManager     = require('./src/sessions/sessionManager');
-const adminRoutes        = require('./src/admin/routes');
-const clientRoutes       = require('./src/api/clientRoutes');
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
-
-// ── Lazy Supabase (used only in cron + boot) ──────────────────
-let _supabase = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-  }
-  return _supabase;
-}
-
-// ── Global helpers for QR streaming ──────────────────────────
-global.getSock     = function(clientId) { return sessionManager.getSession(clientId); };
-global.qrListeners = new Map();
-
-// ── Middleware ────────────────────────────────────────────────
+// ── Middleware ──────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files from root public/ folder
+// Serve static HTML files (admin panel, client dashboard, landing)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Routes ────────────────────────────────────────────────────
-app.use('/api', clientRoutes);   // JWT-protected client endpoints
-app.use('/', adminRoutes);       // Admin panel endpoints
+// ── API Routes ──────────────────────────────────────────────────
+// Client routes mounted at /api — routes inside are /client/*, /push/*
+app.use('/api', clientRoutes);
 
-// ── Partner expiry cron ───────────────────────────────────────
-async function runPartnerExpiryCheck() {
-  try {
-    var supabase = getSupabase();
-    var now      = new Date().toISOString();
+// Admin routes mounted at /admin — routes inside are /login, /partners/*, /clients/*
+app.use('/admin', adminRoutes);
 
-    // 1. Deactivate expired partners
-    var expired = await supabase
-      .from('clients')
-      .select('id,business_name,notification_number')
-      .eq('is_partner', true)
-      .eq('subscription_active', true)
-      .lt('partner_expires_at', now);
+// ── HTML page fallbacks ─────────────────────────────────────────
+// Serve admin panel at /admin-panel  (keeps /admin free for the API)
+app.get('/admin-panel', function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
-    for (var i = 0; i < (expired.data || []).length; i++) {
-      var partner = expired.data[i];
-      await supabase.from('clients')
-        .update({ subscription_active: false })
-        .eq('id', partner.id);
-      await supabase.from('partner_log').insert({
-        client_id: partner.id,
-        action: 'expired',
-        note: 'Auto-expired at ' + now
-      });
-      console.log('[PartnerCron] Trial expired for: ' + partner.business_name);
-    }
+// Serve client dashboard
+app.get('/dashboard', function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
 
-    // 2. Warn partners expiring in < 24 hours
-    var tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    var expiring = await supabase
-      .from('clients')
-      .select('id,business_name,notification_number,partner_expires_at')
-      .eq('is_partner', true)
-      .eq('subscription_active', true)
-      .eq('trial_notified', false)
-      .lt('partner_expires_at', tomorrow)
-      .gt('partner_expires_at', now);
+// Serve onboarding page
+app.get('/onboard', function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'onboard.html'));
+});
 
-    for (var j = 0; j < (expiring.data || []).length; j++) {
-      var p       = expiring.data[j];
-      var expDate = new Date(p.partner_expires_at).toLocaleDateString('en-NG', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-      });
-      var sock = sessionManager.getSession(p.id);
-      if (sock && p.notification_number) {
-        try {
-          var ownerJid = p.notification_number.replace(/\D/g, '') + '@s.whatsapp.net';
-          await sock.sendMessage(ownerJid, {
-            text: [
-              '⚠️ *ForgeBot Partner Trial Ending Soon*',
-              '',
-              'Your ForgeBot partner trial expires on *' + expDate + '*.',
-              '',
-              'After that date, your bot will stop responding to customers.',
-              '',
-              'To continue without interruption, please make the one-time setup payment of *₦30,000*.',
-              '',
-              'Contact us now to keep your bot running:',
-              (process.env.APP_URL || 'https://forgebot.net')
-            ].join('\n')
-          });
-        } catch (e) {
-          console.error('[PartnerCron] Could not send warning to ' + p.business_name + ':', e.message);
-        }
-      }
-      await supabase.from('clients').update({ trial_notified: true }).eq('id', p.id);
-      console.log('[PartnerCron] Sent expiry warning to: ' + p.business_name);
-    }
-  } catch (e) {
-    console.error('[PartnerCron] Error:', e.message);
+// Landing page (root)
+app.get('/', function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// 404 — JSON for API calls, HTML otherwise
+app.use(function(req, res) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/admin')) {
+    return res.status(404).json({ error: 'Not found' });
   }
-}
+  res.status(404).send('Page not found');
+});
 
-// ── Boot ──────────────────────────────────────────────────────
+// ── Boot ────────────────────────────────────────────────────────
 async function start() {
   console.log('');
   console.log('╔══════════════════════════════════════╗');
-  console.log('║         ForgeBot v2 Platform         ║');
+  console.log('║         ForgeBot Platform            ║');
+  console.log('║   WhatsApp Automation for SMEs       ║');
   console.log('╚══════════════════════════════════════╝');
   console.log('');
 
-  startScheduler();
-
+  // 1. Start schedulers (status posts, memes, analytics, bot errands)
   try {
-    var supabase = getSupabase();
-    var { data: clients, error } = await supabase
-      .from('clients')
-      .select('id,business_name,status,subscription_active')
-      .eq('status', 'active')
-      .eq('subscription_active', true);
-
-    if (error) throw error;
-    await sessionManager.bootAllSessions(clients || []);
+    startScheduler();
+    console.log('✅ Schedulers started');
   } catch (e) {
-    console.error('[Boot] Could not fetch clients from Supabase:', e.message);
-    console.error('[Boot] Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars');
+    console.error('⚠️  Scheduler error:', e.message);
   }
 
-  // Partner expiry cron — runs immediately then every hour
-  runPartnerExpiryCheck();
-  setInterval(runPartnerExpiryCheck, 60 * 60 * 1000);
+  // 2. Reconnect clients that were previously connected
+  try {
+    var sb     = db.getSupabase();
+    var result = await sb
+      .from('clients')
+      .select('id, business_name')
+      .eq('whatsapp_connected', true)
+      .eq('subscription_active', true);
 
+    var clients = result.data || [];
+    if (clients.length > 0) {
+      await sessionManager.bootAllSessions(clients);
+    } else {
+      console.log('ℹ️  No previously connected clients to restore');
+    }
+  } catch (e) {
+    console.error('⚠️  Reconnect error:', e.message);
+  }
+
+  // 3. Start HTTP server
   app.listen(PORT, function() {
     console.log('');
-    console.log('🚀 ForgeBot running at: http://localhost:' + PORT);
-    console.log('📊 Admin panel:         http://localhost:' + PORT + '/admin');
+    console.log('🚀 Server running at:  http://localhost:' + PORT);
+    console.log('📊 Admin panel:        http://localhost:' + PORT + '/admin-panel');
+    console.log('📱 Client dashboard:   http://localhost:' + PORT + '/dashboard');
     console.log('');
+    console.log('Press Ctrl+C to stop');
   });
 }
 
 start().catch(function(err) {
-  console.error('❌ Startup error:', err.message);
+  console.error('❌ Startup error:', err);
   process.exit(1);
 });

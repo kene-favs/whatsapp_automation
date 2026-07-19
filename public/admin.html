@@ -7,7 +7,6 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh}
-/* Header */
 .header{background:#0d1520;border-bottom:1px solid rgba(255,255,255,.08);padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
 .logo{font-size:18px;font-weight:900;color:#25D366;letter-spacing:-1px}
 .logo span{color:#fff}
@@ -17,18 +16,15 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 .btn-sm:hover{background:rgba(255,255,255,.15)}
 .btn-sm.danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:#f87171}
 .btn-sm.danger:hover{background:rgba(248,113,113,.2)}
-.btn-sm.copy{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.3);color:#25D366}
-.btn-sm.copy:hover{background:rgba(37,211,102,.2)}
-/* Tabs */
+.btn-sm.copy{background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.3);color:#25D366}
+.btn-sm.copy:hover{background:rgba(37,211,102,.22)}
 .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);padding:0 28px;background:#0d1520}
 .tab{padding:14px 20px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);transition:.2s}
 .tab.active{color:#25D366;border-bottom-color:#25D366}
 .tab:hover:not(.active){color:rgba(255,255,255,.7)}
-/* Content */
 .content{padding:28px;max-width:1100px;margin:0 auto}
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-header h2{font-size:18px;font-weight:800}
-/* Cards */
 .create-card{background:#0d1520;border:1px solid rgba(37,211,102,.2);border-radius:16px;padding:24px;margin-bottom:32px}
 .create-card h3{font-size:15px;font-weight:800;color:#25D366;margin-bottom:16px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -39,45 +35,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 .field select option{background:#111c2c}
 .btn-green{background:#25D366;color:#000;padding:11px 24px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;border:none;transition:.2s;margin-top:6px}
 .btn-green:hover{background:#1fbb58}
-/* Table / client list */
 .client-card{background:#0d1520;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px 20px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .client-card:hover{border-color:rgba(255,255,255,.15)}
 .client-info h4{font-size:15px;font-weight:700;margin-bottom:3px}
 .client-info .meta{font-size:12px;color:rgba(255,255,255,.4);display:flex;flex-wrap:wrap;gap:10px}
-.client-info .meta span{display:flex;align-items:center;gap:4px}
 .badge{display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700}
 .badge.active{background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3)}
 .badge.inactive{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1)}
-.badge.connected{background:rgba(37,211,102,.2);color:#25D366}
-.badge.disconnected{background:rgba(248,113,113,.1);color:#f87171}
 .badge.partner{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}
 .badge.expired{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
 .client-actions{display:flex;gap:8px;flex-shrink:0}
-/* Partner card */
-.partner-card{background:#0d1520;border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:18px 20px;margin-bottom:10px}
+.partner-card{background:#0d1520;border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:18px 20px;margin-bottom:12px}
 .partner-card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 .partner-card h4{font-size:15px;font-weight:700;margin-bottom:4px}
 .partner-card .meta{font-size:12px;color:rgba(255,255,255,.4)}
 .partner-card .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-/* Onboard link box */
-.onboard-link-box{background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.onboard-link-box .link-text{font-size:12px;color:rgba(255,255,255,.5);font-family:monospace;flex:1;word-break:break-all}
+.onboard-link-box{background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:10px 14px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.onboard-link-box .link-text{font-size:12px;color:rgba(37,211,102,.8);font-family:monospace;word-break:break-all;flex:1}
 .empty{text-align:center;padding:40px;color:rgba(255,255,255,.25);font-size:14px}
-/* Notice */
 .notice{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 16px;font-size:13px;color:#fbbf24;margin-bottom:20px;display:none}
-/* Refresh btn */
 .refresh-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer}
 .refresh-btn:hover{background:rgba(255,255,255,.12)}
 /* Toast */
-.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#25D366;color:#000;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:9999}
-.toast.show{opacity:1}
+#toast{position:fixed;bottom:24px;right:24px;background:#25D366;color:#000;padding:12px 20px;border-radius:10px;font-weight:700;font-size:14px;z-index:9999;transform:translateY(100px);opacity:0;transition:.3s;pointer-events:none}
+#toast.show{transform:translateY(0);opacity:1}
 @media(max-width:600px){.form-grid,.form-grid.three{grid-template-columns:1fr}.client-card{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
-
-<!-- Toast -->
-<div id="toast" class="toast">✓ Copied!</div>
 
 <!-- ── LOGIN PAGE ───────────────────────────────────────────── -->
 <div id="loginPage" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px">
@@ -100,7 +85,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 
 <!-- ── ADMIN PANEL ──────────────────────────────────────────── -->
 <div id="adminPanel" style="display:none">
-
   <div class="header">
     <div class="logo">Forge<span>Bot</span></div>
     <div class="header-right">
@@ -176,47 +160,36 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
     </div>
     <div id="partnersList"><div class="empty">Loading...</div></div>
   </div>
-
 </div>
 
+<!-- ── TOAST ────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
 <script>
-// ── All occupations ──────────────────────────────────────────
+// ── Toast notification ────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// ── Occupation options ────────────────────────────────────────
 var ALL_OCCUPATIONS = {
   service: [
-    'Photography / Videography',
-    'Beauty / Salon / Spa',
-    'Fashion / Tailoring',
-    'Education / Tutoring',
-    'Events / Decoration',
-    'Tech / IT Services',
-    'Fitness / Gym',
-    'Consulting',
-    'Legal / Law Firm',
-    'Medical / Clinic',
-    'Travel / Tourism',
-    'Logistics / Delivery',
-    'Auto / Car Services',
-    'Interior Design',
-    'Agriculture / Farming Services',
-    'Religious Organisation',
-    'General Service Business'
+    'Photography / Videography','Beauty / Salon / Spa','Fashion / Tailoring',
+    'Education / Tutoring','Events / Decoration','Tech / IT Services',
+    'Fitness / Gym','Consulting','Legal / Law Firm','Medical / Clinic',
+    'Travel / Tourism','Logistics / Delivery','Auto / Car Services',
+    'Interior Design','Agriculture / Farming Services',
+    'Religious Organisation','General Service Business'
   ],
   product: [
-    'Food / Catering / Restaurant',
-    'Retail Shop / Store',
-    'Supermarket / Grocery',
-    'Fashion / Clothing Store',
-    'Electronics / Phone Sales',
-    'Building Materials',
-    'Pharmacy / Chemist',
-    'Bakery / Confectionery',
-    'Agriculture / Farm Produce',
-    'Online Store / E-commerce',
-    'Market Trader',
-    'Hardware / Tools',
-    'Auto / Car Dealer',
-    'Real Estate',
-    'General Product Business'
+    'Food / Catering / Restaurant','Retail Shop / Store','Supermarket / Grocery',
+    'Fashion / Clothing Store','Electronics / Phone Sales','Building Materials',
+    'Pharmacy / Chemist','Bakery / Confectionery','Agriculture / Farm Produce',
+    'Online Store / E-commerce','Market Trader','Hardware / Tools',
+    'Auto / Car Dealer','Real Estate','General Product Business'
   ]
 };
 
@@ -224,7 +197,6 @@ function updateOccupationOptions() {
   var bizType = document.getElementById('pBizType').value;
   var sel     = document.getElementById('pOccupation');
   sel.innerHTML = '<option value="">Select (optional)...</option>';
-
   if (!bizType || bizType === 'both') {
     sel.innerHTML += '<optgroup label="── Service Businesses ──">';
     ALL_OCCUPATIONS.service.forEach(function(o) {
@@ -236,12 +208,11 @@ function updateOccupationOptions() {
     });
     sel.innerHTML += '</optgroup>';
   } else {
-    ALL_OCCUPATIONS[bizType].forEach(function(o) {
+    (ALL_OCCUPATIONS[bizType] || []).forEach(function(o) {
       sel.innerHTML += '<option value="' + o + '">' + o + '</option>';
     });
   }
 }
-
 updateOccupationOptions();
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -271,7 +242,7 @@ function doLogin() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.ok) throw new Error(data.error || 'Incorrect email or password');
-    adminToken = data.token || 'forgebot-admin-session';
+    adminToken = data.token;
     sessionStorage.setItem('forgebot_admin_token', adminToken);
     showAdmin();
   })
@@ -294,27 +265,149 @@ function showAdmin() {
   loadClients();
 }
 
-// ── Auth headers ─────────────────────────────────────────────
+// ── Auth headers (Bearer token) ───────────────────────────────
 function authHeaders() {
   return {
-    'Content-Type': 'application/json',
+    'Content-Type':  'application/json',
     'Authorization': 'Bearer ' + adminToken,
     'x-admin-token': adminToken
   };
 }
 
-// ── Toast notification ────────────────────────────────────────
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.textContent = msg || '✓ Copied!';
-  t.classList.add('show');
-  setTimeout(function() { t.classList.remove('show'); }, 2200);
+// ── Handle 401 globally ───────────────────────────────────────
+function checkAuth(r) {
+  if (r.status === 401) { doLogout(); throw new Error('Session expired. Please log in again.'); }
+  return r;
 }
 
-// ── Copy onboard link ─────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.content').forEach(function(c) { c.style.display = 'none'; });
+  if (tab === 'clients') {
+    document.querySelector('.tab:nth-child(1)').classList.add('active');
+    document.getElementById('tabClients').style.display  = 'block';
+    loadClients();
+  } else {
+    document.querySelector('.tab:nth-child(2)').classList.add('active');
+    document.getElementById('tabPartners').style.display = 'block';
+    loadPartners();
+  }
+}
+
+// ── Load clients ──────────────────────────────────────────────
+function loadClients() {
+  fetch('/admin/clients', { headers: authHeaders() })
+  .then(checkAuth)
+  .then(function(r) { return r.json(); })
+  .then(function(clients) {
+    document.getElementById('clientsTitle').textContent = 'All Clients (' + clients.length + ')';
+    var list = document.getElementById('clientsList');
+    if (!clients.length) { list.innerHTML = '<div class="empty">No clients yet.</div>'; return; }
+
+    list.innerHTML = clients.map(function(c) {
+      var statusBadge = c.subscription_active
+        ? '<span class="badge active">Active</span>'
+        : '<span class="badge inactive">Inactive</span>';
+      var sessEl = c.session_active
+        ? '<span style="color:#25D366;font-size:12px">● Connected</span>'
+        : '<span style="color:rgba(255,255,255,.3);font-size:12px">○ Disconnected</span>';
+
+      return '<div class="client-card">' +
+        '<div class="client-info">' +
+          '<h4>' + (c.business_name || c.email) + ' ' + statusBadge + '</h4>' +
+          '<div class="meta">' +
+            '<span>' + c.email + '</span>' +
+            '<span>' + (c.occupation || '—') + '</span>' +
+            '<span>' + sessEl + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="client-actions">' +
+          '<button class="btn-sm" onclick="toggleClientStatus(\'' + c.id + '\',' + c.subscription_active + ')">' +
+            (c.subscription_active ? 'Deactivate' : 'Activate') +
+          '</button>' +
+          '<button class="btn-sm danger" onclick="deleteClient(\'' + c.id + '\')">Delete</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  })
+  .catch(function(e) {
+    document.getElementById('clientsList').innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
+  });
+}
+
+function toggleClientStatus(id, currentlyActive) {
+  var newStatus = !currentlyActive;
+  fetch('/admin/clients/' + id, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ subscription_active: newStatus })
+  })
+  .then(checkAuth)
+  .then(function() { loadClients(); showToast(newStatus ? '✓ Client activated' : '✓ Client deactivated'); });
+}
+
+function deleteClient(id) {
+  if (!confirm('Delete this client permanently? This cannot be undone.')) return;
+  fetch('/admin/clients/' + id, { method: 'DELETE', headers: authHeaders() })
+  .then(checkAuth)
+  .then(function() { loadClients(); showToast('✓ Client deleted'); });
+}
+
+// ── Partners ──────────────────────────────────────────────────
+function loadPartners() {
+  fetch('/admin/partners', { headers: authHeaders() })
+  .then(checkAuth)
+  .then(function(r) { return r.json(); })
+  .then(function(partners) {
+    document.getElementById('partnersTitle').textContent = 'Existing Partners (' + partners.length + ')';
+    var list = document.getElementById('partnersList');
+    if (!partners.length) { list.innerHTML = '<div class="empty">No partner accounts yet.</div>'; return; }
+
+    list.innerHTML = partners.map(function(p) {
+      var expiresAt = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
+      var now       = new Date();
+      var expired   = expiresAt && expiresAt < now;
+      var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / 86400000) : null;
+      var expText   = expiresAt ? (expired ? 'Expired' : daysLeft + ' days left') : 'No expiry';
+      var statusBadge = expired
+        ? '<span class="badge expired">Expired</span>'
+        : (p.subscription_active ? '<span class="badge active">Active Trial</span>' : '<span class="badge inactive">Revoked</span>');
+
+      var onboardLink = window.location.origin + '/onboard?ref=' + p.id;
+
+      return '<div class="partner-card">' +
+        '<div class="top">' +
+          '<div>' +
+            '<h4>' + (p.business_name || p.email) + ' <span class="badge partner">Partner</span></h4>' +
+            '<div class="meta">' + p.email + ' · ' + (p.phone || p.whatsapp_number || '—') + ' · ' + (p.occupation || 'Not set') + '</div>' +
+            '<div style="margin-top:6px">' + statusBadge + ' <span style="font-size:12px;color:rgba(255,255,255,.35);margin-left:8px">⏱ ' + expText + '</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="onboard-link-box">' +
+          '<span class="link-text">' + onboardLink + '</span>' +
+          '<button class="btn-sm copy" onclick="copyOnboardLink(\'' + p.id + '\')">📋 Copy Onboard Link</button>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn-sm" onclick="extendPartner(\'' + p.id + '\')">Extend +7 days</button>' +
+          '<button class="btn-sm" onclick="togglePartner(\'' + p.id + '\',' + p.subscription_active + ')">' +
+            (p.subscription_active ? 'Revoke Access' : 'Restore Access') +
+          '</button>' +
+          '<button class="btn-sm" onclick="convertPartner(\'' + p.id + '\')">Convert to Paid</button>' +
+          '<button class="btn-sm danger" onclick="deletePartner(\'' + p.id + '\')">Delete</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  })
+  .catch(function(e) {
+    document.getElementById('partnersList').innerHTML = '<div class="empty">Error: ' + e.message + '</div>';
+  });
+}
+
+// ── Copy Onboard Link ─────────────────────────────────────────
 function copyOnboardLink(partnerId) {
   var link = window.location.origin + '/onboard?ref=' + partnerId;
-  if (navigator.clipboard) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(function() {
       showToast('✓ Onboard link copied!');
     }).catch(function() {
@@ -331,125 +424,17 @@ function fallbackCopy(text) {
   el.style.position = 'fixed';
   el.style.opacity  = '0';
   document.body.appendChild(el);
-  el.focus();
   el.select();
-  try { document.execCommand('copy'); showToast('✓ Onboard link copied!'); }
-  catch(e) { showToast('Could not copy — see console'); console.log(text); }
+  try {
+    document.execCommand('copy');
+    showToast('✓ Onboard link copied!');
+  } catch (e) {
+    showToast('Could not copy — please copy manually from the link box.');
+  }
   document.body.removeChild(el);
 }
 
-// ── Tabs ──────────────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('.content').forEach(function(c) { c.style.display = 'none'; });
-
-  if (tab === 'clients') {
-    document.querySelector('.tab:nth-child(1)').classList.add('active');
-    document.getElementById('tabClients').style.display  = 'block';
-    loadClients();
-  } else {
-    document.querySelector('.tab:nth-child(2)').classList.add('active');
-    document.getElementById('tabPartners').style.display = 'block';
-    loadPartners();
-  }
-}
-
-// ── Load clients ──────────────────────────────────────────────
-function loadClients() {
-  fetch('/admin/clients', { headers: authHeaders() })
-  .then(function(r) { return r.json(); })
-  .then(function(clients) {
-    var list = document.getElementById('clientsList');
-    document.getElementById('clientsTitle').textContent = 'All Clients (' + clients.length + ')';
-    if (!clients.length) { list.innerHTML = '<div class="empty">No clients yet.</div>'; return; }
-    list.innerHTML = clients.map(function(c) {
-      var statusBadge  = '<span class="badge ' + (c.status === 'active' ? 'active' : 'inactive') + '">' + (c.status || 'inactive') + '</span>';
-      var waBadge      = '<span class="badge ' + (c.session_active ? 'connected' : 'disconnected') + '">' + (c.session_active ? '✓ WA Connected' : 'WA Offline') + '</span>';
-      var partnerBadge = c.is_partner ? '<span class="badge partner">Partner</span>' : '';
-      return '<div class="client-card">' +
-        '<div class="client-info">' +
-          '<h4>' + (c.business_name || c.email) + '</h4>' +
-          '<div class="meta">' +
-            '<span>📧 ' + c.email + '</span>' +
-            '<span>📱 ' + (c.whatsapp_number || '—') + '</span>' +
-            '<span>💼 ' + (c.occupation || 'Not set') + '</span>' +
-          '</div>' +
-          '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' + statusBadge + waBadge + partnerBadge + '</div>' +
-        '</div>' +
-        '<div class="client-actions">' +
-          '<button class="btn-sm" onclick="toggleStatus(\'' + c.id + '\',\'' + c.status + '\')">Toggle Status</button>' +
-          '<button class="btn-sm danger" onclick="deleteClient(\'' + c.id + '\')">Delete</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  })
-  .catch(function() {
-    document.getElementById('clientsList').innerHTML = '<div class="empty">Error loading clients.</div>';
-  });
-}
-
-function toggleStatus(id, current) {
-  var newStatus = current === 'active' ? 'inactive' : 'active';
-  fetch('/admin/clients/' + id, {
-    method: 'PATCH',
-    headers: authHeaders(),
-    body: JSON.stringify({ status: newStatus, subscription_active: newStatus === 'active' })
-  }).then(function() { loadClients(); });
-}
-
-function deleteClient(id) {
-  if (!confirm('Delete this client? This cannot be undone.')) return;
-  fetch('/admin/clients/' + id, { method: 'DELETE', headers: authHeaders() })
-  .then(function() { loadClients(); });
-}
-
-// ── Partners ──────────────────────────────────────────────────
-function loadPartners() {
-  fetch('/admin/partners', { headers: authHeaders() })
-  .then(function(r) { return r.json(); })
-  .then(function(partners) {
-    var list = document.getElementById('partnersList');
-    document.getElementById('partnersTitle').textContent = 'Existing Partners (' + partners.length + ')';
-    if (!partners.length) { list.innerHTML = '<div class="empty">No partner accounts yet.</div>'; return; }
-
-    list.innerHTML = partners.map(function(p) {
-      var expiresAt   = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
-      var now         = new Date();
-      var expired     = expiresAt && expiresAt < now;
-      var daysLeft    = expiresAt ? Math.ceil((expiresAt - now) / 86400000) : null;
-      var expText     = expiresAt ? (expired ? 'Expired' : daysLeft + ' days left') : 'No expiry';
-      var statusBadge = expired ? '<span class="badge expired">Expired</span>' : '<span class="badge active">Active Trial</span>';
-      if (!p.subscription_active) statusBadge = '<span class="badge inactive">Revoked</span>';
-
-      var onboardLink = window.location.origin + '/onboard?ref=' + p.id;
-
-      return '<div class="partner-card">' +
-        '<div class="top">' +
-          '<div>' +
-            '<h4>' + (p.business_name || p.email) + ' <span class="badge partner">Partner</span></h4>' +
-            '<div class="meta">' + p.email + ' · ' + (p.whatsapp_number || '—') + ' · ' + (p.occupation || 'Not set') + '</div>' +
-            '<div style="margin-top:6px">' + statusBadge + ' <span style="font-size:12px;color:rgba(255,255,255,.35);margin-left:8px">⏱ ' + expText + '</span></div>' +
-          '</div>' +
-        '</div>' +
-        /* ── Onboard link section ── */
-        '<div class="onboard-link-box">' +
-          '<span class="link-text">' + onboardLink + '</span>' +
-          '<button class="btn-sm copy" onclick="copyOnboardLink(\'' + p.id + '\')">📋 Copy Onboard Link</button>' +
-        '</div>' +
-        '<div class="actions">' +
-          '<button class="btn-sm" onclick="extendPartner(\'' + p.id + '\')">Extend +7 days</button>' +
-          '<button class="btn-sm" onclick="revokePartner(\'' + p.id + '\',' + p.subscription_active + ')">Toggle Active</button>' +
-          '<button class="btn-sm" onclick="convertPartner(\'' + p.id + '\')">Convert to Paid</button>' +
-          '<button class="btn-sm danger" onclick="deletePartner(\'' + p.id + '\')">Delete</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  })
-  .catch(function() {
-    document.getElementById('partnersList').innerHTML = '<div class="empty">Error loading partners.</div>';
-  });
-}
-
+// ── Partner actions ───────────────────────────────────────────
 function createPartner() {
   var name    = document.getElementById('pName').value.trim();
   var email   = document.getElementById('pEmail').value.trim();
@@ -460,6 +445,10 @@ function createPartner() {
   var notice  = document.getElementById('createNotice');
 
   notice.style.display = 'none';
+  notice.style.background  = 'rgba(251,191,36,.08)';
+  notice.style.borderColor = 'rgba(251,191,36,.25)';
+  notice.style.color       = '#fbbf24';
+
   if (!name || !email || !phone) {
     notice.textContent = '⚠️ Business Name, Email, and WhatsApp Number are required.';
     notice.style.display = 'block';
@@ -470,33 +459,35 @@ function createPartner() {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
-      business_name:    name,
-      email:            email,
-      whatsapp_number:  phone,
-      occupation:       occ || null,
-      biz_type:         bizType || null,
-      trial_days:       days
+      business_name:   name,
+      email:           email,
+      whatsapp_number: phone,
+      occupation:      occ   || null,
+      biz_type:        bizType || null,
+      trial_days:      days
     })
   })
+  .then(checkAuth)
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) throw new Error(data.error);
-    notice.style.background  = 'rgba(37,211,102,.1)';
+    notice.style.background  = 'rgba(37,211,102,.08)';
     notice.style.borderColor = 'rgba(37,211,102,.3)';
-    notice.style.color = '#25D366';
-    notice.textContent = '✓ Partner account created! Login: ' + email + ' / forgebot2025 — Share their onboard link from the card below.';
-    notice.style.display = 'block';
+    notice.style.color       = '#25D366';
+    notice.textContent       = '✓ Partner created! Login: ' + email + ' / ' + (data.password || 'forgebot2025');
+    notice.style.display     = 'block';
     document.getElementById('pName').value  = '';
     document.getElementById('pEmail').value = '';
     document.getElementById('pPhone').value = '';
     loadPartners();
+    showToast('✓ Partner account created!');
   })
   .catch(function(e) {
     notice.style.background  = 'rgba(248,113,113,.1)';
     notice.style.borderColor = 'rgba(248,113,113,.3)';
-    notice.style.color = '#f87171';
-    notice.textContent = '⚠️ ' + e.message;
-    notice.style.display = 'block';
+    notice.style.color       = '#f87171';
+    notice.textContent       = '⚠️ ' + e.message;
+    notice.style.display     = 'block';
   });
 }
 
@@ -505,32 +496,40 @@ function extendPartner(id) {
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ days: 7 })
-  }).then(function() { loadPartners(); });
+  })
+  .then(checkAuth)
+  .then(function() { loadPartners(); showToast('✓ Trial extended by 7 days'); });
 }
 
-function revokePartner(id, currentlyActive) {
+function togglePartner(id, currentlyActive) {
   var action = currentlyActive ? 'revoke' : 'extend';
   fetch('/admin/partners/' + id + '/' + action, {
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ days: 7 })
-  }).then(function() { loadPartners(); });
+  })
+  .then(checkAuth)
+  .then(function() {
+    loadPartners();
+    showToast(currentlyActive ? '✓ Access revoked' : '✓ Access restored');
+  });
 }
 
 function convertPartner(id) {
-  if (!confirm('Convert this partner account to a full paid subscriber?')) return;
+  if (!confirm('Convert this partner to a full paid subscriber?')) return;
   fetch('/admin/partners/' + id + '/convert', {
     method: 'PATCH',
     headers: authHeaders()
-  }).then(function() { loadPartners(); });
+  })
+  .then(checkAuth)
+  .then(function() { loadPartners(); showToast('✓ Converted to paid client'); });
 }
 
 function deletePartner(id) {
-  if (!confirm('Delete this partner account? This cannot be undone.')) return;
-  fetch('/admin/partners/' + id, {
-    method: 'DELETE',
-    headers: authHeaders()
-  }).then(function() { loadPartners(); });
+  if (!confirm('Delete this partner account permanently?')) return;
+  fetch('/admin/partners/' + id, { method: 'DELETE', headers: authHeaders() })
+  .then(checkAuth)
+  .then(function() { loadPartners(); showToast('✓ Partner deleted'); });
 }
 </script>
 </body>
