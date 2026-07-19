@@ -17,6 +17,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 .btn-sm:hover{background:rgba(255,255,255,.15)}
 .btn-sm.danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:#f87171}
 .btn-sm.danger:hover{background:rgba(248,113,113,.2)}
+.btn-sm.copy{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.3);color:#25D366}
+.btn-sm.copy:hover{background:rgba(37,211,102,.2)}
 /* Tabs */
 .tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);padding:0 28px;background:#0d1520}
 .tab{padding:14px 20px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,.4);transition:.2s}
@@ -57,16 +59,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 .partner-card h4{font-size:15px;font-weight:700;margin-bottom:4px}
 .partner-card .meta{font-size:12px;color:rgba(255,255,255,.4)}
 .partner-card .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+/* Onboard link box */
+.onboard-link-box{background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.onboard-link-box .link-text{font-size:12px;color:rgba(255,255,255,.5);font-family:monospace;flex:1;word-break:break-all}
 .empty{text-align:center;padding:40px;color:rgba(255,255,255,.25);font-size:14px}
 /* Notice */
 .notice{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 16px;font-size:13px;color:#fbbf24;margin-bottom:20px;display:none}
 /* Refresh btn */
 .refresh-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer}
 .refresh-btn:hover{background:rgba(255,255,255,.12)}
+/* Toast */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#25D366;color:#000;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:9999}
+.toast.show{opacity:1}
 @media(max-width:600px){.form-grid,.form-grid.three{grid-template-columns:1fr}.client-card{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
+
+<!-- Toast -->
+<div id="toast" class="toast">✓ Copied!</div>
 
 <!-- ── LOGIN PAGE ───────────────────────────────────────────── -->
 <div id="loginPage" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px">
@@ -231,7 +242,6 @@ function updateOccupationOptions() {
   }
 }
 
-// Initialise occupation dropdown
 updateOccupationOptions();
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -291,6 +301,41 @@ function authHeaders() {
     'Authorization': 'Bearer ' + adminToken,
     'x-admin-token': adminToken
   };
+}
+
+// ── Toast notification ────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg || '✓ Copied!';
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+
+// ── Copy onboard link ─────────────────────────────────────────
+function copyOnboardLink(partnerId) {
+  var link = window.location.origin + '/onboard?ref=' + partnerId;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(link).then(function() {
+      showToast('✓ Onboard link copied!');
+    }).catch(function() {
+      fallbackCopy(link);
+    });
+  } else {
+    fallbackCopy(link);
+  }
+}
+
+function fallbackCopy(text) {
+  var el = document.createElement('textarea');
+  el.value = text;
+  el.style.position = 'fixed';
+  el.style.opacity  = '0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try { document.execCommand('copy'); showToast('✓ Onboard link copied!'); }
+  catch(e) { showToast('Could not copy — see console'); console.log(text); }
+  document.body.removeChild(el);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────
@@ -368,13 +413,15 @@ function loadPartners() {
     if (!partners.length) { list.innerHTML = '<div class="empty">No partner accounts yet.</div>'; return; }
 
     list.innerHTML = partners.map(function(p) {
-      var expiresAt = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
-      var now       = new Date();
-      var expired   = expiresAt && expiresAt < now;
-      var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / 86400000) : null;
-      var expText   = expiresAt ? (expired ? 'Expired' : daysLeft + ' days left') : 'No expiry';
+      var expiresAt   = p.partner_expires_at ? new Date(p.partner_expires_at) : null;
+      var now         = new Date();
+      var expired     = expiresAt && expiresAt < now;
+      var daysLeft    = expiresAt ? Math.ceil((expiresAt - now) / 86400000) : null;
+      var expText     = expiresAt ? (expired ? 'Expired' : daysLeft + ' days left') : 'No expiry';
       var statusBadge = expired ? '<span class="badge expired">Expired</span>' : '<span class="badge active">Active Trial</span>';
       if (!p.subscription_active) statusBadge = '<span class="badge inactive">Revoked</span>';
+
+      var onboardLink = window.location.origin + '/onboard?ref=' + p.id;
 
       return '<div class="partner-card">' +
         '<div class="top">' +
@@ -383,6 +430,11 @@ function loadPartners() {
             '<div class="meta">' + p.email + ' · ' + (p.whatsapp_number || '—') + ' · ' + (p.occupation || 'Not set') + '</div>' +
             '<div style="margin-top:6px">' + statusBadge + ' <span style="font-size:12px;color:rgba(255,255,255,.35);margin-left:8px">⏱ ' + expText + '</span></div>' +
           '</div>' +
+        '</div>' +
+        /* ── Onboard link section ── */
+        '<div class="onboard-link-box">' +
+          '<span class="link-text">' + onboardLink + '</span>' +
+          '<button class="btn-sm copy" onclick="copyOnboardLink(\'' + p.id + '\')">📋 Copy Onboard Link</button>' +
         '</div>' +
         '<div class="actions">' +
           '<button class="btn-sm" onclick="extendPartner(\'' + p.id + '\')">Extend +7 days</button>' +
@@ -429,10 +481,10 @@ function createPartner() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) throw new Error(data.error);
-    notice.style.background = 'rgba(37,211,102,.1)';
+    notice.style.background  = 'rgba(37,211,102,.1)';
     notice.style.borderColor = 'rgba(37,211,102,.3)';
     notice.style.color = '#25D366';
-    notice.textContent = '✓ Partner account created! Login details: ' + email + ' / forgebot2025';
+    notice.textContent = '✓ Partner account created! Login: ' + email + ' / forgebot2025 — Share their onboard link from the card below.';
     notice.style.display = 'block';
     document.getElementById('pName').value  = '';
     document.getElementById('pEmail').value = '';

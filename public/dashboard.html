@@ -4,55 +4,44 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
-<!-- PWA -->
-<link rel="manifest" href="/manifest.json"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="ForgeBot"/>
-<meta name="theme-color" content="#22c55e"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
-:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
+:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7;--teal:#14b8a6}
 header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
 header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
 header .logo span{color:#fff}
 .status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
 .status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
-
-/* ── Onboarding Notice ── */
-#onboardNotice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:10px;padding:16px 20px;margin:16px 20px 0}
-#onboardNotice h3{font-size:.9rem;font-weight:800;color:#60a5fa;margin-bottom:10px}
-.checklist-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.83rem}
-.checklist-item:last-child{border-bottom:none}
-.ci-icon{font-size:1rem;flex-shrink:0}
-.ci-text{flex:1;color:#94a3b8}
-.ci-link{font-size:.78rem;font-weight:700;color:#60a5fa;cursor:pointer;white-space:nowrap;text-decoration:none}
-.ci-link:hover{color:#93c5fd}
-.done-icon{color:var(--green)}
-.todo-icon{color:#f59e0b}
-
 nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
-nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
+nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s;position:relative}
 nav button.active{color:var(--green);border-bottom-color:var(--green)}
-.container{max-width:900px;margin:0 auto;padding:28px 20px}
+nav button .badge{position:absolute;top:8px;right:6px;background:var(--red);color:#fff;font-size:.62rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+.container{max-width:960px;margin:0 auto;padding:28px 20px}
 .section{display:none}
 .section.active{display:block}
 h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
+h3{font-size:.95rem;font-weight:600;color:#f1f5f9}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
-label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
+.card-sm{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px}
+label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px;margin-top:12px}
+label:first-child{margin-top:0}
 input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
 input:focus,textarea:focus,select:focus{border-color:var(--blue)}
 textarea{min-height:80px;resize:vertical}
-.btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
+.btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s;display:inline-block}
 .btn-green{background:var(--green);color:#000}
 .btn-green:hover{background:#16a34a}
-.btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{background:#dc2626}
 .btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:#2563eb}
+.btn-orange{background:var(--orange);color:#000}
 .btn-gray{background:#374151;color:#e2e8f0}
-.row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
-.row .grow{flex:1}
+.btn-gray:hover{background:#4b5563}
+.btn-sm{padding:5px 12px;font-size:.78rem}
+.row{display:flex;gap:12px;margin-bottom:0px;align-items:flex-end;flex-wrap:wrap}
+.row .grow{flex:1;min-width:140px}
 .flow-item,.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
 .flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
@@ -69,100 +58,62 @@ textarea{min-height:80px;resize:vertical}
 .feat-card{background:var(--card);border-radius:10px;padding:18px;margin-bottom:14px}
 .notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
 .notif-box b{color:#fff}
-
-/* ── PWA Install Overlay ── */
-#pwa-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(6px);z-index:99999;align-items:center;justify-content:center;padding:20px}
-#pwa-overlay.show{display:flex}
-#pwa-card{background:#111827;border:1px solid #1e2d3d;border-radius:20px;padding:32px 28px;max-width:360px;width:100%;text-align:center;animation:slideUp .35s ease}
-@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
-#pwa-card .pwa-logo{font-size:2rem;font-weight:900;color:#22c55e;margin-bottom:4px}
-#pwa-card .pwa-logo span{color:#fff}
-#pwa-card .pwa-tag{font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:100px;padding:3px 10px;display:inline-block;margin-bottom:18px}
-#pwa-card h2{font-size:1.1rem;font-weight:800;color:#f1f5f9;margin-bottom:8px;line-height:1.3}
-#pwa-card p{font-size:.84rem;color:#64748b;margin-bottom:24px;line-height:1.5}
-.pwa-install-btn{width:100%;background:#22c55e;color:#000;border:none;border-radius:10px;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer;margin-bottom:10px}
-.pwa-skip{background:none;border:none;color:#374151;font-size:.78rem;cursor:pointer;text-decoration:underline}
-#ios-section{display:none}
-.ios-steps{text-align:left;margin-bottom:20px}
-.ios-step{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
-.ios-step .snum{width:26px;height:26px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#22c55e;flex-shrink:0;margin-top:1px}
-.ios-step .stxt{font-size:.83rem;color:#94a3b8;line-height:1.45}
-.ios-step .stxt strong{color:#f1f5f9}
-.pwa-done-btn{width:100%;background:#22c55e;color:#000;border:none;border-radius:10px;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer}
-.bounce-arrow{font-size:1.3rem;animation:bounce .8s infinite alternate;display:inline-block;margin-left:4px}
-@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-5px)}}
+/* Orders */
+.order-card{background:#0d1526;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px}
+.order-card.status-pending{border-left:3px solid var(--orange)}
+.order-card.status-confirmed{border-left:3px solid var(--green)}
+.order-card.status-packaging{border-left:3px solid var(--blue)}
+.order-card.status-shipped{border-left:3px solid var(--teal)}
+.order-card.status-rejected{border-left:3px solid var(--red)}
+.order-card.status-delivered{border-left:3px solid #a3e635}
+.order-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.order-customer{font-weight:700;font-size:.95rem;color:#f1f5f9}
+.order-time{font-size:.75rem;color:#64748b}
+.order-items{font-size:.83rem;color:#94a3b8;margin-bottom:10px;line-height:1.6}
+.order-total{font-size:.95rem;font-weight:700;color:var(--green);margin-bottom:10px}
+.order-address{font-size:.8rem;color:#93c5fd;margin-bottom:10px}
+.status-pill{display:inline-block;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.pill-pending{background:#451a03;color:var(--orange)}
+.pill-confirmed{background:#14532d;color:var(--green)}
+.pill-packaging{background:#1e3a5f;color:#93c5fd}
+.pill-shipped{background:#134e4a;color:#5eead4}
+.pill-rejected{background:#450a0a;color:var(--red)}
+.pill-delivered{background:#1a2e05;color:#a3e635}
+.order-actions{display:flex;gap:8px;flex-wrap:wrap}
+.receipt-thumb{width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer;margin-bottom:8px}
+/* Analytics */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+.stat-num{font-size:1.8rem;font-weight:700;color:var(--green);line-height:1}
+.stat-label{font-size:.75rem;color:#64748b;margin-top:6px}
+.stat-card.rev .stat-num{color:var(--orange)}
+/* Settings sections */
+.settings-section{margin-bottom:24px}
+.settings-section-title{font-size:.82rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:4px}
+.checkbox-item{display:flex;align-items:center;gap:6px;font-size:.83rem;cursor:pointer}
+.checkbox-item input[type=checkbox]{width:auto;cursor:pointer}
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:6px 16px;border:1px solid var(--border);background:transparent;color:#94a3b8;border-radius:20px;cursor:pointer;font-size:.8rem;transition:.2s}
+.filter-btn.active{background:var(--green);color:#000;border-color:var(--green);font-weight:700}
+.empty{text-align:center;padding:40px 20px;color:#64748b;font-size:.88rem}
 </style>
 </head>
 <body>
 
-<!-- ── PWA Install Overlay ─────────────────────────────────── -->
-<div id="pwa-overlay">
-  <div id="pwa-card">
-    <div class="pwa-logo">Forge<span>Bot</span></div>
-    <div class="pwa-tag">Quick Access</div>
-    <h2>Add ForgeBot to your Home Screen</h2>
-    <p>Install the app so you can open your dashboard in one tap — no browser, no links, just click and go.</p>
-    <div id="android-section">
-      <button class="pwa-install-btn" id="pwa-install-btn">📲 &nbsp;Add to Home Screen</button><br/>
-      <button class="pwa-skip" id="pwa-skip-btn">I'll do it later</button>
-    </div>
-    <div id="ios-section">
-      <div class="ios-steps">
-        <div class="ios-step">
-          <div class="snum">1</div>
-          <div class="stxt">Tap the <strong>Share</strong> button at the bottom of your screen <span class="bounce-arrow">⬆️</span></div>
-        </div>
-        <div class="ios-step">
-          <div class="snum">2</div>
-          <div class="stxt">Scroll down and tap <strong>"Add to Home Screen"</strong></div>
-        </div>
-        <div class="ios-step">
-          <div class="snum">3</div>
-          <div class="stxt">Tap <strong>"Add"</strong> in the top right corner</div>
-        </div>
-      </div>
-      <button class="pwa-done-btn" id="pwa-done-btn">✅ &nbsp;I've Added It!</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Header ─────────────────────────────────────────────── -->
 <header>
   <div class="logo">Forge<span>Bot</span></div>
   <div style="display:flex;align-items:center;gap:12px">
-    <span id="waBadge" class="status-badge disc">● Disconnected</span>
+    <span id="waBadge" class="status-badge disc">&#9679; Disconnected</span>
     <button class="btn btn-gray" onclick="logout()" style="padding:6px 14px;font-size:.8rem">Logout</button>
   </div>
 </header>
 
-<!-- ── Onboarding Notice ───────────────────────────────────── -->
-<div id="onboardNotice" style="display:none">
-  <h3>⚡ Complete your setup — your bot needs a few more things to go live</h3>
-  <div class="checklist-item" id="ci-wa">
-    <span class="ci-icon todo-icon">⏳</span>
-    <span class="ci-text">Connect your WhatsApp number</span>
-    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
-  </div>
-  <div class="checklist-item" id="ci-notif">
-    <span class="ci-icon todo-icon">⏳</span>
-    <span class="ci-text">Set your notification number (so you get payment alerts)</span>
-    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
-  </div>
-  <div class="checklist-item" id="ci-fallback">
-    <span class="ci-icon todo-icon">⏳</span>
-    <span class="ci-text">Add a fallback message (what bot says when it doesn't know the answer)</span>
-    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
-  </div>
-  <div class="checklist-item" id="ci-flows">
-    <span class="ci-icon todo-icon">⏳</span>
-    <span class="ci-text">Add at least one auto-reply rule so your bot can start answering customers</span>
-    <a class="ci-link" onclick="goReplies()">Go to Auto-Replies →</a>
-  </div>
-</div>
-
-<!-- ── Navigation ─────────────────────────────────────────── -->
 <nav>
   <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
+  <button onclick="switchTab('orders',this)">Orders <span class="badge" id="ordersBadge" style="display:none">0</span></button>
+  <button onclick="switchTab('analytics',this)">Analytics</button>
   <button onclick="switchTab('status',this)">Status Posts</button>
   <button onclick="switchTab('broadcast',this)">Broadcast</button>
   <button onclick="switchTab('features',this)">Features</button>
@@ -176,7 +127,7 @@ textarea{min-height:80px;resize:vertical}
     <h2>Auto-Reply Rules</h2>
     <div id="msgReplies" class="msg"></div>
     <div class="card">
-      <div class="row">
+      <div class="row" style="margin-bottom:12px">
         <div class="grow">
           <label>Keywords (comma separated)</label>
           <input id="newKw" placeholder="e.g. price, how much, cost"/>
@@ -191,6 +142,38 @@ textarea{min-height:80px;resize:vertical}
     <div id="flowList"></div>
   </div>
 
+  <!-- ORDERS -->
+  <div id="tab-orders" class="section">
+    <h2>Customer Orders</h2>
+    <div id="msgOrders" class="msg"></div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterOrders('all',this)">All</button>
+      <button class="filter-btn" onclick="filterOrders('pending',this)">Pending</button>
+      <button class="filter-btn" onclick="filterOrders('confirmed',this)">Confirmed</button>
+      <button class="filter-btn" onclick="filterOrders('packaging',this)">Packaging</button>
+      <button class="filter-btn" onclick="filterOrders('shipped',this)">Shipped</button>
+      <button class="filter-btn" onclick="filterOrders('delivered',this)">Delivered</button>
+    </div>
+    <div id="orderList"></div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div id="tab-analytics" class="section">
+    <h2>Business Analytics</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <div>
+        <label style="margin:0 0 4px">Select Month</label>
+        <input type="month" id="analyticMonth" style="width:auto" onchange="loadAnalytics()"/>
+      </div>
+      <button class="btn btn-gray" style="margin-top:20px" onclick="loadAnalytics()">Refresh</button>
+    </div>
+    <div id="analyticStats" class="stat-grid"></div>
+    <div class="card" style="margin-top:8px">
+      <h3 style="margin-bottom:12px;color:var(--green)">&#128200; What This Month Looks Like</h3>
+      <div id="analyticSummary" style="font-size:.88rem;color:#94a3b8;line-height:1.8"></div>
+    </div>
+  </div>
+
   <!-- STATUS POSTS -->
   <div id="tab-status" class="section">
     <h2>WhatsApp Status Scheduler</h2>
@@ -201,10 +184,10 @@ textarea{min-height:80px;resize:vertical}
         <input id="spMedia" placeholder="https://i.imgur.com/yourimage.jpg"/>
       </div>
       <div style="margin-bottom:12px">
-        <label>Caption (optional — leave blank for auto caption)</label>
+        <label>Caption (optional)</label>
         <textarea id="spCaption" placeholder="Optional custom caption..."></textarea>
       </div>
-      <div class="row">
+      <div class="row" style="margin-bottom:12px">
         <div class="grow">
           <label>Post Time (24hr e.g. 09:00)</label>
           <input id="spTime" placeholder="09:00"/>
@@ -237,36 +220,76 @@ textarea{min-height:80px;resize:vertical}
   <!-- FEATURES -->
   <div id="tab-features" class="section">
     <h2>Bot Features</h2>
+
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">🎙️</span>
+        <span style="font-size:1.4rem">&#127908;</span>
         <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
       <p style="font-size:.83rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot automatically transcribes and replies in English text. Powered by OpenAI Whisper.</p>
     </div>
+
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">💰</span>
-        <span style="font-weight:700;color:var(--green)">Payment Confirmation Alerts</span>
+        <span style="font-size:1.4rem">&#128176;</span>
+        <span style="font-weight:700;color:var(--green)">Smart Order & Payment Flow</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
-      <p style="font-size:.83rem;color:#94a3b8">When a customer says they have paid, your bot alerts you on your personal WhatsApp. Reply <b style="color:#fff">1</b> to confirm, <b style="color:#fff">2</b> to ask them wait, <b style="color:#fff">3</b> if not received. Bot messages the customer automatically.</p>
-      <p style="font-size:.78rem;color:var(--orange);margin-top:8px">Set your notification number in the Settings tab.</p>
+      <p style="font-size:.83rem;color:#94a3b8">When a customer says they have paid, your bot asks for a receipt photo. The receipt is saved and you get alerted on your personal WhatsApp. Reply <b style="color:#fff">1</b> to confirm, <b style="color:#fff">2</b> to ask them wait, <b style="color:#fff">3</b> if not received. After confirming, the bot collects the customer's delivery address automatically.</p>
+      <p style="font-size:.78rem;color:var(--orange);margin-top:8px">You can also manage orders directly from the <b style="color:#fff">Orders tab</b> on this dashboard.</p>
     </div>
+
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">🙏</span>
+        <span style="font-size:1.4rem">&#129309;</span>
+        <span style="font-weight:700;color:var(--green)">Customer Name Memory</span>
+        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+      </div>
+      <p style="font-size:.83rem;color:#94a3b8">The bot collects every customer's name on first contact and remembers it forever. Returning customers are greeted by name. All customer contacts are used for broadcasts.</p>
+    </div>
+
+    <div class="feat-card" style="border:1px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.4rem">&#128588;</span>
         <span style="font-weight:700;color:var(--green)">Human Handoff Detection</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
       <p style="font-size:.83rem;color:#94a3b8">When a customer asks to speak to a real person, the bot tells them to hold on, pauses itself for 30 minutes, and alerts you immediately on your personal WhatsApp.</p>
     </div>
+
+    <div class="feat-card" style="border:1px solid var(--green)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.4rem">&#128204;</span>
+        <span style="font-weight:700;color:var(--green)">Lead Alerts</span>
+        <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
+      </div>
+      <p style="font-size:.83rem;color:#94a3b8">Every time a new customer asks for a price, your bot sends you a lead alert on WhatsApp with the customer's name, what they asked about, and a direct link to this dashboard. You always know who is interested.</p>
+    </div>
+
+    <div style="margin:28px 0 10px;padding:10px 14px;background:#0d1a2e;border-left:3px solid var(--purple);border-radius:6px">
+      <p style="font-size:.82rem;color:#93c5fd">&#128640; <b style="color:#fff">Upcoming Upgrades</b> &mdash; You joined ForgeBot early. All features below will be unlocked for you <b style="color:var(--green)">completely free</b> when they go live. No extra payment needed.</p>
+    </div>
+
     <div class="coming-soon">
-      <div class="cs-icon">🔒</div>
+      <div class="cs-icon">&#128274;</div>
       <h3>Fake Payment Receipt Detection</h3>
-      <p>Our AI will automatically scan payment screenshots sent by customers and verify if they are real or edited. No more fake alerts fooling your business.</p>
+      <p>Customers sometimes send edited or fake payment screenshots. Our AI will scan every receipt image, verify if it is genuine or manipulated, and alert you immediately if it looks suspicious &mdash; so you never get deceived again.</p>
       <div class="cs-badge">COMING SOON</div>
+    </div>
+
+    <div class="coming-soon" style="border-color:#f97316;background:#1a0a00">
+      <div class="cs-icon">&#128247;&#127916;</div>
+      <h3 style="color:#f97316">Social Media Bot + AI Video Creator</h3>
+      <p>The same bot that handles your WhatsApp will expand to automatically reply DMs on <b style="color:#fff">Instagram, TikTok, and Facebook</b>. It will also use AI to create short promotional videos for your business, add captions and background music, then post them to your social pages on a schedule you choose.</p>
+      <div class="cs-badge" style="background:#f97316">COMING SOON</div>
+    </div>
+
+    <div class="coming-soon" style="border-color:#ef4444;background:#1a0000">
+      <div class="cs-icon">&#128680;</div>
+      <h3 style="color:#ef4444">Community Fraud Blacklist</h3>
+      <p>If a customer scams your business, flag their WhatsApp number directly inside ForgeBot. When <b style="color:#fff">5 or more ForgeBot businesses</b> flag the same number, they get automatically blacklisted across the entire network. Every business gets warned the moment that number contacts them.</p>
+      <div class="cs-badge" style="background:#ef4444">COMING SOON</div>
     </div>
   </div>
 
@@ -274,56 +297,174 @@ textarea{min-height:80px;resize:vertical}
   <div id="tab-settings" class="section">
     <h2>Settings</h2>
     <div id="msgSettings" class="msg"></div>
-    <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--green)">Your Notification Number</h3>
-      <div class="notif-box">
-        This is your <b>personal WhatsApp number</b> where the bot sends you all alerts: payment claims, human handoff requests, and other notifications. Enter it in international format without the + sign.
+
+    <!-- Alerts -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#128276; Alert Numbers</div>
+      <div class="card">
+        <div class="notif-box">
+          This is your <b>personal WhatsApp number</b> where the bot sends all alerts: payment claims, lead notifications, human handoff requests, and monthly analytics reports. Enter it without the + sign.
+        </div>
+        <label>Your Personal WhatsApp Number (e.g. 2348012345678)</label>
+        <input id="notifNumber" placeholder="2348012345678"/>
+        <button class="btn btn-green" style="margin-top:12px" onclick="saveSettings(['notification_number'],'msgSettings')">Save Number</button>
       </div>
-      <label>WhatsApp Number (e.g. 2348012345678)</label>
-      <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:12px"/>
-      <button class="btn btn-green" onclick="saveNotifNumber()">Save Number</button>
     </div>
-    <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">Fallback Message</h3>
-      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">Sent when a customer message does not match any auto-reply rule.</p>
-      <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
-      <button class="btn btn-green" style="margin-top:12px" onclick="saveFallback()">Save Fallback</button>
+
+    <!-- Bot Messages -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#128172; Bot Messages</div>
+      <div class="card">
+        <label>Welcome Message <span style="color:#64748b;font-size:.78rem">(sent to every new customer on first contact)</span></label>
+        <textarea id="welcomeMsg" placeholder="Welcome! I'm the virtual assistant for [Your Business]. How can I help you today?"></textarea>
+        <label style="margin-top:16px">Fallback Message <span style="color:#64748b;font-size:.78rem">(sent when no rule matches)</span></label>
+        <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
+        <button class="btn btn-green" style="margin-top:14px" onclick="saveBotMessages()">Save Messages</button>
+      </div>
     </div>
-    <div class="card">
-      <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">WhatsApp Connection</h3>
-      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">If your bot disconnects, click below to reconnect. Open the link on a computer to scan the QR code with your phone.</p>
-      <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
+
+    <!-- Bank Details -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#127974; Bank / Payment Details</div>
+      <div class="card">
+        <div class="notif-box" style="border-color:var(--orange);color:#fbbf24">
+          When a customer asks how to pay, the bot will automatically send these bank details. Make sure they are correct.
+        </div>
+        <div class="row" style="margin-bottom:0">
+          <div class="grow">
+            <label>Bank Name</label>
+            <input id="bankName" placeholder="e.g. Access Bank"/>
+          </div>
+          <div class="grow">
+            <label>Account Name</label>
+            <input id="accountName" placeholder="e.g. John Doe"/>
+          </div>
+        </div>
+        <label>Account Number</label>
+        <input id="accountNumber" placeholder="e.g. 0123456789"/>
+        <button class="btn btn-green" style="margin-top:14px" onclick="saveSettings(['bank_name','account_name','account_number'],'msgSettings')">Save Bank Details</button>
+      </div>
     </div>
+
+    <!-- Business Info -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#128198; Business Info</div>
+      <div class="card">
+        <label>Business Hours <span style="color:#64748b;font-size:.78rem">(bot tells customers when you're open)</span></label>
+        <input id="businessHours" placeholder="Mon–Fri: 9am–6pm, Sat: 10am–4pm"/>
+        <button class="btn btn-green" style="margin-top:14px" onclick="saveSettings(['business_hours'],'msgSettings')">Save Hours</button>
+      </div>
+    </div>
+
+    <!-- Bot Setup / Questionnaire Fields -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#129302; Bot Setup Details</div>
+      <div class="card">
+        <p style="font-size:.82rem;color:#94a3b8;margin-bottom:14px">These are the answers you provided during setup. You can update them here anytime — the bot uses this info to answer customer questions about delivery, payment, social media, etc.</p>
+
+        <div class="row" style="margin-bottom:0">
+          <div class="grow">
+            <label>Instagram Handle</label>
+            <input id="setupInstagram" placeholder="@yourbusiness"/>
+          </div>
+          <div class="grow">
+            <label>Facebook Page</label>
+            <input id="setupFacebook" placeholder="facebook.com/yourbusiness"/>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:0">
+          <div class="grow">
+            <label>TikTok Handle</label>
+            <input id="setupTiktok" placeholder="@yourbusiness"/>
+          </div>
+          <div class="grow">
+            <label>WhatsApp Channel Link</label>
+            <input id="setupWhatsappChannel" placeholder="https://whatsapp.com/channel/..."/>
+          </div>
+        </div>
+        <label>Delivery Areas / Service Areas</label>
+        <input id="setupServiceAreas" placeholder="e.g. Lagos, Abuja, Port Harcourt"/>
+        <label>Delivery Fee (local)</label>
+        <input id="setupDeliveryFee" placeholder="e.g. ₦1,500 within Lagos"/>
+        <label>Delivery Time</label>
+        <input id="setupDeliveryTime" placeholder="e.g. 1–3 business days"/>
+        <label>Return Policy</label>
+        <textarea id="setupReturnPolicy" style="min-height:60px" placeholder="e.g. Returns accepted within 7 days with receipt..."></textarea>
+        <label>Minimum Order</label>
+        <input id="setupMinOrder" placeholder="e.g. ₦5,000 minimum order"/>
+        <label>Current Promotion</label>
+        <input id="setupPromo" placeholder="e.g. 20% off all orders this week!"/>
+
+        <label style="margin-top:14px">Payment Methods Accepted</label>
+        <div class="checkbox-grid" id="paymentMethodsGrid">
+          <label class="checkbox-item"><input type="checkbox" value="Bank Transfer" id="pm_bank"> Bank Transfer</label>
+          <label class="checkbox-item"><input type="checkbox" value="Cash" id="pm_cash"> Cash</label>
+          <label class="checkbox-item"><input type="checkbox" value="POS" id="pm_pos"> POS</label>
+          <label class="checkbox-item"><input type="checkbox" value="Online Transfer" id="pm_online"> Online Transfer</label>
+          <label class="checkbox-item"><input type="checkbox" value="USSD" id="pm_ussd"> USSD</label>
+        </div>
+
+        <button class="btn btn-green" style="margin-top:18px" onclick="saveBotSetup()">Save Bot Setup</button>
+      </div>
+    </div>
+
+    <!-- WhatsApp Connection -->
+    <div class="settings-section">
+      <div class="settings-section-title">&#128241; WhatsApp Connection</div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <span id="waStatusDot" style="font-size:.82rem;color:#94a3b8">Checking status...</span>
+        </div>
+        <p style="font-size:.82rem;color:#94a3b8;margin-bottom:14px">Scan the QR code below with your WhatsApp to connect your bot. Open WhatsApp → Linked Devices → Link a Device → point at the QR code.</p>
+        <button class="btn btn-blue" onclick="showQR()" id="qrBtn">&#128247; Show QR Code</button>
+        <button class="btn btn-gray" style="margin-left:8px" onclick="reconnectWA()">Open in New Tab</button>
+        <!-- QR Code display area -->
+        <div id="qrArea" style="display:none;margin-top:20px;text-align:center">
+          <div id="qrStatus" style="font-size:.85rem;color:#93c5fd;margin-bottom:12px">Connecting...</div>
+          <div id="qrCanvas" style="display:inline-block;background:#fff;padding:12px;border-radius:10px"></div>
+          <p style="font-size:.78rem;color:#64748b;margin-top:10px">QR code expires after 60 seconds. Refresh if it expires.</p>
+          <button class="btn btn-gray btn-sm" style="margin-top:10px" onclick="hideQR()">Close</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 </div>
 
+<!-- Receipt Modal -->
+<div id="receiptModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;display:none;align-items:center;justify-content:center" onclick="closeReceipt()">
+  <img id="receiptImg" src="" style="max-width:90vw;max-height:90vh;border-radius:8px;border:2px solid var(--border)"/>
+</div>
+
 <script>
-// ── Auth ──────────────────────────────────────────────────────
-var API   = '';
+var API = '';
 var TOKEN = localStorage.getItem('forgebot_token');
 if (!TOKEN) {
   var t = new URLSearchParams(window.location.search).get('token');
   if (t) { TOKEN = t; localStorage.setItem('forgebot_token', t); }
   else window.location.href = '/';
 }
-var H = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
+var H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
 
-// ── Tab switching ─────────────────────────────────────────────
+var allOrders = [];
+var currentFilter = 'all';
+
 function switchTab(id, btn) {
-  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
-  document.querySelectorAll('nav button').forEach(function(b) { b.classList.remove('active'); });
-  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
+  if (id === 'orders') loadOrders();
+  if (id === 'analytics') loadAnalytics();
+  if (id === 'settings') loadSettings();
 }
-function goSettings() { document.querySelector('nav button:nth-child(5)').click(); }
-function goReplies()  { document.querySelector('nav button:nth-child(1)').click(); }
 
 function showMsg(id, text, type) {
   var el = document.getElementById(id);
   el.textContent = text;
   el.className = 'msg show ' + type;
-  setTimeout(function() { el.classList.remove('show'); }, 4000);
+  setTimeout(function(){ el.classList.remove('show'); }, 4500);
 }
 
 function logout() {
@@ -335,325 +476,496 @@ function reconnectWA() {
   window.open('/onboard?token=' + TOKEN, '_blank');
 }
 
-// ── Onboarding notice ─────────────────────────────────────────
-function checkOnboarding(client, flows) {
-  var notice    = document.getElementById('onboardNotice');
-  var ciWa      = document.getElementById('ci-wa');
-  var ciNotif   = document.getElementById('ci-notif');
-  var ciFallback = document.getElementById('ci-fallback');
-  var ciFlows   = document.getElementById('ci-flows');
-
-  var waOk       = client.whatsapp_status === 'connected';
-  var notifOk    = !!(client.notification_number);
-  var fallbackOk = !!(client.fallback_message);
-  var flowsOk    = flows && flows.length > 0;
-
-  function setItem(el, done, doneText, todoText) {
-    var icon = el.querySelector('.ci-icon');
-    var text = el.querySelector('.ci-text');
-    if (done) {
-      icon.textContent = '✅';
-      icon.className   = 'ci-icon done-icon';
-      text.textContent = doneText;
-      el.querySelector('.ci-link').style.display = 'none';
-    } else {
-      icon.textContent = '⏳';
-      icon.className   = 'ci-icon todo-icon';
-      text.textContent = todoText;
-      el.querySelector('.ci-link').style.display = '';
-    }
-  }
-
-  setItem(ciWa,       waOk,       'WhatsApp connected ✓',              'Connect your WhatsApp number');
-  setItem(ciNotif,    notifOk,    'Notification number set ✓',         'Set your notification number (so you get payment alerts)');
-  setItem(ciFallback, fallbackOk, 'Fallback message set ✓',            'Add a fallback message (what bot says when it doesn\'t know the answer)');
-  setItem(ciFlows,    flowsOk,    'Auto-reply rules added ✓',          'Add at least one auto-reply rule so your bot can answer customers');
-
-  var allDone = waOk && notifOk && fallbackOk && flowsOk;
-  notice.style.display = allDone ? 'none' : 'block';
-}
-
-// ── Load all ──────────────────────────────────────────────────
+// ── Load everything on start ──────────────────────────────────
 async function loadAll() {
-  var flows = await loadFlows();
+  await loadFlows();
   await loadStatusPosts();
   await loadBroadcastLogs();
-  pollWaStatus(flows);
+  await loadOrdersBadge();
+  pollWaStatus();
+  // Set analytics month to current month
+  var now = new Date();
+  document.getElementById('analyticMonth').value =
+    now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 }
 
-async function pollWaStatus(cachedFlows) {
+async function pollWaStatus() {
   try {
-    var r = await fetch(API + '/api/client/me', { headers: H });
+    var r = await fetch(API+'/api/client/me', { headers: H });
     if (r.ok) {
-      var c     = await r.json();
+      var c = await r.json();
       var badge = document.getElementById('waBadge');
+      var dot = document.getElementById('waStatusDot');
       if (c.whatsapp_status === 'connected') {
         badge.textContent = '● Connected';
-        badge.className   = 'status-badge';
+        badge.className = 'status-badge';
+        if (dot) dot.innerHTML = '<span style="color:var(--green)">✅ WhatsApp is connected</span>';
       } else {
         badge.textContent = '● Disconnected';
-        badge.className   = 'status-badge disc';
+        badge.className = 'status-badge disc';
+        if (dot) dot.innerHTML = '<span style="color:var(--red)">⚠️ WhatsApp disconnected — scan QR code below to reconnect</span>';
       }
-      if (c.notification_number) document.getElementById('notifNumber').value = c.notification_number;
-      if (c.fallback_message)    document.getElementById('fallbackMsg').value  = c.fallback_message;
-
-      // Update onboarding notice
-      var flows = cachedFlows || [];
-      try {
-        var fr = await fetch(API + '/api/client/flows', { headers: H });
-        if (fr.ok) flows = await fr.json();
-      } catch(e) {}
-      checkOnboarding(c, flows);
     }
   } catch(e) {}
-  setTimeout(function() { pollWaStatus(); }, 10000);
+  setTimeout(pollWaStatus, 10000);
 }
 
-// ── Flows ─────────────────────────────────────────────────────
+// ── Auto-Replies ───────────────────────────────────────────────
 async function loadFlows() {
   try {
-    var r     = await fetch(API + '/api/client/flows', { headers: H });
+    var r = await fetch(API+'/api/client/flows', { headers: H });
     var flows = await r.json();
-    var el    = document.getElementById('flowList');
-    if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return flows; }
+    var el = document.getElementById('flowList');
+    if (!flows.length) { el.innerHTML = '<p class="empty">No auto-reply rules yet. Add one above.</p>'; return; }
     el.innerHTML = flows.map(function(f) {
-      return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">' + esc(f.keywords) + '</div><div class="flow-resp">' + esc(f.response) + '</div></div><button class="btn btn-red" onclick="deleteFlow(\'' + f.id + '\')">Delete</button></div>';
+      return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">'+esc(f.keywords)+'</div>'
+           + '<div class="flow-resp">'+esc(f.response)+'</div></div>'
+           + '<button class="btn btn-red btn-sm" onclick="deleteFlow(\''+f.id+'\')">Delete</button></div>';
     }).join('');
-    return flows;
-  } catch(e) { return []; }
+  } catch(e) { console.error(e); }
 }
 
 async function addFlow() {
-  var kw   = document.getElementById('newKw').value.trim();
+  var kw = document.getElementById('newKw').value.trim();
   var resp = document.getElementById('newResp').value.trim();
-  if (!kw || !resp) { showMsg('msgReplies', 'Please fill in keywords and reply.', 'err'); return; }
-  var r = await fetch(API + '/api/client/flows', { method: 'POST', headers: H, body: JSON.stringify({ keywords: kw, response: resp }) });
+  if (!kw || !resp) { showMsg('msgReplies','Please fill in keywords and reply.','err'); return; }
+  var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:resp}) });
   if (r.ok) {
-    document.getElementById('newKw').value   = '';
-    document.getElementById('newResp').value = '';
-    showMsg('msgReplies', 'Rule added!', 'ok');
+    document.getElementById('newKw').value='';
+    document.getElementById('newResp').value='';
+    showMsg('msgReplies','Rule added!','ok');
     loadFlows();
-  } else { showMsg('msgReplies', 'Failed to add rule.', 'err'); }
+  } else showMsg('msgReplies','Failed to add rule.','err');
 }
 
 async function deleteFlow(id) {
-  if (!confirm('Delete this rule?')) return;
-  var r = await fetch(API + '/api/client/flows/' + id, { method: 'DELETE', headers: H });
-  if (r.ok) { showMsg('msgReplies', 'Rule deleted.', 'ok'); loadFlows(); }
+  if (!confirm('Delete this auto-reply rule?')) return;
+  var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgReplies','Rule deleted.','ok'); loadFlows(); }
 }
 
-// ── Status Posts ──────────────────────────────────────────────
+// ── Orders ─────────────────────────────────────────────────────
+async function loadOrdersBadge() {
+  try {
+    var r = await fetch(API+'/api/client/orders', { headers: H });
+    if (r.ok) {
+      var orders = await r.json();
+      var pending = orders.filter(function(o){ return o.status === 'pending' || o.payment_status === 'receipt_submitted'; });
+      var badge = document.getElementById('ordersBadge');
+      if (pending.length > 0) {
+        badge.textContent = pending.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch(e) {}
+}
+
+async function loadOrders() {
+  try {
+    var r = await fetch(API+'/api/client/orders', { headers: H });
+    if (!r.ok) { document.getElementById('orderList').innerHTML = '<p class="empty">Failed to load orders.</p>'; return; }
+    allOrders = await r.json();
+    renderOrders();
+  } catch(e) { document.getElementById('orderList').innerHTML = '<p class="empty">Error loading orders.</p>'; }
+}
+
+function filterOrders(status, btn) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderOrders();
+}
+
+function renderOrders() {
+  var filtered = currentFilter === 'all' ? allOrders :
+    allOrders.filter(function(o){ return o.status === currentFilter; });
+  var el = document.getElementById('orderList');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">No orders found' + (currentFilter !== 'all' ? ' with status: '+currentFilter : '') + '.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(function(o) {
+    var statusClass = 'status-' + (o.status || 'pending');
+    var pillClass   = 'pill-' + (o.status || 'pending');
+    var statusLabel = (o.status || 'pending').replace(/_/g,' ').toUpperCase();
+    var items       = '';
+    try {
+      var cart = typeof o.cart === 'string' ? JSON.parse(o.cart) : (o.cart || []);
+      if (Array.isArray(cart) && cart.length) {
+        items = cart.map(function(item){
+          return (item.qty||1) + 'x ' + esc(item.name||item) + (item.price ? ' — ₦'+Number(item.price).toLocaleString() : '');
+        }).join('<br>');
+      } else {
+        items = esc(o.items || '—');
+      }
+    } catch(e) { items = esc(o.items || '—'); }
+
+    var receipt = o.receipt_url
+      ? '<img src="'+esc(o.receipt_url)+'" class="receipt-thumb" onclick="viewReceipt(\''+esc(o.receipt_url)+'\')" title="Click to view receipt"/>'
+      : '';
+
+    var address = o.delivery_address
+      ? '<div class="order-address">&#128205; '+esc(o.delivery_address)+'</div>'
+      : (o.delivery_address === 'pickup' ? '<div class="order-address">&#128099; Customer will pickup</div>' : '');
+
+    var actions = buildOrderActions(o);
+
+    var total = o.total ? '₦' + Number(o.total).toLocaleString() : '';
+
+    return '<div class="order-card '+statusClass+'">'
+      + '<div class="order-header">'
+      + '<div><div class="order-customer">'+esc(o.customer_name||o.customer_jid||'Unknown Customer')+'</div>'
+      + '<div class="order-time">'+new Date(o.created_at).toLocaleString('en-NG')+'</div></div>'
+      + '<span class="status-pill '+pillClass+'">'+statusLabel+'</span>'
+      + '</div>'
+      + receipt
+      + '<div class="order-items">'+items+'</div>'
+      + (total ? '<div class="order-total">Total: '+total+'</div>' : '')
+      + address
+      + '<div class="order-actions">'+actions+'</div>'
+      + '</div>';
+  }).join('');
+}
+
+function buildOrderActions(o) {
+  var btns = '';
+  var s = o.status || 'pending';
+
+  if (s === 'pending' || s === 'awaiting_receipt') {
+    btns += '<button class="btn btn-green btn-sm" onclick="updateOrder(\''+o.id+'\',\'confirmed\')">&#10003; Confirm Payment</button>';
+    btns += '<button class="btn btn-red btn-sm" onclick="updateOrder(\''+o.id+'\',\'rejected\')">&#10005; Reject</button>';
+  } else if (s === 'confirmed') {
+    btns += '<button class="btn btn-blue btn-sm" onclick="updateOrder(\''+o.id+'\',\'packaging\')">&#128230; Mark Packaging</button>';
+    btns += '<button class="btn btn-red btn-sm" onclick="updateOrder(\''+o.id+'\',\'rejected\')">Reject</button>';
+  } else if (s === 'packaging') {
+    btns += '<button class="btn btn-orange btn-sm" onclick="updateOrder(\''+o.id+'\',\'shipped\')">&#128666; Mark Shipped</button>';
+  } else if (s === 'shipped') {
+    btns += '<button class="btn btn-green btn-sm" onclick="updateOrder(\''+o.id+'\',\'delivered\')">&#10003; Mark Delivered</button>';
+  } else if (s === 'rejected') {
+    btns += '<span style="font-size:.78rem;color:var(--red)">&#10005; This order was rejected</span>';
+  } else if (s === 'delivered') {
+    btns += '<span style="font-size:.78rem;color:var(--green)">&#10003; Completed</span>';
+  }
+
+  return btns;
+}
+
+async function updateOrder(id, status) {
+  var confirmMsg = {
+    confirmed: 'Confirm this payment? The bot will ask the customer for their delivery address.',
+    rejected:  'Reject this order? The bot will notify the customer.',
+    packaging: 'Mark this order as being packaged? The bot will notify the customer.',
+    shipped:   'Mark as shipped? The bot will send a delivery notification to the customer.',
+    delivered: 'Mark as delivered? The bot will send a completion message to the customer.'
+  };
+  if (!confirm(confirmMsg[status] || 'Update order status to: '+status+'?')) return;
+
+  try {
+    var r = await fetch(API+'/api/client/orders/'+id, {
+      method: 'PUT', headers: H, body: JSON.stringify({ status: status })
+    });
+    if (r.ok) {
+      showMsg('msgOrders', 'Order updated — customer has been notified on WhatsApp.', 'ok');
+      await loadOrders();
+      await loadOrdersBadge();
+    } else {
+      var d = await r.json();
+      showMsg('msgOrders', d.error || 'Failed to update order.', 'err');
+    }
+  } catch(e) { showMsg('msgOrders','Network error.','err'); }
+}
+
+function viewReceipt(url) {
+  document.getElementById('receiptImg').src = url;
+  document.getElementById('receiptModal').style.display = 'flex';
+}
+
+function closeReceipt() {
+  document.getElementById('receiptModal').style.display = 'none';
+}
+
+// ── Analytics ──────────────────────────────────────────────────
+async function loadAnalytics() {
+  var month = document.getElementById('analyticMonth').value;
+  if (!month) return;
+  try {
+    var r = await fetch(API+'/api/client/analytics?month='+month, { headers: H });
+    if (!r.ok) return;
+    var s = await r.json();
+
+    document.getElementById('analyticStats').innerHTML =
+      statCard('&#129309;', s.new_customers, 'New Customers') +
+      statCard('&#128204;', s.leads, 'Price Inquiries') +
+      statCard('&#128239;', s.orders_placed, 'Orders Placed') +
+      statCard('&#10003;', s.orders_confirmed, 'Confirmed Orders') +
+      '<div class="stat-card rev">'+
+        '<div class="stat-num">₦'+Number(s.total_revenue||0).toLocaleString()+'</div>'+
+        '<div class="stat-label">Revenue Confirmed</div>'+
+      '</div>';
+
+    var summary = '';
+    if (s.new_customers > 0) summary += '&#128293; <b style="color:#f1f5f9">'+s.new_customers+'</b> new customer'+(s.new_customers>1?'s':'')+' reached out this month.<br>';
+    if (s.leads > 0) summary += '&#128204; <b style="color:#f1f5f9">'+s.leads+'</b> people asked for prices (potential buyers).<br>';
+    if (s.orders_placed > 0) summary += '&#128239; <b style="color:#f1f5f9">'+s.orders_placed+'</b> order'+(s.orders_placed>1?'s':'')+' placed by customers.<br>';
+    if (s.orders_confirmed > 0) summary += '&#10003; <b style="color:var(--green)">'+s.orders_confirmed+'</b> payment'+(s.orders_confirmed>1?'s':'')+' confirmed.<br>';
+    if (s.total_revenue > 0) summary += '&#128176; Total confirmed revenue: <b style="color:var(--orange)">₦'+Number(s.total_revenue).toLocaleString()+'</b>.<br>';
+    if (!summary) summary = 'No data for this month yet.';
+    document.getElementById('analyticSummary').innerHTML = summary;
+  } catch(e) { console.error(e); }
+}
+
+function statCard(icon, num, label) {
+  return '<div class="stat-card"><div class="stat-num">'+icon+'<br>'+num+'</div><div class="stat-label">'+label+'</div></div>';
+}
+
+// ── Status Posts ───────────────────────────────────────────────
 async function loadStatusPosts() {
   try {
-    var r     = await fetch(API + '/api/client/status-posts', { headers: H });
+    var r = await fetch(API+'/api/client/status-posts', { headers: H });
     var posts = await r.json();
-    var el    = document.getElementById('postList');
-    if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
+    var el = document.getElementById('postList');
+    if (!posts.length) { el.innerHTML = '<p class="empty">No scheduled posts yet.</p>'; return; }
     el.innerHTML = posts.map(function(p) {
-      var time = p.post_time || p.scheduled_time || '';
-      var days = p.scheduled_days || p.days || '';
-      return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">' + esc(p.caption || '(auto caption)') + '</div><div style="font-size:.78rem;color:#64748b">' + time + ' — ' + days + '</div></div><button class="btn btn-red" onclick="deletePost(\'' + p.id + '\')">Delete</button></div>';
+      return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">'+esc(p.caption||'(auto caption)')+'</div>'
+           + '<div style="font-size:.78rem;color:#64748b">'+esc(p.scheduled_time||p.post_time)+' &mdash; '+esc(p.scheduled_days||p.days)+'</div></div>'
+           + '<button class="btn btn-red btn-sm" onclick="deletePost(\''+p.id+'\')">Delete</button></div>';
     }).join('');
   } catch(e) {}
 }
 
 async function addStatusPost() {
-  var mediaUrl     = document.getElementById('spMedia').value.trim();
-  var caption      = document.getElementById('spCaption').value.trim();
+  var mediaUrl = document.getElementById('spMedia').value.trim();
+  var caption  = document.getElementById('spCaption').value.trim();
   var scheduledTime = document.getElementById('spTime').value.trim();
   var scheduledDays = document.getElementById('spDays').value.trim();
-  if (!mediaUrl || !scheduledTime || !scheduledDays) { showMsg('msgStatus', 'Please fill media URL, time and days.', 'err'); return; }
-  var r = await fetch(API + '/api/client/status-posts', { method: 'POST', headers: H, body: JSON.stringify({ mediaUrl: mediaUrl, caption: caption, scheduledTime: scheduledTime, scheduledDays: scheduledDays }) });
+  if (!mediaUrl || !scheduledTime || !scheduledDays) {
+    showMsg('msgStatus','Please fill in media URL, time and days.','err'); return;
+  }
+  var r = await fetch(API+'/api/client/status-posts', {
+    method:'POST', headers:H,
+    body:JSON.stringify({mediaUrl:mediaUrl,caption:caption,scheduledTime:scheduledTime,scheduledDays:scheduledDays})
+  });
   if (r.ok) {
-    document.getElementById('spMedia').value   = '';
-    document.getElementById('spCaption').value = '';
-    document.getElementById('spTime').value    = '';
-    document.getElementById('spDays').value    = '';
-    showMsg('msgStatus', 'Post scheduled!', 'ok');
+    document.getElementById('spMedia').value='';
+    document.getElementById('spCaption').value='';
+    document.getElementById('spTime').value='';
+    document.getElementById('spDays').value='';
+    showMsg('msgStatus','Post scheduled!','ok');
     loadStatusPosts();
-  } else { showMsg('msgStatus', 'Failed to schedule.', 'err'); }
+  } else showMsg('msgStatus','Failed to schedule.','err');
 }
 
 async function deletePost(id) {
   if (!confirm('Delete this scheduled post?')) return;
-  var r = await fetch(API + '/api/client/status-posts/' + id, { method: 'DELETE', headers: H });
-  if (r.ok) { showMsg('msgStatus', 'Post deleted.', 'ok'); loadStatusPosts(); }
+  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgStatus','Post deleted.','ok'); loadStatusPosts(); }
 }
 
-// ── Broadcasts ────────────────────────────────────────────────
+// ── Broadcast ──────────────────────────────────────────────────
 async function loadBroadcastLogs() {
   try {
-    var r    = await fetch(API + '/api/client/broadcasts', { headers: H });
+    var r = await fetch(API+'/api/client/broadcasts', { headers: H });
     var logs = await r.json();
-    var el   = document.getElementById('broadcastLog');
-    if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
+    var el = document.getElementById('broadcastLog');
+    if (!logs.length) { el.innerHTML = '<p class="empty">No broadcasts yet.</p>'; return; }
     el.innerHTML = logs.map(function(l) {
-      return '<div class="broadcast-log">' + new Date(l.created_at).toLocaleString() + ' — ' + l.recipients + ' recipients — "' + esc(l.message.slice(0, 60)) + '..."</div>';
+      return '<div class="broadcast-log">'+new Date(l.created_at).toLocaleString('en-NG')
+           +' &mdash; '+l.recipients+' recipients &mdash; "'
+           +esc(l.message.slice(0,60))+(l.message.length>60?'...':'')
+           +'"</div>';
     }).join('');
   } catch(e) {}
 }
 
 async function sendBroadcast() {
   var message = document.getElementById('bcMsg').value.trim();
-  if (!message) { showMsg('msgBroadcast', 'Please type a message.', 'err'); return; }
-  if (!confirm('Send this to all recent contacts?')) return;
-  var r = await fetch(API + '/api/client/broadcasts', { method: 'POST', headers: H, body: JSON.stringify({ message: message }) });
-  if (r.ok) { document.getElementById('bcMsg').value = ''; showMsg('msgBroadcast', 'Broadcast sent!', 'ok'); loadBroadcastLogs(); }
-  else { showMsg('msgBroadcast', 'Failed to send.', 'err'); }
+  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
+  if (!confirm('Send this to ALL recent contacts? This cannot be undone.')) return;
+  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message:message}) });
+  if (r.ok) {
+    var d = await r.json();
+    document.getElementById('bcMsg').value='';
+    showMsg('msgBroadcast','Broadcast sent to '+d.sent+' contacts!','ok');
+    loadBroadcastLogs();
+  } else showMsg('msgBroadcast','Failed to send. Is WhatsApp connected?','err');
 }
 
-// ── Settings ──────────────────────────────────────────────────
-async function saveNotifNumber() {
-  var num = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
-  if (!num) { showMsg('msgSettings', 'Please enter a valid number.', 'err'); return; }
-  var r = await fetch(API + '/api/client/settings', { method: 'PUT', headers: H, body: JSON.stringify({ notification_number: num }) });
-  if (r.ok) showMsg('msgSettings', 'Notification number saved!', 'ok');
-  else showMsg('msgSettings', 'Save failed.', 'err');
-}
-
-async function saveFallback() {
-  var msg = document.getElementById('fallbackMsg').value.trim();
-  if (!msg) { showMsg('msgSettings', 'Please type a fallback message.', 'err'); return; }
-  var r = await fetch(API + '/api/client/fallback', { method: 'PUT', headers: H, body: JSON.stringify({ fallback_message: msg }) });
-  if (r.ok) showMsg('msgSettings', 'Fallback saved!', 'ok');
-  else showMsg('msgSettings', 'Save failed.', 'err');
-}
-
-// ── Escape HTML ───────────────────────────────────────────────
-function esc(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── PWA Install Prompt ────────────────────────────────────────
-(function() {
-  var isStandalone = window.matchMedia('(display-mode: standalone)').matches
-                  || window.navigator.standalone === true;
-  if (isStandalone) return;
-  if (localStorage.getItem('forgebot_pwa_installed')) return;
-
-  var overlay        = document.getElementById('pwa-overlay');
-  var androidSec     = document.getElementById('android-section');
-  var iosSec         = document.getElementById('ios-section');
-  var installBtn     = document.getElementById('pwa-install-btn');
-  var skipBtn        = document.getElementById('pwa-skip-btn');
-  var doneBtn        = document.getElementById('pwa-done-btn');
-  var deferredPrompt = null;
-  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-
-  window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    deferredPrompt = e;
-  });
-
-  // Show after 2 seconds
-  setTimeout(function() {
-    if (isIOS) {
-      androidSec.style.display = 'none';
-      iosSec.style.display     = 'block';
+// ── Settings ───────────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    var [clientR, setupR] = await Promise.all([
+      fetch(API+'/api/client/me', { headers: H }),
+      fetch(API+'/api/client/bot-setup', { headers: H })
+    ]);
+    if (clientR.ok) {
+      var c = await clientR.json();
+      if (c.notification_number) document.getElementById('notifNumber').value = c.notification_number;
+      if (c.welcome_message)     document.getElementById('welcomeMsg').value   = c.welcome_message;
+      if (c.fallback_message)    document.getElementById('fallbackMsg').value  = c.fallback_message;
+      if (c.bank_name)           document.getElementById('bankName').value      = c.bank_name;
+      if (c.account_name)        document.getElementById('accountName').value   = c.account_name;
+      if (c.account_number)      document.getElementById('accountNumber').value = c.account_number;
+      if (c.business_hours)      document.getElementById('businessHours').value = c.business_hours;
     }
-    overlay.classList.add('show');
-  }, 2000);
-
-  if (installBtn) {
-    installBtn.addEventListener('click', function() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(function(result) {
-          if (result.outcome === 'accepted') {
-            localStorage.setItem('forgebot_pwa_installed', '1');
-            overlay.classList.remove('show');
-          }
-          deferredPrompt = null;
+    if (setupR.ok) {
+      var s = await setupR.json();
+      if (s.instagram)          document.getElementById('setupInstagram').value         = s.instagram;
+      if (s.facebook)           document.getElementById('setupFacebook').value          = s.facebook;
+      if (s.tiktok)             document.getElementById('setupTiktok').value            = s.tiktok;
+      if (s.whatsapp_channel)   document.getElementById('setupWhatsappChannel').value   = s.whatsapp_channel;
+      if (s.service_areas)      document.getElementById('setupServiceAreas').value      = s.service_areas;
+      if (s.delivery_fee_local) document.getElementById('setupDeliveryFee').value       = s.delivery_fee_local;
+      if (s.delivery_time_local)document.getElementById('setupDeliveryTime').value      = s.delivery_time_local;
+      if (s.return_policy)      document.getElementById('setupReturnPolicy').value      = s.return_policy;
+      if (s.minimum_order)      document.getElementById('setupMinOrder').value          = s.minimum_order;
+      if (s.current_promo)      document.getElementById('setupPromo').value             = s.current_promo;
+      // Payment methods checkboxes
+      if (s.payment_methods) {
+        var methods = s.payment_methods.split(',').map(function(m){ return m.trim().toLowerCase(); });
+        var checkboxes = document.querySelectorAll('#paymentMethodsGrid input[type=checkbox]');
+        checkboxes.forEach(function(cb){
+          cb.checked = methods.some(function(m){ return m.includes(cb.value.toLowerCase()); });
         });
-      } else {
-        localStorage.setItem('forgebot_pwa_installed', '1');
-        overlay.classList.remove('show');
       }
-    });
-  }
-
-  if (doneBtn) {
-    doneBtn.addEventListener('click', function() {
-      localStorage.setItem('forgebot_pwa_installed', '1');
-      overlay.classList.remove('show');
-    });
-  }
-
-  if (skipBtn) {
-    skipBtn.addEventListener('click', function() {
-      overlay.classList.remove('show');
-    });
-  }
-
-  window.addEventListener('appinstalled', function() {
-    localStorage.setItem('forgebot_pwa_installed', '1');
-    overlay.classList.remove('show');
-  });
-})();
-
-// ── Service Worker + Notification Permission ──────────────────
-(function() {
-  if (!('serviceWorker' in navigator)) return;
-
-  navigator.serviceWorker.register('/sw.js').then(async function(registration) {
-    console.log('[ForgeBot] Service worker registered');
-
-    // Ask for notification permission after a short delay
-    setTimeout(async function() {
-      if (Notification.permission === 'default') {
-        var perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          console.log('[ForgeBot] Notification permission granted');
-          // Try to subscribe to push notifications if VAPID key is configured
-          tryPushSubscribe(registration);
-        }
-      } else if (Notification.permission === 'granted') {
-        tryPushSubscribe(registration);
-      }
-    }, 5000);
-
-  }).catch(function(err) {
-    console.warn('[ForgeBot] SW registration failed:', err);
-  });
-
-  async function tryPushSubscribe(registration) {
-    try {
-      // Fetch VAPID public key from server
-      var r = await fetch(API + '/api/push/vapid-key');
-      if (!r.ok) return; // VAPID not configured yet — skip
-      var data = await r.json();
-      if (!data.publicKey) return;
-
-      var existing = await registration.pushManager.getSubscription();
-      if (existing) return; // Already subscribed
-
-      var subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.publicKey)
-      });
-
-      // Send subscription to server
-      await fetch(API + '/api/push/subscribe', {
-        method: 'POST',
-        headers: H,
-        body: JSON.stringify(subscription)
-      });
-      console.log('[ForgeBot] Push subscription saved');
-    } catch(e) {
-      console.warn('[ForgeBot] Push subscribe failed:', e.message);
     }
-  }
+  } catch(e) { console.error(e); }
+}
 
-  function urlBase64ToUint8Array(base64String) {
-    var padding = '='.repeat((4 - base64String.length % 4) % 4);
-    var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    var raw     = window.atob(base64);
-    var output  = new Uint8Array(raw.length);
-    for (var i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
-    return output;
-  }
-})();
+async function saveSettings(fields, msgId) {
+  var body = {};
+  var fieldMap = {
+    notification_number: 'notifNumber',
+    bank_name:           'bankName',
+    account_name:        'accountName',
+    account_number:      'accountNumber',
+    business_hours:      'businessHours',
+    welcome_message:     'welcomeMsg',
+    fallback_message:    'fallbackMsg'
+  };
+  fields.forEach(function(f) {
+    var elId = fieldMap[f];
+    if (elId) body[f] = document.getElementById(elId).value.trim();
+  });
+  // Clean phone number
+  if (body.notification_number) body.notification_number = body.notification_number.replace(/\D/g,'');
 
+  try {
+    var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify(body) });
+    if (r.ok) showMsg(msgId || 'msgSettings','Saved!','ok');
+    else showMsg(msgId || 'msgSettings','Save failed.','err');
+  } catch(e) { showMsg(msgId || 'msgSettings','Network error.','err'); }
+}
+
+async function saveBotMessages() {
+  var welcome  = document.getElementById('welcomeMsg').value.trim();
+  var fallback = document.getElementById('fallbackMsg').value.trim();
+  try {
+    var r = await fetch(API+'/api/client/settings', {
+      method:'PUT', headers:H,
+      body: JSON.stringify({ welcome_message: welcome, fallback_message: fallback })
+    });
+    if (r.ok) showMsg('msgSettings','Messages saved!','ok');
+    else showMsg('msgSettings','Save failed.','err');
+  } catch(e) { showMsg('msgSettings','Network error.','err'); }
+}
+
+async function saveBotSetup() {
+  var checkboxes = document.querySelectorAll('#paymentMethodsGrid input[type=checkbox]:checked');
+  var methods = Array.from(checkboxes).map(function(cb){ return cb.value; }).join(',');
+
+  var body = {
+    instagram:           document.getElementById('setupInstagram').value.trim(),
+    facebook:            document.getElementById('setupFacebook').value.trim(),
+    tiktok:              document.getElementById('setupTiktok').value.trim(),
+    whatsapp_channel:    document.getElementById('setupWhatsappChannel').value.trim(),
+    service_areas:       document.getElementById('setupServiceAreas').value.trim(),
+    delivery_fee_local:  document.getElementById('setupDeliveryFee').value.trim(),
+    delivery_time_local: document.getElementById('setupDeliveryTime').value.trim(),
+    return_policy:       document.getElementById('setupReturnPolicy').value.trim(),
+    minimum_order:       document.getElementById('setupMinOrder').value.trim(),
+    current_promo:       document.getElementById('setupPromo').value.trim(),
+    payment_methods:     methods
+  };
+
+  try {
+    var r = await fetch(API+'/api/client/bot-setup', { method:'PUT', headers:H, body:JSON.stringify(body) });
+    if (r.ok) showMsg('msgSettings','Bot setup saved! Your bot will use this info immediately.','ok');
+    else showMsg('msgSettings','Save failed.','err');
+  } catch(e) { showMsg('msgSettings','Network error.','err'); }
+}
+
+// ── Utility ────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ── QR Code ────────────────────────────────────────────────────
+var qrEventSource = null;
+
+function showQR() {
+  document.getElementById('qrArea').style.display = 'block';
+  document.getElementById('qrBtn').style.display  = 'none';
+  document.getElementById('qrStatus').textContent = 'Connecting to WhatsApp...';
+  document.getElementById('qrCanvas').innerHTML   = '';
+
+  if (qrEventSource) qrEventSource.close();
+  qrEventSource = new EventSource(API + '/api/client/qr-stream?token=' + TOKEN);
+
+  qrEventSource.addEventListener('qr', function(e) {
+    var data = JSON.parse(e.data);
+    document.getElementById('qrStatus').textContent = 'Scan this QR code with your WhatsApp';
+    // Use qrcode.js to render the QR
+    var canvas = document.createElement('canvas');
+    document.getElementById('qrCanvas').innerHTML = '';
+    document.getElementById('qrCanvas').appendChild(canvas);
+    if (window.QRCode) {
+      new QRCode(canvas, { text: data.qr, width: 240, height: 240 });
+    } else {
+      // Fallback: show as image via goqr.me API
+      var img = document.createElement('img');
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(data.qr);
+      img.style.width  = '240px';
+      img.style.height = '240px';
+      document.getElementById('qrCanvas').innerHTML = '';
+      document.getElementById('qrCanvas').appendChild(img);
+    }
+  });
+
+  qrEventSource.addEventListener('connected', function() {
+    document.getElementById('qrStatus').textContent = '✅ WhatsApp connected successfully!';
+    document.getElementById('qrCanvas').innerHTML = '<div style="font-size:3rem;padding:40px">✅</div>';
+    document.getElementById('waBadge').textContent = '● Connected';
+    document.getElementById('waBadge').className   = 'status-badge';
+    var dot = document.getElementById('waStatusDot');
+    if (dot) dot.textContent = '✅ WhatsApp is connected';
+    setTimeout(hideQR, 2500);
+  });
+
+  qrEventSource.addEventListener('disconnected', function() {
+    document.getElementById('qrStatus').textContent = 'Disconnected. Click "Show QR Code" to reconnect.';
+    hideQR();
+  });
+
+  qrEventSource.onerror = function() {
+    document.getElementById('qrStatus').textContent = 'Connection error. Please try again.';
+    document.getElementById('qrBtn').style.display = 'block';
+  };
+}
+
+function hideQR() {
+  document.getElementById('qrArea').style.display = 'none';
+  document.getElementById('qrBtn').style.display  = 'block';
+  if (qrEventSource) { qrEventSource.close(); qrEventSource = null; }
+}
+
+// ── Start ──────────────────────────────────────────────────────
 loadAll();
 </script>
 </body>
