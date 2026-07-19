@@ -26,17 +26,14 @@ function adminSecret() {
 
 // ── Admin auth middleware ─────────────────────────────────────
 function adminAuth(req, res, next) {
-  // Method 1: Bearer JWT
   var authHeader = req.headers['authorization'] || '';
   if (authHeader.startsWith('Bearer ')) {
     try { jwt.verify(authHeader.slice(7), adminSecret()); return next(); } catch (e) {}
   }
-  // Method 2: x-admin-token header
   var xToken = req.headers['x-admin-token'];
   if (xToken) {
     try { jwt.verify(xToken, adminSecret()); return next(); } catch (e) {}
   }
-  // Method 3: Legacy email/password headers
   var email   = (req.headers['email']    || '').trim().toLowerCase();
   var pass    = (req.headers['password'] || '').trim();
   if (email && email === (process.env.ADMIN_EMAIL || '').toLowerCase() && pass === (process.env.ADMIN_PASSWORD || '')) {
@@ -188,9 +185,9 @@ router.post('/partners', adminAuth, async function(req, res) {
 
     var result = await sb.from('clients').insert({
       business_name:       business_name,
-      full_name:           business_name,   // required NOT NULL — use business name
+      full_name:           business_name,    // required NOT NULL
       email:               email,
-      whatsapp_number:     whatsapp_number,
+      whatsapp_number:     whatsapp_number,  // correct column name (not phone)
       occupation:          occupation,
       password_hash:       hashedPw,
       status:              'active',
@@ -203,7 +200,6 @@ router.post('/partners', adminAuth, async function(req, res) {
 
     if (result.error) throw new Error(result.error.message);
 
-    // Audit log (non-fatal)
     await sb.from('partner_log').insert({
       client_id: result.data.id,
       action:    'created',
