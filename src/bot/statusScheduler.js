@@ -1,12 +1,18 @@
+// ============================================================
+//  ForgeBot — Status Post Scheduler
+//  File location: src/bot/statusScheduler.js
+// ============================================================
+
+'use strict';
+
 const cron = require('node-cron');
-const { getCaption } = require('./captions');
+const { createClient } = require('@supabase/supabase-js');
 const { sessions } = require('../sessions/sessionManager');
 
-// ── Lazy Supabase ─────────────────────────────────────────────────────────────
+// ── Lazy Supabase init ────────────────────────────────────────
 let _supabase = null;
 function getSupabase() {
   if (!_supabase) {
-    const { createClient } = require('@supabase/supabase-js');
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
     if (!url || !key) throw new Error('Supabase env vars missing');
@@ -15,7 +21,7 @@ function getSupabase() {
   return _supabase;
 }
 
-// ── Nigerian Business Memes (rotate weekly) ──────────────────────────────────
+// ── Nigerian Business Memes (rotate weekly) ───────────────────
 const MEMES = [
   "Me before ForgeBot: reading 200 unread WhatsApp messages at midnight 😭\nMe after ForgeBot: sleeping peacefully while bot closes sales 🤖💰 #SmallBusinessNaija",
   "Customer: Are you available?\nMe at 3am: 💤💤💤\nForgeBot: YES! We are open 24/7! How can I help you today? 😊\n\nThis bot dey do pass me 😭🔥 #ForgeBot",
@@ -40,17 +46,21 @@ const MEMES = [
 ];
 
 function getWeeklyMeme() {
-  const weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  var weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
   return MEMES[weekNumber % MEMES.length];
 }
 
-// ── Post status for a single client ──────────────────────────────────────────
+// ── Post status for a single client ──────────────────────────
 async function postStatus(clientId, mediaUrl, caption) {
-  const sock = sessions.get(clientId);
+  var sock = sessions.get(clientId);
   if (!sock) return;
+
   try {
     if (mediaUrl) {
-      await sock.sendMessage('status@broadcast', { image: { url: mediaUrl }, caption: caption || '' });
+      await sock.sendMessage('status@broadcast', {
+        image: { url: mediaUrl },
+        caption: caption || ''
+      });
     } else {
       await sock.sendMessage('status@broadcast', { text: caption });
     }
@@ -60,36 +70,58 @@ async function postStatus(clientId, mediaUrl, caption) {
   }
 }
 
-// ── Main scheduler ────────────────────────────────────────────────────────────
+// ── Check if today matches the post's scheduled days ─────────
+// Handles: null (= every day), "Mon,Wed,Fri", "Mon", etc.
+function isDueToday(scheduledDays, todayAbbr) {
+  if (!scheduledDays) return true; // no day restriction = every day
+  var parts = scheduledDays.split(',').map(function(d) { return d.trim(); });
+  return parts.indexOf(todayAbbr) !== -1;
+}
+
+// ── Main scheduler: runs every minute ────────────────────────
 function startScheduler() {
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('* * * * *', async function() {
     try {
-      const supabase = getSupabase();
-      const now = new Date();
-      const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const today = dayNames[now.getDay()];
-      const todayDate = now.toISOString().split('T')[0];
+      var sb  = getSupabase();
+      var now = new Date();
+      var timeStr  = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      var days     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var today    = days[now.getDay()];
+      var todayDate = now.toISOString().split('T')[0];
 
-      // Use post_time — the actual column name in status_posts table
-      const { data: duePosts, error } = await supabase
+      // Fetch posts due at this time, joining the client record
+      var result = await sb
         .from('status_posts')
-        .select('*, clients(*)')
-        .eq('post_time', timeStr)
-        .ilike('days', '%' + today + '%');
+        .select('*, clients(id, status, subscription_active, business_type)')
+        .eq('post_time', timeStr);
 
-      if (error) throw error;
-      if (!duePosts || duePosts.length === 0) return;
+      if (result.error) {
+        console.error('[StatusScheduler] Query error:', result.error.message);
+        return;
+      }
 
-      for (const post of duePosts) {
+      var posts = result.data || [];
+
+      for (var i = 0; i < posts.length; i++) {
+        var post = posts[i];
+
+        // Skip if already posted today
         if (post.last_posted_date === todayDate) continue;
-        const client = post.clients;
+
+        // Check scheduled days (column may be scheduled_days or a null for every day)
+        var dayField = post.scheduled_days || post.days || null;
+        if (!isDueToday(dayField, today)) continue;
+
+        // Check client is active
+        var client = post.clients;
         if (!client || client.status !== 'active' || !client.subscription_active) continue;
 
-        const caption = post.caption || getCaption(client.business_type || 'general');
+        // Post the status
+        var caption = post.caption || null;
         await postStatus(client.id, post.media_url, caption);
 
-        await supabase
+        // Mark as posted today
+        await sb
           .from('status_posts')
           .update({ last_posted_date: todayDate })
           .eq('id', post.id);
@@ -99,29 +131,30 @@ function startScheduler() {
     }
   });
 
-  // ── Weekly meme: every Sunday at 8:00pm ──────────────────────────────────
-  cron.schedule('0 20 * * 0', async () => {
+  // ── Weekly meme: every Sunday at 8:00pm ──────────────────
+  cron.schedule('0 20 * * 0', async function() {
     console.log('[StatusScheduler] Posting weekly meme to all active clients...');
     try {
-      const supabase = getSupabase();
-      const { data: clients, error } = await supabase
+      var sb     = getSupabase();
+      var result = await sb
         .from('clients')
-        .select('*')
+        .select('id')
         .eq('status', 'active')
         .eq('subscription_active', true);
 
-      if (error) throw error;
-      if (!clients || clients.length === 0) return;
+      if (result.error) throw new Error(result.error.message);
 
-      const meme = getWeeklyMeme();
-      for (const client of clients) {
-        const sock = sessions.get(client.id);
+      var meme    = getWeeklyMeme();
+      var clients = result.data || [];
+
+      for (var i = 0; i < clients.length; i++) {
+        var sock = sessions.get(clients[i].id);
         if (!sock) continue;
         try {
           await sock.sendMessage('status@broadcast', { text: meme });
-          console.log('[StatusScheduler] Weekly meme posted for client ' + client.id);
+          console.log('[StatusScheduler] Weekly meme posted for client ' + clients[i].id);
         } catch (err) {
-          console.error('[StatusScheduler] Meme failed for client ' + client.id + ':', err.message);
+          console.error('[StatusScheduler] Meme failed for client ' + clients[i].id + ':', err.message);
         }
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
