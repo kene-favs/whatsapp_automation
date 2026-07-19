@@ -63,23 +63,6 @@ input:focus,select:focus{border-color:var(--green)}
 .form-btn:disabled{background:#374151;color:#64748b;cursor:not-allowed}
 .err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
 .err.show{display:block}
-/* Early Adopters */
-.early{padding:0 20px 60px;max-width:700px;margin:0 auto;text-align:center}
-.early-box{background:#0d1526;border:1px solid rgba(34,197,94,.25);border-radius:14px;padding:28px 24px}
-.early-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;padding:5px 14px;border-radius:100px;margin-bottom:14px}
-.early-title{font-size:1.15rem;font-weight:800;color:#f1f5f9;margin-bottom:6px}
-.early-sub{font-size:.82rem;color:#64748b;margin-bottom:20px}
-.early-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left}
-.early-feat{background:#111827;border:1px solid #1e2d3d;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
-.early-feat-icon{font-size:1.4rem;flex-shrink:0}
-.early-feat-name{font-size:.85rem;font-weight:700;color:#e2e8f0}
-.modal-early{background:#0a1628;border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px 16px;margin-top:16px}
-.modal-early-badge{display:inline-block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:100px;margin-bottom:8px}
-.modal-early-title{font-size:.82rem;font-weight:700;color:#f1f5f9;margin-bottom:3px}
-.modal-early-sub{font-size:.73rem;color:#64748b;margin-bottom:10px}
-.modal-early-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.modal-early-item{font-size:.73rem;color:#94a3b8;display:flex;align-items:center;gap:6px}
-.modal-early-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;flex-shrink:0;opacity:.7}
 .pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
 .pay-card{background:#0d1526;border:2px solid var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:.2s}
 .pay-card:hover,.pay-card.selected{border-color:var(--green)}
@@ -170,20 +153,6 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
   </div>
 </div>
 
-<div class="early">
-  <div class="early-box">
-    <div class="early-badge">🏷️ Early Adopters Only</div>
-    <div class="early-title">Join now — get all future upgrades FREE forever</div>
-    <div class="early-sub">4 features coming soon. Founding members pay nothing extra.</div>
-    <div class="early-grid">
-      <div class="early-feat"><div class="early-feat-icon">🧾</div><div class="early-feat-name">Fake Receipt Detection</div></div>
-      <div class="early-feat"><div class="early-feat-icon">📱</div><div class="early-feat-name">Social Media Bot</div></div>
-      <div class="early-feat"><div class="early-feat-icon">🚫</div><div class="early-feat-name">Fraud Blacklist</div></div>
-      <div class="early-feat"><div class="early-feat-icon">🎬</div><div class="early-feat-name">AI Video Creator</div></div>
-    </div>
-  </div>
-</div>
-
 <footer>
   <div style="font-size:1rem;font-weight:700;color:var(--green);margin-bottom:6px">ForgeBot by TheFavsForge</div>
   WhatsApp Automation for Nigerian Businesses &nbsp;|&nbsp; support@thefavsforge.com
@@ -203,7 +172,7 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
         <div class="step-dot" id="dot3"></div>
       </div>
 
-      <!-- STEP 1: Account details -->
+      <!-- STEP 1: Account + Bank Details -->
       <div id="step1">
         <label>Full Name</label>
         <input id="fullName" placeholder="Your full name"/>
@@ -235,6 +204,21 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
           <option value="other">Other (International)</option>
         </select>
 
+        <div style="border-top:1px solid #1e2d3d;margin:16px 0 4px"></div>
+        <p style="font-size:.78rem;color:#22c55e;margin-top:6px;font-weight:600">&#128176; Payment Collection Details</p>
+        <p style="font-size:.75rem;color:#64748b;margin-top:3px">Your bot will automatically send these when customers ask how to pay you.</p>
+
+        <label>Bank Name</label>
+        <input id="bankName" placeholder="e.g. GTBank, Access Bank, Zenith Bank"/>
+
+        <label>Account Number</label>
+        <input id="accountNumber" placeholder="10-digit account number" type="tel" maxlength="10"/>
+
+        <label>Account Name</label>
+        <input id="accountName" placeholder="Name on your bank account"/>
+
+        <div style="border-top:1px solid #1e2d3d;margin:16px 0 4px"></div>
+
         <label>Email Address</label>
         <input id="signupEmail" type="email" placeholder="your@email.com"/>
 
@@ -258,17 +242,6 @@ footer{background:#111827;border-top:1px solid var(--border);padding:24px;text-a
             <div class="flag">&#127758; International</div>
             <div class="amount">$45</div>
             <div class="monthly">+ $10/month</div>
-          </div>
-        </div>
-        <div class="modal-early">
-          <div class="modal-early-badge">🏷️ Early Adopters Only</div>
-          <div class="modal-early-title">Join now — get all future upgrades FREE forever</div>
-          <div class="modal-early-sub">Founding members get these 4 upcoming features at no extra cost:</div>
-          <div class="modal-early-grid">
-            <div class="modal-early-item"><div class="modal-early-dot"></div>🧾 Fake Receipt Detection</div>
-            <div class="modal-early-item"><div class="modal-early-dot"></div>📱 Social Media Bot</div>
-            <div class="modal-early-item"><div class="modal-early-dot"></div>🚫 Fraud Blacklist</div>
-            <div class="modal-early-item"><div class="modal-early-dot"></div>🎬 AI Video Creator</div>
           </div>
         </div>
         <div class="err" id="errStep2"></div>
@@ -333,20 +306,30 @@ function showErr(id, msg) {
 }
 
 function goStep2() {
-  var fullName = document.getElementById('fullName').value.trim();
-  var businessName = document.getElementById('businessName').value.trim();
-  var waNumber = document.getElementById('waNumber').value.trim().replace(/\D/g, '');
-  var notifNumber = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
-  var email = document.getElementById('signupEmail').value.trim();
-  var password = document.getElementById('signupPassword').value;
+  var fullName      = document.getElementById('fullName').value.trim();
+  var businessName  = document.getElementById('businessName').value.trim();
+  var waNumber      = document.getElementById('waNumber').value.trim().replace(/\D/g, '');
+  var notifNumber   = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
+  var bankName      = document.getElementById('bankName').value.trim();
+  var accountNumber = document.getElementById('accountNumber').value.trim().replace(/\D/g, '');
+  var accountName   = document.getElementById('accountName').value.trim();
+  var email         = document.getElementById('signupEmail').value.trim();
+  var password      = document.getElementById('signupPassword').value;
+
   if (!fullName || !businessName || !waNumber || !email || !password) {
-    showErr('errStep1', 'Please fill in all fields.'); return;
-  }
-  if (password.length < 8) {
-    showErr('errStep1', 'Password must be at least 8 characters.'); return;
+    showErr('errStep1', 'Please fill in all required fields.'); return;
   }
   if (!notifNumber) {
     showErr('errStep1', 'Please enter your personal WhatsApp number for bot alerts.'); return;
+  }
+  if (!bankName || !accountNumber || !accountName) {
+    showErr('errStep1', 'Please enter your bank details so the bot can send payment info to customers.'); return;
+  }
+  if (accountNumber.length !== 10) {
+    showErr('errStep1', 'Account number must be exactly 10 digits.'); return;
+  }
+  if (password.length < 8) {
+    showErr('errStep1', 'Password must be at least 8 characters.'); return;
   }
   goStep(2);
 }
@@ -368,14 +351,17 @@ async function processPayment() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        full_name: document.getElementById('fullName').value.trim(),
-        business_name: document.getElementById('businessName').value.trim(),
-        business_type: document.getElementById('businessType').value,
-        whatsapp_number: document.getElementById('waNumber').value.trim().replace(/\D/g, ''),
+        full_name:           document.getElementById('fullName').value.trim(),
+        business_name:       document.getElementById('businessName').value.trim(),
+        business_type:       document.getElementById('businessType').value,
+        whatsapp_number:     document.getElementById('waNumber').value.trim().replace(/\D/g, ''),
         notification_number: document.getElementById('notifNumber').value.trim().replace(/\D/g, ''),
-        country: document.getElementById('country').value,
-        email: document.getElementById('signupEmail').value.trim(),
-        password: document.getElementById('signupPassword').value
+        country:             document.getElementById('country').value,
+        bank_name:           document.getElementById('bankName').value.trim(),
+        account_number:      document.getElementById('accountNumber').value.trim().replace(/\D/g, ''),
+        account_name:        document.getElementById('accountName').value.trim(),
+        email:               document.getElementById('signupEmail').value.trim(),
+        password:            document.getElementById('signupPassword').value
       })
     });
     var signupData = await signupResp.json();
