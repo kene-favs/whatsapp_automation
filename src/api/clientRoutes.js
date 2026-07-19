@@ -97,7 +97,6 @@ async function checkPartnerExpiry(clientId) {
 //  PUBLIC ROUTES — MUST be before router.use('/client', auth …)
 // ══════════════════════════════════════════════════════════════
 
-// helper: activate a pending client account
 async function activateClient(clientId) {
   var sb = _supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   await sb.from('clients').update({ status: 'active', trial_notified: false }).eq('id', clientId);
@@ -108,54 +107,36 @@ router.post('/client/signup', async function(req, res) {
   try {
     var { email, full_name, whatsapp_number, plan, ref } = req.body;
     if (!email || !full_name || !whatsapp_number) return res.status(400).json({ error: 'email, full_name, and whatsapp_number are required' });
-
     var sb   = getSupabase();
     var hash = await bcrypt.hash('forgebot2025', 10);
-
     var insert = await sb.from('clients').insert({
-      email:           email,
-      full_name:       full_name,
-      whatsapp_number: whatsapp_number,
-      password_hash:   hash,
-      status:          'pending',
-      plan:            plan || 'monthly',
-      referred_by:     ref || null,
-      trial_notified:  false,
-      setup_completed: false
+      email: email, full_name: full_name, whatsapp_number: whatsapp_number,
+      password_hash: hash, status: 'pending', plan: plan || 'monthly',
+      referred_by: ref || null, trial_notified: false, setup_completed: false
     }).select('id').single();
-
     if (insert.error) throw new Error(insert.error.message);
     var clientId = insert.data.id;
-
     var amount = (plan === 'yearly') ? 24000 : 2500;
     var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
-    var txRef  = 'FB-' + clientId + '-' + Date.now();
-
     var flwRes;
     try {
       flwRes = await axios.post('https://api.flutterwave.com/v3/payments', {
-        tx_ref:       txRef,
-        amount:       amount,
-        currency:     'NGN',
+        tx_ref: 'FB-' + clientId + '-' + Date.now(), amount: amount, currency: 'NGN',
         redirect_url: appUrl + '/api/client/pay/callback',
-        customer:     { email: email, name: full_name, phonenumber: whatsapp_number },
-        meta:         { client_id: clientId },
+        customer: { email: email, name: full_name, phonenumber: whatsapp_number },
+        meta: { client_id: clientId },
         customizations: { title: 'ForgeBot Subscription', logo: appUrl + '/icons/icon-192.png' }
       }, { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } });
     } catch (e) {
       await sb.from('clients').delete().eq('id', clientId);
       return res.status(502).json({ error: 'Payment gateway unavailable. Please try again.' });
     }
-
     if (!flwRes.data || flwRes.data.status !== 'success') {
       await sb.from('clients').delete().eq('id', clientId);
       return res.status(502).json({ error: 'Could not create payment link. Please try again.' });
     }
-
     res.json({ payment_url: flwRes.data.data.link });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/client/login
@@ -163,25 +144,19 @@ router.post('/client/login', async function(req, res) {
   try {
     var { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-
-    var sb     = getSupabase();
+    var sb = getSupabase();
     var result = await sb.from('clients').select('*').eq('email', email).single();
     if (result.error || !result.data) return res.status(401).json({ error: 'Invalid credentials' });
-
     var client = result.data;
     if (client.status !== 'active') return res.status(403).json({ error: 'Account not yet active. Complete payment first.' });
-
     var match = await bcrypt.compare(password, client.password_hash);
     if (!match) return res.status(401).json({ error: 'Invalid credentials' });
-
     var token = jwt.sign({ id: client.id, clientId: client.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ token: token, client: { id: client.id, full_name: client.full_name, email: client.email } });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/client/qr-stream  — PUBLIC (EventSource cannot send headers)
+// GET /api/client/qr-stream — PUBLIC (EventSource cannot send auth headers)
 router.get('/client/qr-stream', async function(req, res) {
   var token = req.query.token;
   var clientId;
@@ -204,20 +179,12 @@ router.get('/client/qr-stream', async function(req, res) {
     try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
   }
 
-  // Heartbeat every 20s to survive Railway's 30s idle timeout
+  // Heartbeat every 20s — keeps Railway's 30s idle timeout from killing the connection
   var heartbeat = setInterval(function() {
     try { res.write(':heartbeat\n\n'); } catch (e) {}
   }, 20000);
 
-  // Already connected?
-  var existingSock = global.getSock && global.getSock(clientId);
-  if (existingSock) {
-    sendEvent('connected', { status: 'connected' });
-    clearInterval(heartbeat);
-    res.end();
-    return;
-  }
-
+  // Register this SSE client in the global listeners map
   var listeners = global.qrListeners.get(clientId) || [];
   listeners.push(sendEvent);
   global.qrListeners.set(clientId, listeners);
@@ -228,27 +195,9 @@ router.get('/client/qr-stream', async function(req, res) {
     global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
   });
 
+  // Start (or wake up) the session — sessionManager broadcasts directly to qrListeners
   try {
-    await sessionManager.startSession(clientId, {
-      onQR: function(qr) {
-        var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { fn('qr', { qr: qr }); });
-      },
-      onConnected: function() {
-        var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { fn('connected', { status: 'connected' }); });
-        global.qrListeners.delete(clientId);
-      },
-      onDisconnected: function(isStale) {
-        // isStale = true means sessionManager wiped creds and is restarting automatically.
-        // In that case, stay silent — the next QR will arrive through qrListeners shortly.
-        // Only forward 'disconnected' if it's a genuine post-scan disconnect (user was already connected).
-        if (!isStale) {
-          var all = global.qrListeners.get(clientId) || [];
-          all.forEach(function(fn) { fn('disconnected', { status: 'disconnected' }); });
-        }
-      }
-    });
+    await sessionManager.startSession(clientId);
   } catch (e) {
     sendEvent('error', { message: 'Failed to start WhatsApp session. Please refresh and try again.' });
     clearInterval(heartbeat);
@@ -261,33 +210,22 @@ router.get('/client/pay/callback', async function(req, res) {
   try {
     var { status, tx_ref, transaction_id } = req.query;
     var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
-
-    if (status !== 'successful' || !transaction_id) {
-      return res.redirect(appUrl + '/?payment=failed');
-    }
-
+    if (status !== 'successful' || !transaction_id) return res.redirect(appUrl + '/?payment=failed');
     var verify;
     try {
       verify = await axios.get('https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify', {
         headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY }
       });
-    } catch (e) {
-      return res.redirect(appUrl + '/?payment=failed');
-    }
-
+    } catch (e) { return res.redirect(appUrl + '/?payment=failed'); }
     var txData = verify.data && verify.data.data;
     if (!txData || txData.status !== 'successful') return res.redirect(appUrl + '/?payment=failed');
-
     var clientId = txData.meta && txData.meta.client_id;
     if (!clientId) return res.redirect(appUrl + '/?payment=failed');
-
     await activateClient(clientId);
-
     var token = jwt.sign({ id: clientId, clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     return res.redirect(appUrl + '/onboard?activated=1&token=' + token);
   } catch (e) {
-    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
-    return res.redirect(appUrl + '/?payment=error');
+    return res.redirect((process.env.APP_URL || 'https://forgebot.up.railway.app') + '/?payment=error');
   }
 });
 
@@ -296,16 +234,13 @@ router.post('/client/pay/webhook', async function(req, res) {
   try {
     var hash = req.headers['verif-hash'];
     if (!hash || hash !== process.env.FLW_HASH) return res.status(401).json({ error: 'Unauthorized' });
-
     var { event, data } = req.body;
     if (event === 'charge.completed' && data && data.status === 'successful') {
       var clientId = data.meta && data.meta.client_id;
       if (clientId) await activateClient(clientId);
     }
     res.json({ status: 'ok' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/push/vapid-key
@@ -320,20 +255,14 @@ router.post('/push/subscribe', async function(req, res) {
     if (!subscription || !cid) return res.status(400).json({ error: 'subscription and clientId required' });
     var sb = getSupabase();
     await sb.from('push_subscriptions').upsert({
-      client_id:    cid,
-      subscription: JSON.stringify(subscription),
-      updated_at:   new Date().toISOString()
+      client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString()
     }, { onConflict: 'client_id' });
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/push/test
-router.post('/push/test', function(req, res) {
-  res.json({ ok: true });
-});
+router.post('/push/test', function(req, res) { res.json({ ok: true }); });
 
 // ── Apply auth + partner check to all client routes ───────────
 router.use('/client', auth, async function(req, res, next) {
@@ -842,7 +771,6 @@ router.put('/client/qualification-toggle', async function(req, res) {
 
 // ── Bot Setup ─────────────────────────────────────────────────────────────────
 
-// PUT /api/client/bot-setup  — saves questionnaire answers from onboard.html
 router.put('/client/bot-setup', async function(req, res) {
   try {
     var sb       = getSupabase();
@@ -865,46 +793,28 @@ router.put('/client/bot-setup', async function(req, res) {
     }
 
     var setupData = {
-      client_id:           clientId,
-      availability_days:   availability_days   || null,
-      payment_methods:     payment_methods     || null,
-      current_promo:       current_promo       || null,
-      instagram:           instagram           || null,
-      facebook:            facebook            || null,
-      tiktok:              tiktok              || null,
-      whatsapp_channel:    whatsapp_channel    || null,
-      service_areas:       service_areas       || null,
-      studio_location:     studio_location     || null,
-      home_service:        home_service        || null,
-      advance_booking:     advance_booking     || null,
-      deposit_required:    deposit_required    || null,
-      session_duration:    session_duration    || null,
-      who_do_you_serve:    who_do_you_serve    || null,
-      free_consult:        free_consult        || null,
-      return_policy:       return_policy       || null,
-      delivers_to:         delivers_to         || null,
-      delivery_fee_local:  delivery_fee_local  || null,
-      delivery_time_local: delivery_time_local || null,
-      minimum_order:       minimum_order       || null,
-      bulk_orders:         bulk_orders         || null,
-      updated_at:          new Date().toISOString()
+      client_id: clientId,
+      availability_days: availability_days || null,
+      payment_methods: payment_methods || null,
+      current_promo: current_promo || null,
+      instagram: instagram || null, facebook: facebook || null,
+      tiktok: tiktok || null, whatsapp_channel: whatsapp_channel || null,
+      service_areas: service_areas || null, studio_location: studio_location || null,
+      home_service: home_service || null, advance_booking: advance_booking || null,
+      deposit_required: deposit_required || null, session_duration: session_duration || null,
+      who_do_you_serve: who_do_you_serve || null, free_consult: free_consult || null,
+      return_policy: return_policy || null, delivers_to: delivers_to || null,
+      delivery_fee_local: delivery_fee_local || null, delivery_time_local: delivery_time_local || null,
+      minimum_order: minimum_order || null, bulk_orders: bulk_orders || null,
+      updated_at: new Date().toISOString()
     };
+    Object.keys(setupData).forEach(function(k) { if (setupData[k] === undefined) delete setupData[k]; });
 
-    // Remove undefined keys
-    Object.keys(setupData).forEach(function(k) {
-      if (setupData[k] === undefined) delete setupData[k];
-    });
-
-    var { error } = await sb.from('bot_setup')
-      .upsert(setupData, { onConflict: 'client_id' });
+    var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
     if (error) throw new Error(error.message);
-
     await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
-
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
