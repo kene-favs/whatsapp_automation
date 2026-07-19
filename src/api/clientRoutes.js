@@ -94,7 +94,7 @@ async function checkPartnerExpiry(clientId) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  PUBLIC ROUTES — MUST be before router.use('/client', auth …)
+//  PUBLIC ROUTES — before router.use('/client', auth …)
 // ══════════════════════════════════════════════════════════════
 
 async function activateClient(clientId) {
@@ -102,7 +102,6 @@ async function activateClient(clientId) {
   await sb.from('clients').update({ status: 'active', trial_notified: false }).eq('id', clientId);
 }
 
-// POST /api/client/signup
 router.post('/client/signup', async function(req, res) {
   try {
     var { email, full_name, whatsapp_number, plan, ref } = req.body;
@@ -139,7 +138,6 @@ router.post('/client/signup', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/login
 router.post('/client/login', async function(req, res) {
   try {
     var { email, password } = req.body;
@@ -163,9 +161,7 @@ router.get('/client/qr-stream', async function(req, res) {
   try {
     var decoded = jwt.verify(token, process.env.JWT_SECRET);
     clientId = decoded.clientId || decoded.id;
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
+  } catch (e) { return res.status(401).json({ error: 'Invalid token' }); }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -179,12 +175,10 @@ router.get('/client/qr-stream', async function(req, res) {
     try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
   }
 
-  // Heartbeat every 20s — keeps Railway's 30s idle timeout from killing the connection
   var heartbeat = setInterval(function() {
     try { res.write(':heartbeat\n\n'); } catch (e) {}
   }, 20000);
 
-  // Register this SSE client in the global listeners map
   var listeners = global.qrListeners.get(clientId) || [];
   listeners.push(sendEvent);
   global.qrListeners.set(clientId, listeners);
@@ -195,7 +189,6 @@ router.get('/client/qr-stream', async function(req, res) {
     global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
   });
 
-  // Start (or wake up) the session — sessionManager broadcasts directly to qrListeners
   try {
     await sessionManager.startSession(clientId);
   } catch (e) {
@@ -205,7 +198,6 @@ router.get('/client/qr-stream', async function(req, res) {
   }
 });
 
-// GET /api/client/pay/callback
 router.get('/client/pay/callback', async function(req, res) {
   try {
     var { status, tx_ref, transaction_id } = req.query;
@@ -224,12 +216,9 @@ router.get('/client/pay/callback', async function(req, res) {
     await activateClient(clientId);
     var token = jwt.sign({ id: clientId, clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     return res.redirect(appUrl + '/onboard?activated=1&token=' + token);
-  } catch (e) {
-    return res.redirect((process.env.APP_URL || 'https://forgebot.up.railway.app') + '/?payment=error');
-  }
+  } catch (e) { return res.redirect((process.env.APP_URL || 'https://forgebot.up.railway.app') + '/?payment=error'); }
 });
 
-// POST /api/client/pay/webhook
 router.post('/client/pay/webhook', async function(req, res) {
   try {
     var hash = req.headers['verif-hash'];
@@ -243,25 +232,16 @@ router.post('/client/pay/webhook', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/push/vapid-key
-router.get('/push/vapid-key', function(req, res) {
-  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
-});
-
-// POST /api/push/subscribe
+router.get('/push/vapid-key', function(req, res) { res.json({ publicKey: process.env.VAPID_PUBLIC_KEY }); });
 router.post('/push/subscribe', async function(req, res) {
   try {
     var { subscription, clientId: cid } = req.body;
     if (!subscription || !cid) return res.status(400).json({ error: 'subscription and clientId required' });
     var sb = getSupabase();
-    await sb.from('push_subscriptions').upsert({
-      client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString()
-    }, { onConflict: 'client_id' });
+    await sb.from('push_subscriptions').upsert({ client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString() }, { onConflict: 'client_id' });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// POST /api/push/test
 router.post('/push/test', function(req, res) { res.json({ ok: true }); });
 
 // ── Apply auth + partner check to all client routes ───────────
@@ -769,47 +749,24 @@ router.put('/client/qualification-toggle', async function(req, res) {
 });
 
 
-// ── Bot Setup ─────────────────────────────────────────────────────────────────
-
 router.put('/client/bot-setup', async function(req, res) {
   try {
-    var sb       = getSupabase();
-    var clientId = req.clientId;
-    var {
-      occupation, occupation_data,
-      availability_days, payment_methods, current_promo,
-      instagram, facebook, tiktok, whatsapp_channel,
-      service_areas, studio_location, home_service,
-      advance_booking, deposit_required, session_duration,
-      who_do_you_serve, free_consult,
-      return_policy, delivers_to, delivery_fee_local,
-      delivery_time_local, minimum_order, bulk_orders
-    } = req.body;
-
-    if (occupation) {
-      await sb.from('clients')
-        .update({ occupation: occupation, occupation_data: occupation_data || {} })
-        .eq('id', clientId);
-    }
-
-    var setupData = {
-      client_id: clientId,
-      availability_days: availability_days || null,
-      payment_methods: payment_methods || null,
-      current_promo: current_promo || null,
-      instagram: instagram || null, facebook: facebook || null,
-      tiktok: tiktok || null, whatsapp_channel: whatsapp_channel || null,
-      service_areas: service_areas || null, studio_location: studio_location || null,
-      home_service: home_service || null, advance_booking: advance_booking || null,
-      deposit_required: deposit_required || null, session_duration: session_duration || null,
-      who_do_you_serve: who_do_you_serve || null, free_consult: free_consult || null,
-      return_policy: return_policy || null, delivers_to: delivers_to || null,
-      delivery_fee_local: delivery_fee_local || null, delivery_time_local: delivery_time_local || null,
-      minimum_order: minimum_order || null, bulk_orders: bulk_orders || null,
-      updated_at: new Date().toISOString()
-    };
+    var sb = getSupabase(); var clientId = req.clientId;
+    var { occupation, occupation_data, availability_days, payment_methods, current_promo,
+      instagram, facebook, tiktok, whatsapp_channel, service_areas, studio_location,
+      home_service, advance_booking, deposit_required, session_duration, who_do_you_serve,
+      free_consult, return_policy, delivers_to, delivery_fee_local, delivery_time_local,
+      minimum_order, bulk_orders } = req.body;
+    if (occupation) await sb.from('clients').update({ occupation: occupation, occupation_data: occupation_data || {} }).eq('id', clientId);
+    var setupData = { client_id: clientId, availability_days: availability_days||null, payment_methods: payment_methods||null,
+      current_promo: current_promo||null, instagram: instagram||null, facebook: facebook||null, tiktok: tiktok||null,
+      whatsapp_channel: whatsapp_channel||null, service_areas: service_areas||null, studio_location: studio_location||null,
+      home_service: home_service||null, advance_booking: advance_booking||null, deposit_required: deposit_required||null,
+      session_duration: session_duration||null, who_do_you_serve: who_do_you_serve||null, free_consult: free_consult||null,
+      return_policy: return_policy||null, delivers_to: delivers_to||null, delivery_fee_local: delivery_fee_local||null,
+      delivery_time_local: delivery_time_local||null, minimum_order: minimum_order||null, bulk_orders: bulk_orders||null,
+      updated_at: new Date().toISOString() };
     Object.keys(setupData).forEach(function(k) { if (setupData[k] === undefined) delete setupData[k]; });
-
     var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
     if (error) throw new Error(error.message);
     await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
