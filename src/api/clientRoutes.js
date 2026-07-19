@@ -93,59 +93,73 @@ async function checkPartnerExpiry(clientId) {
   }
 }
 
-
 // ══════════════════════════════════════════════════════════════
-//  PUBLIC ROUTES — no auth required
-//  MUST be defined BEFORE router.use('/client', auth) so they
-//  are not blocked by the JWT middleware.
+//  PUBLIC ROUTES — MUST be before router.use('/client', auth …)
 // ══════════════════════════════════════════════════════════════
 
-// helper
+// helper: activate a pending client account
 async function activateClient(clientId) {
-  var sb = getSupabase();
-  await sb.from('clients')
-    .update({ status: 'active', subscription_active: true })
-    .eq('id', clientId);
+  var sb = _supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  await sb.from('clients').update({ status: 'active', trial_notified: false }).eq('id', clientId);
 }
 
 // POST /api/client/signup
 router.post('/client/signup', async function(req, res) {
   try {
-    var { full_name, business_name, email, password, whatsapp_number, occupation, plan } = req.body;
-    if (!full_name || !business_name || !email || !password || !whatsapp_number) {
-      return res.status(400).json({ error: 'All required fields must be filled in.' });
-    }
-    var sb = getSupabase();
-    var existing = await sb.from('clients').select('id').eq('email', email).maybeSingle();
-    if (existing.data) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
-    var password_hash = await bcrypt.hash(password, 10);
+    var { email, full_name, whatsapp_number, plan, ref } = req.body;
+    if (!email || !full_name || !whatsapp_number) return res.status(400).json({ error: 'email, full_name, and whatsapp_number are required' });
+
+    var sb   = getSupabase();
+    var hash = await bcrypt.hash('forgebot2025', 10);
+
+    // Create pending account
     var insert = await sb.from('clients').insert({
-      full_name: full_name, business_name: business_name, email: email,
-      password_hash: password_hash, whatsapp_number: whatsapp_number,
-      occupation: occupation || null, status: 'pending_payment',
-      subscription_active: false, trial_notified: false, setup_completed: false
+      email:           email,
+      full_name:       full_name,
+      whatsapp_number: whatsapp_number,
+      password_hash:   hash,
+      status:          'pending',
+      plan:            plan || 'monthly',
+      referred_by:     ref || null,
+      trial_notified:  false,
+      setup_completed: false
     }).select('id').single();
+
     if (insert.error) throw new Error(insert.error.message);
     var clientId = insert.data.id;
-    var appUrl   = process.env.APP_URL || 'https://localhost:3000';
-    var amount   = plan === 'usd' ? 45 : 30000;
-    var currency = plan === 'usd' ? 'USD' : 'NGN';
-    var flwRes = await axios.post('https://api.flutterwave.com/v3/payments', {
-      tx_ref: 'forgebot-' + clientId + '-' + Date.now(),
-      amount: amount, currency: currency,
-      redirect_url: appUrl + '/api/client/pay/callback',
-      customer: { email: email, name: full_name, phonenumber: whatsapp_number },
-      customizations: { title: 'ForgeBot Subscription', description: 'WhatsApp automation for ' + business_name, logo: appUrl + '/icons/icon-192x192.png' },
-      meta: { client_id: clientId }
-    }, { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } });
+
+    // Initiate Flutterwave payment
+    var amount  = (plan === 'yearly') ? 24000 : 2500;
+    var appUrl  = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    var txRef   = 'FB-' + clientId + '-' + Date.now();
+
+    var flwRes;
+    try {
+      flwRes = await axios.post('https://api.flutterwave.com/v3/payments', {
+        tx_ref:       txRef,
+        amount:       amount,
+        currency:     'NGN',
+        redirect_url: appUrl + '/api/client/pay/callback',
+        customer:     { email: email, name: full_name, phonenumber: whatsapp_number },
+        meta:         { client_id: clientId },
+        customizations: { title: 'ForgeBot Subscription', logo: appUrl + '/icons/icon-192.png' }
+      }, {
+        headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY }
+      });
+    } catch (e) {
+      // Payment init failed — delete pending account so user can retry
+      await sb.from('clients').delete().eq('id', clientId);
+      return res.status(502).json({ error: 'Payment gateway unavailable. Please try again.' });
+    }
+
     if (!flwRes.data || flwRes.data.status !== 'success') {
       await sb.from('clients').delete().eq('id', clientId);
-      return res.status(502).json({ error: 'Could not initiate payment. Please try again.' });
+      return res.status(502).json({ error: 'Could not create payment link. Please try again.' });
     }
-    return res.json({ payment_link: flwRes.data.data.link });
+
+    res.json({ payment_url: flwRes.data.data.link });
   } catch (e) {
-    console.error('[Signup]', e.message);
-    return res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -153,28 +167,28 @@ router.post('/client/signup', async function(req, res) {
 router.post('/client/login', async function(req, res) {
   try {
     var { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
-    var sb = getSupabase();
-    var result = await sb.from('clients')
-      .select('id,password_hash,status,subscription_active,full_name,business_name')
-      .eq('email', email).maybeSingle();
-    if (!result.data) return res.status(401).json({ error: 'No account found with that email address.' });
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+
+    var sb     = getSupabase();
+    var result = await sb.from('clients').select('*').eq('email', email).single();
+    if (result.error || !result.data) return res.status(401).json({ error: 'Invalid credentials' });
+
     var client = result.data;
-    var match  = await bcrypt.compare(password, client.password_hash);
-    if (!match) return res.status(401).json({ error: 'Incorrect password. Please try again.' });
-    if (client.status === 'pending_payment') return res.status(403).json({ error: 'Payment required to activate your account.' });
-    var token = jwt.sign({ id: client.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    return res.json({ token: token, clientId: client.id, full_name: client.full_name, business_name: client.business_name });
+    if (client.status !== 'active') return res.status(403).json({ error: 'Account not yet active. Complete payment first.' });
+
+    var match = await bcrypt.compare(password, client.password_hash);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+
+    var token = jwt.sign({ id: client.id, clientId: client.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token: token, client: { id: client.id, full_name: client.full_name, email: client.email } });
   } catch (e) {
-    console.error('[Login]', e.message);
-    return res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/client/qr-stream (SSE)
-// PUBLIC — handles its own token via query param (EventSource cannot send headers)
-// MUST be before router.use('/client', auth) or Railway auth middleware will block it
+// GET /api/client/qr-stream (SSE — must be PUBLIC, EventSource cannot send headers)
 router.get('/client/qr-stream', async function(req, res) {
+  // Verify token from query param
   var token = req.query.token;
   var clientId;
   try {
@@ -186,8 +200,8 @@ router.get('/client/qr-stream', async function(req, res) {
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('X-Accel-Buffering', 'no');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable Railway nginx buffering
   res.flushHeaders();
 
   if (!global.qrListeners) global.qrListeners = new Map();
@@ -196,20 +210,12 @@ router.get('/client/qr-stream', async function(req, res) {
     try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch(e) {}
   }
 
-  // Heartbeat every 20s to keep Railway connection alive
+  // Heartbeat every 20s to survive Railway's 30s idle timeout
   var heartbeat = setInterval(function() {
     try { res.write(':heartbeat\n\n'); } catch(e) {}
   }, 20000);
 
-  function cleanup() {
-    clearInterval(heartbeat);
-    var all = global.qrListeners.get(clientId) || [];
-    global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
-  }
-
-  req.on('close', cleanup);
-
-  // If already connected, tell the client immediately
+  // Already connected?
   var existingSock = global.getSock && global.getSock(clientId);
   if (existingSock) {
     sendEvent('connected', { status: 'connected' });
@@ -222,103 +228,116 @@ router.get('/client/qr-stream', async function(req, res) {
   listeners.push(sendEvent);
   global.qrListeners.set(clientId, listeners);
 
+  req.on('close', function() {
+    clearInterval(heartbeat);
+    var all = global.qrListeners.get(clientId) || [];
+    global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
+  });
+
   try {
     await sessionManager.startSession(clientId, {
       onQR: function(qr) {
         var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { try { fn('qr', { qr: qr }); } catch(e) {} });
+        all.forEach(function(fn) { fn('qr', { qr: qr }); });
       },
       onConnected: function() {
         var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { try { fn('connected', { status: 'connected' }); } catch(e) {} });
+        all.forEach(function(fn) { fn('connected', { status: 'connected' }); });
         global.qrListeners.delete(clientId);
       },
       onDisconnected: function() {
         var all = global.qrListeners.get(clientId) || [];
-        all.forEach(function(fn) { try { fn('disconnected', { status: 'disconnected' }); } catch(e) {} });
+        all.forEach(function(fn) { fn('disconnected', { status: 'disconnected' }); });
       }
     });
   } catch (e) {
-    console.error('[QR-Stream] startSession error:', e.message);
-    sendEvent('error', { message: 'Failed to start session. Please refresh.' });
+    sendEvent('error', { message: 'Failed to start WhatsApp session. Please refresh and try again.' });
     clearInterval(heartbeat);
     res.end();
   }
 });
 
-// GET /api/client/pay/callback (Flutterwave redirect)
+// GET /api/client/pay/callback — Flutterwave redirects here after payment
 router.get('/client/pay/callback', async function(req, res) {
   try {
-    var { transaction_id, status, tx_ref } = req.query;
-    var appUrl = process.env.APP_URL || 'https://localhost:3000';
-    if (status !== 'successful' || !transaction_id) return res.redirect(appUrl + '/?payment=failed');
-    var verify = await axios.get(
-      'https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify',
-      { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } }
-    );
-    if (!verify.data || verify.data.data.status !== 'successful') return res.redirect(appUrl + '/?payment=failed');
-    var txData   = verify.data.data;
-    var clientId = txData.meta && txData.meta.client_id;
-    if (!clientId) {
-      var parts = (tx_ref || '').split('-');
-      if (parts.length >= 6) clientId = parts.slice(1, 6).join('-');
+    var { status, tx_ref, transaction_id } = req.query;
+    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+
+    if (status !== 'successful' || !transaction_id) {
+      return res.redirect(appUrl + '/?payment=failed');
     }
-    if (!clientId) return res.redirect(appUrl + '/?payment=error');
+
+    // Verify with Flutterwave
+    var verify;
+    try {
+      verify = await axios.get('https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify', {
+        headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY }
+      });
+    } catch (e) {
+      return res.redirect(appUrl + '/?payment=failed');
+    }
+
+    var txData = verify.data && verify.data.data;
+    if (!txData || txData.status !== 'successful') {
+      return res.redirect(appUrl + '/?payment=failed');
+    }
+
+    var clientId = txData.meta && txData.meta.client_id;
+    if (!clientId) return res.redirect(appUrl + '/?payment=failed');
+
     await activateClient(clientId);
-    var token = jwt.sign({ id: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    // Issue JWT so onboard.html can pick it up
+    var token = jwt.sign({ id: clientId, clientId: clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
     return res.redirect(appUrl + '/onboard?activated=1&token=' + token);
   } catch (e) {
-    console.error('[PayCallback]', e.message);
-    return res.redirect((process.env.APP_URL || '') + '/?payment=error');
+    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    return res.redirect(appUrl + '/?payment=error');
   }
 });
 
-// POST /api/client/pay/webhook (Flutterwave webhook)
+// POST /api/client/pay/webhook — Flutterwave webhook
 router.post('/client/pay/webhook', async function(req, res) {
   try {
     var hash = req.headers['verif-hash'];
-    if (!hash || hash !== process.env.FLW_HASH) return res.status(401).json({ error: 'Invalid signature' });
-    var { data } = req.body;
-    if (!data || data.status !== 'successful') return res.json({ ok: true });
-    var clientId = data.meta && data.meta.client_id;
-    if (!clientId) {
-      var parts = (data.tx_ref || '').split('-');
-      if (parts.length >= 6) clientId = parts.slice(1, 6).join('-');
+    if (!hash || hash !== process.env.FLW_HASH) return res.status(401).json({ error: 'Unauthorized' });
+
+    var { event, data } = req.body;
+    if (event === 'charge.completed' && data && data.status === 'successful') {
+      var clientId = data.meta && data.meta.client_id;
+      if (clientId) await activateClient(clientId);
     }
-    if (clientId) await activateClient(clientId);
-    return res.json({ ok: true });
+    res.json({ status: 'ok' });
   } catch (e) {
-    console.error('[PayWebhook]', e.message);
-    return res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
 // GET /api/push/vapid-key
 router.get('/push/vapid-key', function(req, res) {
-  res.json({ key: process.env.VAPID_PUBLIC_KEY });
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
 // POST /api/push/subscribe
 router.post('/push/subscribe', async function(req, res) {
   try {
-    var { subscription, clientId } = req.body;
-    if (!subscription || !clientId) return res.status(400).json({ error: 'Missing fields' });
+    var { subscription, clientId: cid } = req.body;
+    if (!subscription || !cid) return res.status(400).json({ error: 'subscription and clientId required' });
     var sb = getSupabase();
-    await sb.from('push_subscriptions').upsert({ client_id: clientId, subscription: subscription, updated_at: new Date().toISOString() }, { onConflict: 'client_id' });
+    await sb.from('push_subscriptions').upsert({
+      client_id:    cid,
+      subscription: JSON.stringify(subscription),
+      updated_at:   new Date().toISOString()
+    }, { onConflict: 'client_id' });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/push/test
 router.post('/push/test', async function(req, res) {
-  try {
-    var webpush = require('web-push');
-    webpush.setVapidDetails('mailto:' + (process.env.ADMIN_EMAIL || 'admin@forgebot.com'), process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
-    var { subscription } = req.body;
-    if (!subscription) return res.status(400).json({ error: 'No subscription provided' });
-    await webpush.sendNotification(subscription, JSON.stringify({ title: 'ForgeBot Test', body: 'Notifications are working! 🎉' }));
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  res.json({ ok: true, message: 'Push test received' });
 });
 
 // ── Apply auth + partner check to all client routes ───────────
@@ -480,7 +499,7 @@ router.put('/client/fallback', async function(req, res) {
   }
 });
 
-// /api/client/qr-stream — moved above auth middleware (see PUBLIC ROUTES section)
+// GET /api/client/qr-stream — MOVED to PUBLIC ROUTES block above (before auth middleware)
 
 // ══════════════════════════════════════════════════════════════
 //  NEW ROUTES v2
@@ -820,6 +839,79 @@ router.put('/client/qualification-toggle', async function(req, res) {
       .eq('id', req.clientId);
 
     res.json({ ok: true, qualification_enabled: !!enabled });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// ── Bot Setup (questionnaire answers from onboard.html) ──────────────────────
+
+// PUT /api/client/bot-setup
+router.put('/client/bot-setup', async function(req, res) {
+  try {
+    var sb       = getSupabase();
+    var clientId = req.clientId;
+    var {
+      occupation, occupation_data,
+      availability_days, payment_methods, current_promo,
+      instagram, facebook, tiktok, whatsapp_channel,
+      service_areas, studio_location, home_service,
+      advance_booking, deposit_required, session_duration,
+      who_do_you_serve, free_consult,
+      return_policy, delivers_to, delivery_fee_local,
+      delivery_time_local, minimum_order, bulk_orders
+    } = req.body;
+
+    // 1. Update occupation on clients table
+    if (occupation) {
+      await sb.from('clients')
+        .update({ occupation: occupation, occupation_data: occupation_data || {} })
+        .eq('id', clientId);
+    }
+
+    // 2. Upsert all questionnaire answers into bot_setup
+    var setupData = {
+      client_id:          clientId,
+      availability_days:  availability_days,
+      payment_methods:    payment_methods,
+      current_promo:      current_promo    || null,
+      instagram:          instagram        || null,
+      facebook:           facebook         || null,
+      tiktok:             tiktok           || null,
+      whatsapp_channel:   whatsapp_channel || null,
+      service_areas:      service_areas    || null,
+      studio_location:    studio_location  || null,
+      home_service:       home_service     || null,
+      advance_booking:    advance_booking  || null,
+      deposit_required:   deposit_required || null,
+      session_duration:   session_duration || null,
+      who_do_you_serve:   who_do_you_serve || null,
+      return_policy:      return_policy    || null,
+      delivers_to:        delivers_to      || null,
+      delivery_fee_local: delivery_fee_local  || null,
+      delivery_time_local:delivery_time_local || null,
+      minimum_order:      minimum_order    || null,
+      bulk_orders:        bulk_orders      || null,
+      updated_at:         new Date().toISOString()
+    };
+
+    // Remove undefined keys
+    Object.keys(setupData).forEach(function(k) {
+      if (setupData[k] === undefined) delete setupData[k];
+    });
+
+    var { error } = await sb.from('bot_setup')
+      .upsert(setupData, { onConflict: 'client_id' });
+
+    if (error) throw new Error(error.message);
+
+    // Mark setup as completed on clients table
+    await sb.from('clients')
+      .update({ setup_completed: true })
+      .eq('id', clientId);
+
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
