@@ -1,3 +1,8 @@
+// Polyfill Web Crypto API for Node.js < 19 (required by Baileys)
+if (typeof crypto === 'undefined') {
+  global.crypto = require('crypto').webcrypto;
+}
+
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const path    = require('path');
@@ -5,12 +10,11 @@ const fs      = require('fs');
 const pino    = require('pino');
 const replyEngine = require('../bot/replyEngine');
 
-const sessions  = {};       // clientId → { sock, latestQR }
+const sessions  = {};        // clientId → { sock, latestQR }
 const starting  = new Set(); // mutex: clientIds currently being initialised
-const retryInfo = {};       // clientId → { count, delay }
+const retryInfo = {};        // clientId → { count, delay }
 const logger    = pino({ level: 'silent' });
 
-// ── Wipe session auth files ───────────────────────────────────────────────────
 function clearSessionFiles(clientId) {
   const authDir = path.join(__dirname, '../../sessions', clientId);
   try {
@@ -23,19 +27,17 @@ function clearSessionFiles(clientId) {
   }
 }
 
-// ── Broadcast SSE event to all waiting QR-page clients ───────────────────────
 function broadcast(clientId, event, data) {
   if (!global.qrListeners) return;
   const all = global.qrListeners.get(clientId) || [];
   all.forEach(function(fn) { try { fn(event, data); } catch (e) {} });
 }
 
-// ── Exponential backoff helper ────────────────────────────────────────────────
 function nextDelay(clientId) {
   if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
   retryInfo[clientId].count += 1;
   const d = retryInfo[clientId].delay;
-  retryInfo[clientId].delay = Math.min(d * 2, 60000); // 5s → 10s → 20s → 40s → 60s cap
+  retryInfo[clientId].delay = Math.min(d * 2, 60000);
   return d;
 }
 
@@ -43,15 +45,11 @@ function resetRetry(clientId) {
   retryInfo[clientId] = { count: 0, delay: 5000 };
 }
 
-// ── Start (or wake up) a WhatsApp session ────────────────────────────────────
 async function startSession(clientId) {
-  // MUTEX: prevent double-starts for the same client
   if (starting.has(clientId)) {
     console.log('[ForgeBot] startSession already in progress for', clientId, '— skipping');
     return;
   }
-
-  // Already running — send cached QR to any waiting SSE clients
   if (sessions[clientId]?.sock) {
     if (sessions[clientId].latestQR) {
       broadcast(clientId, 'qr', { qr: sessions[clientId].latestQR });
@@ -66,7 +64,6 @@ async function startSession(clientId) {
     const authDir = path.join(__dirname, '../../sessions', clientId);
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-    // fetchLatestBaileysVersion makes a network call — fall back if it fails
     let version = [2, 3000, 1015901307];
     try {
       const v = await fetchLatestBaileysVersion();
@@ -107,28 +104,26 @@ async function startSession(clientId) {
       }
 
       if (connection === 'close') {
-        const err     = lastDisconnect?.error;
-        const code    = err instanceof Boom ? err.output?.statusCode : 0;
-        const errMsg  = err ? (err.message || String(err)) : 'none';
+        const err    = lastDisconnect?.error;
+        const code   = err instanceof Boom ? err.output?.statusCode : 0;
+        const errMsg = err ? (err.message || String(err)) : 'none';
         const staleCodes = [DisconnectReason.loggedOut, DisconnectReason.connectionReplaced, 515];
         const isStale = staleCodes.includes(code);
-        const delay   = nextDelay(clientId);
-        const count   = retryInfo[clientId].count;
+        const delay  = nextDelay(clientId);
+        const count  = retryInfo[clientId].count;
 
         console.log('[ForgeBot] Client', clientId, 'disconnected — code:', code, '| error:', errMsg, '| retry #' + count + ' in', delay/1000 + 's');
 
         delete sessions[clientId];
 
         if (isStale || count % 3 === 0) {
-          // Clear stale/corrupt files every 3rd failure
           clearSessionFiles(clientId);
         }
 
         if (count >= 10) {
-          // Too many failures — stop retrying, tell the client to refresh the page
-          console.log('[ForgeBot] Giving up on', clientId, 'after', count, 'failures. User must refresh.');
+          console.log('[ForgeBot] Giving up on', clientId, 'after', count, 'failures.');
           broadcast(clientId, 'fatal', { message: 'Connection could not be established. Please refresh the page to try again.' });
-          resetRetry(clientId); // reset so manual refresh works
+          resetRetry(clientId);
           return;
         }
 
