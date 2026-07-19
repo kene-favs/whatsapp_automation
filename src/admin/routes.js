@@ -1,46 +1,41 @@
 // ============================================================
 //  ForgeBot — Admin API Routes
-//  File location: src/admin/routes.js  (or src/routes/adminRoutes.js)
-//
-//  Auth: POST /admin/login returns a JWT.
-//        All other routes require Authorization: Bearer <token>
-//        OR legacy email/password headers (backward compat).
+//  File location: src/admin/routes.js
 //
 //  Mount in index.js:
-//    const adminRoutes = require('./src/admin/routes');
 //    app.use('/admin', adminRoutes);
+//
+//  GET /admin          → served by index.js (admin.html)
+//  POST /admin/login   → returns JWT
+//  All other /admin/*  → protected by adminAuth middleware
 // ============================================================
 
 'use strict';
 
-const express  = require('express');
-const jwt      = require('jsonwebtoken');
-const bcrypt   = require('bcryptjs');
-const router   = express.Router();
+const express = require('express');
+const jwt     = require('jsonwebtoken');
+const bcrypt  = require('bcryptjs');
+const router  = express.Router();
 
 const db             = require('../db/supabase');
 const sessionManager = require('../sessions/sessionManager');
 
 // ── Admin JWT secret ──────────────────────────────────────────
-// Uses the JWT_SECRET env var, prefixed so admin tokens are distinct
 function adminSecret() {
   return (process.env.JWT_SECRET || 'forgebot-secret') + '-admin';
 }
 
 // ── Admin auth middleware ─────────────────────────────────────
-// Accepts Bearer JWT token from Authorization header.
-// Also accepts legacy email/password custom headers for backward compat.
+// Accepts: Bearer JWT, x-admin-token header, or legacy email/password headers
 function adminAuth(req, res, next) {
-  // Method 1: Bearer JWT token
+  // Method 1: Bearer JWT
   var authHeader = req.headers['authorization'] || '';
   if (authHeader.startsWith('Bearer ')) {
     var token = authHeader.slice(7);
     try {
       jwt.verify(token, adminSecret());
       return next();
-    } catch (e) {
-      // Try legacy method before failing
-    }
+    } catch (e) { /* try next method */ }
   }
 
   // Method 2: x-admin-token header
@@ -49,17 +44,13 @@ function adminAuth(req, res, next) {
     try {
       jwt.verify(xToken, adminSecret());
       return next();
-    } catch (e) {
-      // Try legacy method
-    }
+    } catch (e) { /* try next method */ }
   }
 
-  // Method 3: Legacy email/password custom headers (backward compat)
-  var email    = (req.headers['email'] || '').trim().toLowerCase();
+  // Method 3: Legacy email/password headers (backward compat)
+  var email    = (req.headers['email']    || '').trim().toLowerCase();
   var password = (req.headers['password'] || '').trim();
-  var adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  var adminPass  = (process.env.ADMIN_PASSWORD || '').trim();
-  if (email && email === adminEmail && password === adminPass) {
+  if (email && email === (process.env.ADMIN_EMAIL || '').toLowerCase() && password === (process.env.ADMIN_PASSWORD || '')) {
     return next();
   }
 
@@ -70,7 +61,6 @@ function adminAuth(req, res, next) {
 //  PUBLIC: Login
 // ════════════════════════════════════════════════════════════════
 
-// POST /admin/login
 router.post('/login', async function(req, res) {
   try {
     var email    = (req.body.email    || '').trim().toLowerCase();
@@ -96,20 +86,18 @@ router.post('/login', async function(req, res) {
 //  CLIENTS
 // ════════════════════════════════════════════════════════════════
 
-// GET /admin/clients — list all clients
+// GET /admin/clients
 router.get('/clients', adminAuth, async function(req, res) {
   try {
-    var clients  = await db.getAllClients();
-    var sockIds  = [];
-    try {
-      sockIds = sessionManager.getAllSessions ? sessionManager.getAllSessions() : [];
-    } catch (e) {}
+    var clients = await db.getAllClients();
+    var sockIds = [];
+    try { sockIds = sessionManager.getAllSessions ? sessionManager.getAllSessions() : []; } catch (e) {}
 
-    var out = clients.map(function(c) {
-      return Object.assign({}, c, {
-        session_active: sockIds.includes ? sockIds.includes(c.id) : false,
-        password_hash:  undefined
-      });
+    var out = (clients || []).map(function(c) {
+      var safe = Object.assign({}, c);
+      delete safe.password_hash;
+      safe.session_active = sockIds.includes(c.id);
+      return safe;
     });
     return res.json(out);
   } catch (err) {
@@ -130,7 +118,7 @@ router.get('/clients/:id', adminAuth, async function(req, res) {
   }
 });
 
-// PATCH /admin/clients/:id — update client fields
+// PATCH /admin/clients/:id
 router.patch('/clients/:id', adminAuth, async function(req, res) {
   try {
     var updated = await db.updateClient(req.params.id, req.body);
@@ -151,7 +139,7 @@ router.delete('/clients/:id', adminAuth, async function(req, res) {
   }
 });
 
-// POST /admin/clients/:id/connect — start WhatsApp session
+// POST /admin/clients/:id/connect
 router.post('/clients/:id/connect', adminAuth, async function(req, res) {
   try {
     var client = await db.getClientById(req.params.id);
@@ -174,16 +162,16 @@ router.post('/clients/:id/disconnect', adminAuth, async function(req, res) {
 });
 
 // ════════════════════════════════════════════════════════════════
-//  PARTNERS / INFLUENCERS
+//  PARTNERS
 // ════════════════════════════════════════════════════════════════
 
-// GET /admin/partners — list all partner accounts
+// GET /admin/partners
 router.get('/partners', adminAuth, async function(req, res) {
   try {
     var sb     = db.getSupabase();
     var result = await sb
       .from('clients')
-      .select('id,business_name,email,phone,whatsapp_number,occupation,business_type,subscription_active,is_partner,partner_expires_at,created_at')
+      .select('id,business_name,email,whatsapp_number,occupation,subscription_active,is_partner,partner_expires_at,created_at')
       .eq('is_partner', true)
       .order('created_at', { ascending: false });
 
@@ -204,52 +192,49 @@ router.get('/partners', adminAuth, async function(req, res) {
   }
 });
 
-// POST /admin/partners — create new partner account
+// POST /admin/partners — create partner account
+// FIX: uses whatsapp_number column (not phone)
 router.post('/partners', adminAuth, async function(req, res) {
   try {
     var business_name   = (req.body.business_name   || '').trim();
     var email           = (req.body.email           || '').trim().toLowerCase();
     var whatsapp_number = (req.body.whatsapp_number || req.body.phone || '').replace(/\D/g, '');
-    var occupation      = req.body.occupation   || req.body.biz_type || 'general';
-    var business_type   = req.body.biz_type     || 'both';
+    var occupation      = req.body.occupation || 'general';
     var trial_days      = parseInt(req.body.trial_days) || 7;
 
     if (!business_name || !email || !whatsapp_number) {
       return res.status(400).json({ error: 'Business name, email and WhatsApp number are required' });
     }
 
-    // Check if email already registered
+    // Check for duplicate email
     var existing = await db.getClientByEmail(email);
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
-    // Auto-generate password
-    var rawPassword = 'forgebot2025';   // default starter password
+    var rawPassword = 'forgebot2025';
     var hashedPw    = await bcrypt.hash(rawPassword, 10);
-
-    var expires = new Date(Date.now() + trial_days * 24 * 60 * 60 * 1000).toISOString();
-    var sb      = db.getSupabase();
+    var expires     = new Date(Date.now() + trial_days * 24 * 60 * 60 * 1000).toISOString();
+    var sb          = db.getSupabase();
 
     var result = await sb.from('clients').insert([{
       business_name:       business_name,
       email:               email,
-      phone:               whatsapp_number,
+      whatsapp_number:     whatsapp_number,   // ← correct column name
       occupation:          occupation,
-      business_type:       business_type,
       password_hash:       hashedPw,
       status:              'active',
       subscription_active: true,
       is_partner:          true,
       partner_expires_at:  expires
-    }]).select('id,business_name,email,occupation,business_type,partner_expires_at').single();
+    }]).select('id,business_name,email,whatsapp_number,occupation,partner_expires_at').single();
 
     if (result.error) throw new Error(result.error.message);
 
-    // Log creation
+    // Audit log
     await sb.from('partner_log').insert([{
       client_id: result.data.id,
       action:    'created',
-      note:      'Trial period: ' + trial_days + ' days. Expires: ' + expires
-    }]).then(function() {}).catch(function() {});  // non-fatal
+      note:      'Trial: ' + trial_days + ' days. Expires: ' + expires
+    }]).then(function() {}).catch(function() {});
 
     return res.json({
       ok:         true,
@@ -265,13 +250,12 @@ router.post('/partners', adminAuth, async function(req, res) {
   }
 });
 
-// PATCH /admin/partners/:id/extend — extend trial by N days
+// PATCH /admin/partners/:id/extend
 router.patch('/partners/:id/extend', adminAuth, async function(req, res) {
   try {
     var days    = parseInt(req.body.days || req.body.extra_days) || 7;
     var sb      = db.getSupabase();
-    var current = await sb.from('clients')
-      .select('partner_expires_at').eq('id', req.params.id).single();
+    var current = await sb.from('clients').select('partner_expires_at').eq('id', req.params.id).single();
 
     if (current.error || !current.data) return res.status(404).json({ error: 'Partner not found' });
 
@@ -280,10 +264,7 @@ router.patch('/partners/:id/extend', adminAuth, async function(req, res) {
       : new Date();
     var newExpiry = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
-    await sb.from('clients').update({
-      partner_expires_at:  newExpiry,
-      subscription_active: true
-    }).eq('id', req.params.id);
+    await sb.from('clients').update({ partner_expires_at: newExpiry, subscription_active: true }).eq('id', req.params.id);
 
     await sb.from('partner_log').insert([{
       client_id: req.params.id,
@@ -297,7 +278,7 @@ router.patch('/partners/:id/extend', adminAuth, async function(req, res) {
   }
 });
 
-// PATCH /admin/partners/:id/revoke — disable access
+// PATCH /admin/partners/:id/revoke
 router.patch('/partners/:id/revoke', adminAuth, async function(req, res) {
   try {
     var sb = db.getSupabase();
@@ -313,7 +294,7 @@ router.patch('/partners/:id/revoke', adminAuth, async function(req, res) {
   }
 });
 
-// PATCH /admin/partners/:id/convert — convert partner to full paying client
+// PATCH /admin/partners/:id/convert
 router.patch('/partners/:id/convert', adminAuth, async function(req, res) {
   try {
     var sb = db.getSupabase();
@@ -325,7 +306,7 @@ router.patch('/partners/:id/convert', adminAuth, async function(req, res) {
     await sb.from('partner_log').insert([{
       client_id: req.params.id,
       action:    'converted',
-      note:      'Converted to full paying client by admin'
+      note:      'Converted to full paying client'
     }]).then(function() {}).catch(function() {});
     return res.json({ ok: true });
   } catch (err) {
@@ -344,19 +325,15 @@ router.delete('/partners/:id', adminAuth, async function(req, res) {
   }
 });
 
-// GET /admin/partners/:id/log — audit trail
+// GET /admin/partners/:id/log
 router.get('/partners/:id/log', adminAuth, async function(req, res) {
   try {
     var sb     = db.getSupabase();
-    var result = await sb.from('partner_log')
-      .select('*').eq('client_id', req.params.id)
-      .order('created_at', { ascending: false });
+    var result = await sb.from('partner_log').select('*').eq('client_id', req.params.id).order('created_at', { ascending: false });
     return res.json(result.data || []);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
-
-// ════════════════════════════════════════════════════════════════
 
 module.exports = router;
