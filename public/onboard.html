@@ -3,51 +3,56 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>ForgeBot — Setup &amp; Connect</title>
+<title>ForgeBot — Set Up Your Bot</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:40px 36px;width:100%;max-width:520px;text-align:center}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
+.card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:36px 32px;width:100%;max-width:560px}
 .logo{font-size:20px;font-weight:900;color:#25D366;margin-bottom:24px;letter-spacing:-1px}
 .logo span{color:#fff}
-h1{font-size:22px;font-weight:900;letter-spacing:-1px;margin-bottom:6px}
-p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:22px}
-
-/* Progress bar */
-.progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:28px;justify-content:center}
-.prog-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
-.prog-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.3)}
-.prog-dot.active{background:#25D366;border-color:#25D366;color:#000}
-.prog-dot.done{background:#166534;border-color:#25D366;color:#25D366}
-.prog-line{width:40px;height:2px;background:rgba(255,255,255,.1)}
-.prog-line.done{background:#25D366}
-
-/* Form styles */
-.form-group{text-align:left;margin-bottom:16px}
-.form-group label{display:block;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:6px;font-weight:600}
-.form-group select,.form-group input,.form-group textarea{width:100%;background:#0a1120;border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:10px 12px;font-size:13px;outline:none;-webkit-appearance:none}
-.form-group select:focus,.form-group input:focus,.form-group textarea:focus{border-color:#25D366}
-.form-group select option{background:#0a1120}
-.form-section-title{text-align:left;font-size:11px;font-weight:800;color:#25D366;text-transform:uppercase;letter-spacing:.8px;margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(37,211,102,.15)}
-
-/* Social media */
-.social-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.social-icon{font-size:18px;flex-shrink:0;width:28px;text-align:center}
-.social-row input{flex:1}
-.social-note{font-size:11px;color:#f59e0b;text-align:left;margin-top:4px;display:none}
-
-/* Payment checkboxes */
-.pay-options{display:flex;flex-wrap:wrap;gap:8px;text-align:left}
-.pay-opt{display:flex;align-items:center;gap:6px;background:#0a1120;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;flex-shrink:0}
-.pay-opt input{width:14px;height:14px;accent-color:#25D366;cursor:pointer;margin:0}
-
+/* Progress */
+.progress{display:flex;align-items:center;gap:8px;margin-bottom:28px}
+.prog-step{font-size:12px;font-weight:700;padding:6px 14px;border-radius:100px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.35)}
+.prog-step.active{background:rgba(37,211,102,.15);border-color:rgba(37,211,102,.4);color:#25D366}
+.prog-step.done{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.3);color:#25D366}
+.prog-line{flex:1;height:1px;background:rgba(255,255,255,.1)}
+/* Headings */
+h1{font-size:22px;font-weight:900;letter-spacing:-.5px;margin-bottom:6px}
+p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:24px}
+/* Section titles */
+.sec-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#25D366;margin:28px 0 14px;padding-bottom:6px;border-bottom:1px solid rgba(37,211,102,.15)}
+.sec-sub{font-size:12px;color:rgba(255,255,255,.4);margin-top:-8px;margin-bottom:14px}
+/* Fields */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px}
+.field label .opt{font-weight:400;color:rgba(255,255,255,.3);font-size:12px}
+.field input[type=text],.field textarea,.field select{width:100%;background:#111c2c;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:11px 14px;color:#fff;font-size:14px;outline:none;transition:.2s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:rgba(37,211,102,.5);background:#0f1f30}
+.field select option{background:#111c2c}
+.field textarea{resize:vertical;min-height:60px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* Radio cards */
+.radio-group{display:flex;flex-direction:column;gap:10px}
+.radio-card{display:flex;align-items:flex-start;gap:12px;background:#111c2c;border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;cursor:pointer;transition:.2s}
+.radio-card:hover{border-color:rgba(37,211,102,.3);background:#0f1f30}
+.radio-card input{margin-top:3px;accent-color:#25D366;flex-shrink:0}
+.radio-card.selected{border-color:#25D366;background:rgba(37,211,102,.07)}
+.radio-card .rc-icon{font-size:20px;flex-shrink:0}
+.radio-card strong{display:block;font-size:14px;font-weight:700;color:#fff;margin-bottom:2px}
+.radio-card small{font-size:12px;color:rgba(255,255,255,.45);line-height:1.4}
+/* Checkbox groups */
+.check-group{display:flex;flex-wrap:wrap;gap:8px}
+.check-group label{display:flex;align-items:center;gap:6px;background:#111c2c;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;transition:.2s}
+.check-group label:hover{border-color:rgba(37,211,102,.3)}
+.check-group input{accent-color:#25D366}
+/* Error */
+.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#f87171;margin-bottom:16px;display:none}
 /* Button */
-.btn-main{width:100%;background:#25D366;color:#000;padding:13px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;margin-top:8px;transition:.2s}
-.btn-main:hover{background:#1db954}
-.btn-main:disabled{opacity:.5;cursor:not-allowed}
-.err-msg{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;text-align:left;display:none}
+.btn{width:100%;background:#25D366;color:#000;padding:14px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;border:none;margin-top:8px;transition:.2s}
+.btn:hover{background:#1fbb58}
+.btn:disabled{background:rgba(37,211,102,.3);cursor:not-allowed}
 
-/* QR styles — original preserved */
+/* ── QR section (Step 2) ── */
 .qr-box{width:220px;height:220px;margin:0 auto 24px;border-radius:14px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.03);position:relative;overflow:hidden}
 .qr-box img{width:210px;height:210px;border-radius:10px}
 .qr-box canvas{width:210px;height:210px}
@@ -64,6 +69,10 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .step-item{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
 .step-num{width:24px;height:24px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0}
 .step-text{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5}
+.success-msg{display:none;text-align:center}
+.success-msg .big{font-size:56px;margin-bottom:16px}
+.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
+.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
 .mobile-notice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:22px;text-align:left;display:none}
 .mobile-notice .mn-title{font-size:13px;font-weight:800;color:#60a5fa;margin-bottom:8px}
 .mobile-notice .mn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
@@ -72,11 +81,20 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .mobile-notice .mn-text b{color:#93c5fd}
 .qr-tip{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.5}
 .expire-note{font-size:12px;color:#ffa726;margin-top:8px;display:none}
-.success-msg{display:none;text-align:center}
-.success-msg .big{font-size:56px;margin-bottom:16px}
-.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
-.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
-.btn-go{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
+.text-center{text-align:center}
+@media(max-width:480px){.two-col{grid-template-columns:1fr}}
+
+/* ── Login section ── */
+#loginSection{display:none}
+.hint-box{background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.2);border-radius:10px;padding:14px 16px;margin-bottom:22px}
+.hint-box p{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6}
+.hint-box p b{color:#25D366}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.login-field input{width:100%;background:#111c2c;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:13px 14px;color:#fff;font-size:14px;outline:none;transition:border-color .2s;font-family:inherit}
+.login-field input:focus{border-color:rgba(37,211,102,.5)}
+.login-field input::placeholder{color:rgba(255,255,255,.25)}
+.login-err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#f87171;margin-bottom:14px;display:none;line-height:1.5}
 </style>
 </head>
 <body>
@@ -84,121 +102,275 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
   <div class="logo">Forge<span>Bot</span></div>
 
   <!-- ══════════════════════════════════════════
-       STEP 1 — Business Setup Questionnaire
-  ══════════════════════════════════════════ -->
-  <div id="setupSection">
-    <div class="progress-bar">
-      <div class="prog-step">
-        <div class="prog-dot active" id="dot1">1</div>
-        <span style="font-size:11px;color:rgba(255,255,255,.4)">Setup</span>
-      </div>
-      <div class="prog-line" id="line1"></div>
-      <div class="prog-step">
-        <div class="prog-dot" id="dot2">2</div>
-        <span style="font-size:11px;color:rgba(255,255,255,.4)">Connect WhatsApp</span>
-      </div>
+       PARTNER LOGIN (shown when ?ref= in URL)
+       ══════════════════════════════════════════ -->
+  <div id="loginSection">
+    <h1 style="font-size:24px;margin-bottom:8px">Welcome to ForgeBot</h1>
+    <p class="sub">Log in with the credentials your partner shared with you.</p>
+
+    <div class="hint-box">
+      <p>Your login details were given to you by your ForgeBot agent.<br>
+      Default password is <b>forgebot2025</b> — you can change it later in your dashboard settings.</p>
     </div>
 
-    <h1>Tell us about your business</h1>
-    <p class="sub">This helps your bot give accurate answers to your customers. Takes less than 2 minutes.</p>
+    <div class="login-err" id="loginErr"></div>
 
-    <div id="errMsg" class="err-msg"></div>
-
-    <!-- Occupation -->
-    <div class="form-group">
-      <label>What type of business do you run? *</label>
-      <select id="occupation" onchange="showOccupationQuestions(this.value)" required>
-        <option value="">— Select your business type —</option>
-        <option value="real_estate">Real Estate (property sales, rentals, land)</option>
-        <option value="photography">Photography / Videography</option>
-        <option value="beauty">Beauty (hair, makeup, nails, skincare)</option>
-        <option value="fashion">Fashion (clothing, outfits, tailoring)</option>
-        <option value="food">Food (restaurant, catering, home chef, baking)</option>
-        <option value="medical">Medical / Healthcare</option>
-        <option value="legal">Legal Services (lawyer, solicitor)</option>
-        <option value="consulting">Consulting / Coaching</option>
-        <option value="logistics">Logistics / Dispatch / Delivery</option>
-        <option value="education">Education / Training / Tutoring</option>
-        <option value="events">Events (planning, decoration, MC)</option>
-        <option value="tech">Tech Services (web, app, IT support)</option>
-        <option value="auto">Automotive (repairs, sales, parts, car wash)</option>
-        <option value="agriculture">Agriculture / Farm Produce</option>
-        <option value="travel">Travel / Tourism / Visa</option>
-        <option value="fitness">Fitness / Gym / Personal Training</option>
-        <option value="interior">Interior Design / Renovation</option>
-        <option value="general">Other / General Business</option>
-      </select>
+    <div class="login-field">
+      <label>Email Address</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"/>
     </div>
-
-    <!-- Dynamic occupation-specific questions -->
-    <div id="occQuestions" style="display:none"></div>
-
-    <!-- Common questions (shown after occupation is selected) -->
-    <div id="commonQuestions" style="display:none">
-      <div class="form-section-title">General Business Info</div>
-
-      <div class="form-group">
-        <label>When are you available? (days and hours) *</label>
-        <input id="availability_days" type="text" placeholder="e.g. Mon–Sat, 8am–6pm. Sundays by appointment only" required/>
-      </div>
-
-      <div class="form-group">
-        <label>Payment methods you accept *</label>
-        <div class="pay-options">
-          <label class="pay-opt"><input type="checkbox" value="Bank Transfer" name="payment"/> Bank Transfer</label>
-          <label class="pay-opt"><input type="checkbox" value="POS Machine" name="payment"/> POS Machine</label>
-          <label class="pay-opt"><input type="checkbox" value="Cash" name="payment"/> Cash</label>
-          <label class="pay-opt"><input type="checkbox" value="USSD" name="payment"/> USSD (*737# etc)</label>
-          <label class="pay-opt"><input type="checkbox" value="Online Payment" name="payment"/> Online Payment</label>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Any current promotion or discount? (optional)</label>
-        <input id="current_promo" type="text" placeholder="e.g. 10% off all orders this week, Free delivery above ₦10,000"/>
-      </div>
-
-      <!-- Social Media -->
-      <div class="form-section-title">Social Media Handles <span style="font-size:10px;color:#f59e0b;font-weight:400;text-transform:none">(fill at least one)</span></div>
-
-      <div class="social-row">
-        <div class="social-icon">📸</div>
-        <input id="instagram" type="text" placeholder="Instagram handle e.g. @yourbusiness"/>
-      </div>
-      <div class="social-row">
-        <div class="social-icon">👤</div>
-        <input id="facebook" type="text" placeholder="Facebook page name or link"/>
-      </div>
-      <div class="social-row">
-        <div class="social-icon">🎵</div>
-        <input id="tiktok" type="text" placeholder="TikTok handle e.g. @yourbusiness"/>
-      </div>
-      <div class="social-row">
-        <div class="social-icon">💬</div>
-        <input id="whatsapp_channel" type="text" placeholder="WhatsApp Channel link"/>
-      </div>
-      <div class="social-note" id="socialNote">⚠️ Please enter at least one social media handle to continue.</div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="forgebot2025" autocomplete="current-password"/>
     </div>
-
-    <button class="btn-main" id="submitSetup" onclick="submitQuestionnaire()" style="display:none">Save &amp; Continue to WhatsApp →</button>
+    <button class="btn" id="loginBtn" onclick="doLogin()" style="width:100%;margin-top:4px">
+      Log In &amp; Set Up My Bot &rarr;
+    </button>
   </div>
 
   <!-- ══════════════════════════════════════════
-       STEP 2 — QR Code (original content)
-  ══════════════════════════════════════════ -->
-  <div id="qrSection" style="display:none">
-    <div class="progress-bar">
-      <div class="prog-step">
-        <div class="prog-dot done">✓</div>
-        <span style="font-size:11px;color:rgba(255,255,255,.4)">Setup</span>
-      </div>
-      <div class="prog-line done"></div>
-      <div class="prog-step">
-        <div class="prog-dot active">2</div>
-        <span style="font-size:11px;color:rgba(255,255,255,.4)">Connect WhatsApp</span>
-      </div>
-    </div>
+       MAIN CONTENT (questionnaire + QR)
+       ══════════════════════════════════════════ -->
+  <div id="setupContent" style="display:none">
 
+  <!-- Progress bar -->
+  <div class="progress">
+    <div class="prog-step active" id="prog1">1 · About Your Business</div>
+    <div class="prog-line"></div>
+    <div class="prog-step" id="prog2">2 · Connect WhatsApp</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 1 — QUESTIONNAIRE
+  ═══════════════════════════════════════════════════════ -->
+  <div id="questionSection">
+    <h1>Tell Us About Your Business</h1>
+    <p class="sub">This helps your bot answer customers correctly from day one.</p>
+
+    <form id="setupForm" onsubmit="submitSetup(event)">
+
+      <!-- Business Type -->
+      <div class="sec-title" style="margin-top:0">What Does Your Business Do?</div>
+      <div class="field">
+        <div class="radio-group">
+          <label class="radio-card" id="rc_service">
+            <input type="radio" name="biz_type" value="service" onchange="onBizType()"/>
+            <div class="rc-icon">🛠️</div>
+            <div>
+              <strong>Service Business</strong>
+              <small>I provide services — photography, salon, tutoring, consulting, events, logistics, etc.</small>
+            </div>
+          </label>
+          <label class="radio-card" id="rc_product">
+            <input type="radio" name="biz_type" value="product" onchange="onBizType()"/>
+            <div class="rc-icon">📦</div>
+            <div>
+              <strong>Product / Physical Business</strong>
+              <small>I sell physical products — food, clothing, electronics, groceries, building materials, etc.</small>
+            </div>
+          </label>
+          <label class="radio-card" id="rc_both">
+            <input type="radio" name="biz_type" value="both" onchange="onBizType()"/>
+            <div class="rc-icon">🔄</div>
+            <div>
+              <strong>Both — Services & Products</strong>
+              <small>I provide services AND sell physical products (e.g. fashion designer who also sells fabric).</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Occupation (shown after business type selected) -->
+      <div class="field" id="occGroup" style="display:none">
+        <label>Your Industry / Occupation *</label>
+        <select id="occupation" required>
+          <option value="">Select your industry...</option>
+        </select>
+      </div>
+
+      <!-- ── SERVICE QUESTIONS ────────────────────────────── -->
+      <div id="serviceQuestions" style="display:none">
+        <div class="sec-title">🛠️ About Your Services</div>
+
+        <div class="field">
+          <label>What areas / locations do you serve? *</label>
+          <input type="text" id="service_areas" placeholder="e.g. Lagos Island, Abuja, Port Harcourt, Nationwide"/>
+        </div>
+
+        <div class="field">
+          <label>Do you have a studio, office or shop location? <span class="opt">(optional)</span></label>
+          <input type="text" id="studio_location" placeholder="e.g. 5 Allen Avenue, Ikeja Lagos — or 'No fixed location'"/>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Do you visit / come to clients? *</label>
+            <select id="home_service">
+              <option value="">Select...</option>
+              <option value="Yes, I offer home service">Yes, I come to clients</option>
+              <option value="No, clients come to me">No, clients come to me</option>
+              <option value="Both options available">Both options available</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Do you accept advance bookings? *</label>
+            <select id="advance_booking">
+              <option value="">Select...</option>
+              <option value="Yes">Yes</option>
+              <option value="No, walk-in only">No, walk-in only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Do you require a deposit to book?</label>
+            <select id="deposit_required">
+              <option value="">Select...</option>
+              <option value="Yes, deposit required">Yes, deposit required</option>
+              <option value="No deposit needed">No deposit needed</option>
+              <option value="Sometimes, depends on job">Sometimes / depends on job</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Typical session / job duration?</label>
+            <input type="text" id="session_duration" placeholder="e.g. 1–2 hours, 30 mins, Half day"/>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Who do you mainly serve?</label>
+            <select id="who_do_you_serve">
+              <option value="">Select...</option>
+              <option value="Individuals / Personal clients">Individuals / Personal clients</option>
+              <option value="Businesses / Corporate">Businesses / Corporate</option>
+              <option value="Both individuals and businesses">Both</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Do you offer free consultation?</label>
+            <select id="free_consult">
+              <option value="">Select...</option>
+              <option value="Yes, free consultation available">Yes, it's free</option>
+              <option value="No, consultation is paid">No, consultation is paid</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PRODUCT QUESTIONS ───────────────────────────── -->
+      <div id="productQuestions" style="display:none">
+        <div class="sec-title">📦 About Your Products</div>
+
+        <div class="field">
+          <label>What is your return / exchange policy?</label>
+          <input type="text" id="return_policy" placeholder="e.g. No returns, Exchange within 7 days, All sales are final"/>
+        </div>
+
+        <div class="field">
+          <label>Do you deliver? Where to? *</label>
+          <input type="text" id="delivers_to" placeholder="e.g. Lagos only, Nationwide, No delivery — pickup only"/>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Local delivery fee?</label>
+            <input type="text" id="delivery_fee_local" placeholder="e.g. ₦1,000 flat, Free on orders above ₦20k"/>
+          </div>
+          <div class="field">
+            <label>Estimated delivery time?</label>
+            <input type="text" id="delivery_time_local" placeholder="e.g. Same day, 1–2 days, 3–5 days"/>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Minimum order amount?</label>
+            <input type="text" id="minimum_order" placeholder="e.g. ₦5,000, No minimum"/>
+          </div>
+          <div class="field">
+            <label>Bulk / wholesale discounts?</label>
+            <select id="bulk_orders">
+              <option value="">Select...</option>
+              <option value="Yes, bulk discounts available">Yes, available</option>
+              <option value="No bulk discounts">No bulk discounts</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AVAILABILITY & PAYMENT ─────────────────────── -->
+      <div id="commonQuestions" style="display:none">
+        <div class="sec-title">⏰ Availability & Payments</div>
+
+        <div class="field">
+          <label>What days are you available / open? *</label>
+          <div class="check-group" id="daysGroup">
+            <label><input type="checkbox" name="days" value="Mon"/> Monday</label>
+            <label><input type="checkbox" name="days" value="Tue"/> Tuesday</label>
+            <label><input type="checkbox" name="days" value="Wed"/> Wednesday</label>
+            <label><input type="checkbox" name="days" value="Thu"/> Thursday</label>
+            <label><input type="checkbox" name="days" value="Fri"/> Friday</label>
+            <label><input type="checkbox" name="days" value="Sat"/> Saturday</label>
+            <label><input type="checkbox" name="days" value="Sun"/> Sunday</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>What payment methods do you accept? *</label>
+          <div class="check-group">
+            <label><input type="checkbox" name="payment" value="Bank Transfer"/> Bank Transfer</label>
+            <label><input type="checkbox" name="payment" value="Cash"/> Cash</label>
+            <label><input type="checkbox" name="payment" value="POS / Card"/> POS / Card</label>
+            <label><input type="checkbox" name="payment" value="Online Payment"/> Online Payment</label>
+            <label><input type="checkbox" name="payment" value="USSD"/> USSD</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Any current promotion or offer? <span class="opt">(optional)</span></label>
+          <textarea id="current_promo" rows="2" placeholder="e.g. 10% off all orders this week, Free delivery on orders above ₦20k..."></textarea>
+        </div>
+
+        <!-- SOCIAL MEDIA -->
+        <div class="sec-title">📱 Your Social Media</div>
+        <p class="sec-sub">Add at least one handle so your bot can direct customers to your pages.</p>
+
+        <div class="two-col">
+          <div class="field">
+            <label>Instagram</label>
+            <input type="text" id="instagram" placeholder="@yourbusiness"/>
+          </div>
+          <div class="field">
+            <label>Facebook</label>
+            <input type="text" id="facebook" placeholder="Your page name or link"/>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label>TikTok</label>
+            <input type="text" id="tiktok" placeholder="@yourtiktok"/>
+          </div>
+          <div class="field">
+            <label>WhatsApp Channel</label>
+            <input type="text" id="whatsapp_channel" placeholder="Channel link or name"/>
+          </div>
+        </div>
+
+        <div class="err" id="socialError">⚠️ Please add at least one social media handle before continuing.</div>
+        <div class="err" id="formError"></div>
+
+        <button type="submit" class="btn" id="submitBtn">Save & Continue to WhatsApp Setup →</button>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 2 — QR CODE (original code, untouched)
+  ═══════════════════════════════════════════════════════ -->
+  <div id="qrSection" style="display:none">
     <div id="mainContent">
       <h1>Connect Your WhatsApp</h1>
       <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
@@ -212,9 +384,11 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
         <div class="mn-row"><div class="mn-icon">🔧</div><div class="mn-text"><b>Cyber café:</b> You can also go to a cyber café, open this link on their computer, and scan from there.</div></div>
       </div>
 
-      <div class="status-badge waiting" id="statusBadge">
-        <div class="sdot"></div>
-        <span id="statusText">Generating QR code...</span>
+      <div class="text-center">
+        <div class="status-badge waiting" id="statusBadge">
+          <div class="sdot"></div>
+          <span id="statusText">Generating QR code...</span>
+        </div>
       </div>
 
       <div class="qr-box" id="qrBox">
@@ -228,7 +402,7 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
         <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the <b style="color:#fff">three dots menu (⋮)</b> at the top right → tap <b style="color:#fff">Linked Devices</b></div></div>
         <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> → point your phone camera at the QR code on this screen</div></div>
         <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically 🎉</div></div>
-        <div class="expire-note" id="expireNote">⏱ QR code refreshes every 30 seconds — a new one loads automatically if it expires.</div>
+        <div class="expire-note" id="expireNote">⏳ QR code refreshes every 30 seconds — a new one loads automatically if it expires.</div>
         <p class="qr-tip">💡 The QR code must be shown on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it. If you are on your phone now, see the blue box above.</p>
       </div>
     </div>
@@ -237,260 +411,311 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
       <div class="big">🎉</div>
       <h2>Your Bot is Live!</h2>
       <p>WhatsApp connected successfully. Your bot is now replying customers, posting status, and running 24/7.</p>
-      <a href="/dashboard" class="btn-go">Go to My Dashboard →</a>
+      <a href="/dashboard" class="btn" style="display:inline-block;text-decoration:none">Go to My Dashboard →</a>
     </div>
   </div>
+
+  </div><!-- end #setupContent -->
 </div>
 
 <script>
-// ── Occupation questions ───────────────────────────────────────────────────────
-var OCC_QUESTIONS = {
-  real_estate: [
-    {label:"What areas/locations do you cover? *",name:"service_areas",type:"text",placeholder:"e.g. Lekki, Ajah, Victoria Island, Abuja"},
-    {label:"What types of properties do you deal with? *",name:"property_types",type:"text",placeholder:"e.g. Land, Duplex, Flat, Short-let, Commercial"},
-    {label:"Do you handle rentals, sales, or both? *",name:"deal_type",type:"select",options:["Rentals only","Sales only","Both rentals and sales"]},
-    {label:"Can clients schedule property viewings?",name:"viewings",type:"select",options:["Yes, by appointment","Yes, walk-in allowed","No, virtual tours only"]}
-  ],
-  photography: [
-    {label:"Do you work from a studio, go to clients, or both? *",name:"studio_location",type:"select",options:["Studio only","I go to clients","Both studio and client location"]},
-    {label:"What types of photography/videography do you offer? *",name:"photography_types",type:"text",placeholder:"e.g. Wedding, Portrait, Product, Events, Passport"},
-    {label:"How far in advance must clients book?",name:"advance_booking",type:"text",placeholder:"e.g. At least 3 days, 1 week minimum"},
-    {label:"Is a deposit required to confirm a booking?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment upfront","No deposit needed","Flexible"]}
-  ],
-  beauty: [
-    {label:"Do you offer home service? *",name:"home_service",type:"select",options:["Yes, I come to you","No, salon/studio only","Both available"]},
-    {label:"Where is your salon/studio? (leave blank if home-service only)",name:"studio_location",type:"text",placeholder:"e.g. Surulere, Lagos — near Total filling station"},
-    {label:"How far ahead must clients book?",name:"advance_booking",type:"text",placeholder:"e.g. 24 hours notice required, Same day okay"},
-    {label:"Is a deposit required for appointments?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment","No deposit needed"]}
-  ],
-  fashion: [
-    {label:"Do you make custom outfits, sell ready-made, or both? *",name:"fashion_type",type:"select",options:["Custom outfits only","Ready-made only","Both custom and ready-made"]},
-    {label:"How long does a custom order take? *",name:"delivery_time_local",type:"text",placeholder:"e.g. 3–5 days, 1 week for complex styles"},
-    {label:"Do you offer delivery? If yes, where?",name:"delivers_to",type:"text",placeholder:"e.g. Lagos only, Nationwide via courier"},
-    {label:"Return/exchange policy?",name:"return_policy",type:"text",placeholder:"e.g. No returns on custom orders, Exchange within 48hrs for ready-made"}
-  ],
-  food: [
-    {label:"Do you offer delivery? *",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup only","Both delivery and pickup"]},
-    {label:"Delivery areas and fees?",name:"delivers_to",type:"text",placeholder:"e.g. Lekki: ₦500, Mainland: ₦1,500, Free delivery above ₦15,000"},
-    {label:"Minimum order amount?",name:"minimum_order",type:"text",placeholder:"e.g. ₦2,000 minimum, No minimum"},
-    {label:"How far in advance should orders be placed?",name:"advance_booking",type:"text",placeholder:"e.g. Same day okay before 12pm, Next day for large orders"}
-  ],
-  medical: [
-    {label:"Do you offer online/telemedicine consultations? *",name:"home_service",type:"select",options:["Yes — online and physical","Physical only","Online only"]},
-    {label:"Do patients need appointments or can they walk in? *",name:"advance_booking",type:"select",options:["Appointment required","Walk-in accepted","Both — appointments preferred"]},
-    {label:"What services or specialties do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. General practice, Dental, Eye care, Physiotherapy"},
-    {label:"Do you offer home visits?",name:"home_visits",type:"select",options:["Yes, home visits available","No, clinic only"]}
-  ],
-  legal: [
-    {label:"What areas of law do you practice? *",name:"service_areas",type:"text",placeholder:"e.g. Property law, Family law, Business law, Criminal law"},
-    {label:"Do you offer a free initial consultation? *",name:"free_consult",type:"select",options:["Yes — free first consultation","No — all consultations are billed","Yes — 15 minute free call only"]},
-    {label:"How can clients reach you for urgent matters?",name:"availability_days",type:"text",placeholder:"e.g. Weekdays 9am–5pm, WhatsApp for urgent matters after hours"}
-  ],
-  consulting: [
-    {label:"What type of consulting do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Business strategy, HR, Finance, Marketing, Career coaching"},
-    {label:"Online or in-person sessions? *",name:"session_type",type:"select",options:["Online only","In-person only","Both online and in-person"]},
-    {label:"How long is a typical session?",name:"session_duration",type:"text",placeholder:"e.g. 1 hour, 2 hours, Half day workshop"},
-    {label:"Do you offer a free discovery call?",name:"free_consult",type:"select",options:["Yes — 30 min free call","No — all sessions are paid","Yes — 15 min free call"]}
-  ],
-  logistics: [
-    {label:"What areas do you deliver to? *",name:"delivers_to",type:"text",placeholder:"e.g. Lagos only, Southwest Nigeria, Nationwide"},
-    {label:"What is your typical delivery timeline? *",name:"delivery_time_local",type:"text",placeholder:"e.g. Same day within Lagos, 2–3 days outside Lagos"},
-    {label:"What types of items do you handle?",name:"service_areas",type:"text",placeholder:"e.g. Documents, Packages, Heavy goods, Fragile items"},
-    {label:"Minimum delivery fee?",name:"delivery_fee_local",type:"text",placeholder:"e.g. ₦1,000 within Lagos, ₦2,500 interstate"}
-  ],
-  education: [
-    {label:"Online or physical classes? *",name:"session_type",type:"select",options:["Physical classes only","Online classes only","Both online and physical"]},
-    {label:"Who do you teach? (age group or level) *",name:"who_do_you_serve",type:"text",placeholder:"e.g. Primary school, Secondary, University, Adults, Professionals"},
-    {label:"Group or individual sessions?",name:"session_duration",type:"select",options:["Group classes only","Individual/private only","Both available"]},
-    {label:"How do students enroll?",name:"advance_booking",type:"text",placeholder:"e.g. WhatsApp to book, Pay then get access, Monthly subscription"}
-  ],
-  events: [
-    {label:"What types of events do you handle? *",name:"service_areas",type:"text",placeholder:"e.g. Weddings, Birthdays, Corporate events, Conferences, Burials"},
-    {label:"What services do you provide? *",name:"event_services",type:"text",placeholder:"e.g. Full planning, Decoration only, Catering, MC, Full package"},
-    {label:"How far in advance should clients book?",name:"advance_booking",type:"text",placeholder:"e.g. Minimum 2 weeks, 1 month for large events"},
-    {label:"Is a deposit required to secure a date?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment upfront","Flexible"]}
-  ],
-  tech: [
-    {label:"What tech services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Website design, Mobile apps, IT support, CCTV, Network setup"},
-    {label:"Do you work remotely or on-site? *",name:"session_type",type:"select",options:["Remote only","On-site only","Both remote and on-site"]},
-    {label:"What is a typical project timeline?",name:"delivery_time_local",type:"text",placeholder:"e.g. Website: 2 weeks, App: 2–3 months"},
-    {label:"Do you offer ongoing maintenance/support?",name:"bulk_orders",type:"select",options:["Yes — monthly support plans available","No — one-time projects only","Yes — on request basis"]}
-  ],
-  auto: [
-    {label:"What automotive services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Car repair, Spray painting, Car sales, Auto parts, Car wash"},
-    {label:"Do you offer pickup/drop service for repairs?",name:"home_service",type:"select",options:["Yes — we pick up and return","No — drive in only","Yes, for additional fee"]},
-    {label:"Where are you located? *",name:"studio_location",type:"text",placeholder:"e.g. Ajegunle, Lagos — by Mile 2 bridge"}
-  ],
-  agriculture: [
-    {label:"What do you produce or sell? *",name:"service_areas",type:"text",placeholder:"e.g. Rice, Tomatoes, Poultry, Frozen fish, Vegetables"},
-    {label:"Do you offer delivery? *",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup only","Both available"]},
-    {label:"Minimum order quantity or amount?",name:"minimum_order",type:"text",placeholder:"e.g. Minimum 1 bag, ₦5,000 minimum order"},
-    {label:"Do you offer bulk/wholesale discounts?",name:"bulk_orders",type:"select",options:["Yes — contact me for wholesale prices","Negotiable for large orders","No discounts"]}
-  ],
-  travel: [
-    {label:"What type of travel packages do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Domestic tours, International packages, Hajj/Umrah, Honeymoon"},
-    {label:"Do you handle visa processing? *",name:"visa_service",type:"select",options:["Yes — full visa processing service","No — travel packages only","Yes, for select countries only"]},
-    {label:"How far in advance should clients book?",name:"advance_booking",type:"text",placeholder:"e.g. Minimum 2 weeks, 1 month for international"},
-    {label:"Group packages available?",name:"bulk_orders",type:"select",options:["Yes — group discounts available","Individual packages only","Both individual and group"]}
-  ],
-  fitness: [
-    {label:"Physical gym/studio or online training? *",name:"session_type",type:"select",options:["Physical gym/studio","Online coaching only","Both available"]},
-    {label:"One-on-one or group sessions? *",name:"session_duration",type:"select",options:["One-on-one only","Group classes only","Both available"]},
-    {label:"Your location (if physical)?",name:"studio_location",type:"text",placeholder:"e.g. Ikoyi, Lagos — open 6am to 9pm daily"},
-    {label:"Is a trial session available?",name:"free_consult",type:"select",options:["Yes — first session free","Yes — discounted trial class","No — regular pricing from day one"]}
-  ],
-  interior: [
-    {label:"What interior services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Interior design, Renovation, Furniture supply, Space planning"},
-    {label:"Do you have a showroom?",name:"studio_location",type:"text",placeholder:"e.g. Yes — Victoria Island, Lagos OR No showroom, we visit clients"},
-    {label:"Typical project completion timeline?",name:"delivery_time_local",type:"text",placeholder:"e.g. Design concept: 2 weeks, Full renovation: 4–8 weeks"},
-    {label:"Minimum project budget?",name:"minimum_order",type:"text",placeholder:"e.g. ₦500,000 minimum, No minimum for consultation"}
-  ],
-  general: [
-    {label:"What products or services do you offer? *",name:"service_areas",type:"text",placeholder:"Describe your main products or services"},
-    {label:"How do customers order from you? *",name:"who_do_you_serve",type:"text",placeholder:"e.g. WhatsApp order, Visit our shop, Call us to book"},
-    {label:"Do you offer delivery?",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup/visit only","Both available"]},
-    {label:"Return/refund policy?",name:"return_policy",type:"text",placeholder:"e.g. No returns after 24hrs, Full refund within 48hrs"}
-  ]
-};
+// ── Occupation data ──────────────────────────────────────────
+var SERVICE_OCCUPATIONS = [
+  'Photography / Videography',
+  'Beauty / Salon / Spa',
+  'Fashion / Tailoring',
+  'Education / Tutoring',
+  'Events / Decoration',
+  'Tech / IT Services',
+  'Fitness / Gym',
+  'Consulting',
+  'Legal / Law Firm',
+  'Medical / Clinic',
+  'Travel / Tourism',
+  'Logistics / Delivery',
+  'Auto / Car Services',
+  'Interior Design',
+  'Agriculture / Farming Services',
+  'Religious Organisation',
+  'General Service Business'
+];
 
-function showOccupationQuestions(occ) {
-  var container = document.getElementById('occQuestions');
-  var common = document.getElementById('commonQuestions');
-  var btn = document.getElementById('submitSetup');
+var PRODUCT_OCCUPATIONS = [
+  'Food / Catering / Restaurant',
+  'Retail Shop / Store',
+  'Supermarket / Grocery',
+  'Fashion / Clothing Store',
+  'Electronics / Phone Sales',
+  'Building Materials',
+  'Pharmacy / Chemist',
+  'Bakery / Confectionery',
+  'Agriculture / Farm Produce',
+  'Online Store / E-commerce',
+  'Market Trader',
+  'Hardware / Tools',
+  'Auto / Car Dealer',
+  'Real Estate',
+  'General Product Business'
+];
 
-  if (!occ) {
-    container.style.display = 'none';
-    common.style.display = 'none';
-    btn.style.display = 'none';
-    return;
+// ── Populate occupation dropdown ─────────────────────────────
+function populateOccupation(bizType) {
+  var sel = document.getElementById('occupation');
+  sel.innerHTML = '<option value="">Select your industry...</option>';
+
+  if (bizType === 'service') {
+    SERVICE_OCCUPATIONS.forEach(function(o) {
+      sel.innerHTML += '<option value="' + o + '">' + o + '</option>';
+    });
+  } else if (bizType === 'product') {
+    PRODUCT_OCCUPATIONS.forEach(function(o) {
+      sel.innerHTML += '<option value="' + o + '">' + o + '</option>';
+    });
+  } else if (bizType === 'both') {
+    sel.innerHTML += '<optgroup label="── Service Businesses ──">';
+    SERVICE_OCCUPATIONS.forEach(function(o) {
+      sel.innerHTML += '<option value="' + o + '">' + o + '</option>';
+    });
+    sel.innerHTML += '</optgroup><optgroup label="── Physical / Product Businesses ──">';
+    PRODUCT_OCCUPATIONS.forEach(function(o) {
+      sel.innerHTML += '<option value="' + o + '">' + o + '</option>';
+    });
+    sel.innerHTML += '</optgroup>';
   }
-
-  var questions = OCC_QUESTIONS[occ] || OCC_QUESTIONS['general'];
-  var html = '<div class="form-section-title">About Your ' + document.getElementById('occupation').options[document.getElementById('occupation').selectedIndex].text.split('(')[0].trim() + '</div>';
-
-  questions.forEach(function(q) {
-    html += '<div class="form-group"><label>' + q.label + '</label>';
-    if (q.type === 'select') {
-      html += '<select id="occ_' + q.name + '"><option value="">— Select —</option>';
-      q.options.forEach(function(o) { html += '<option value="' + o + '">' + o + '</option>'; });
-      html += '</select>';
-    } else {
-      html += '<input type="text" id="occ_' + q.name + '" placeholder="' + q.placeholder + '"/>';
-    }
-    html += '</div>';
-  });
-
-  container.innerHTML = html;
-  container.style.display = 'block';
-  common.style.display = 'block';
-  btn.style.display = 'block';
 }
 
-async function submitQuestionnaire() {
-  var errEl = document.getElementById('errMsg');
-  errEl.style.display = 'none';
+// ── Handle business type selection ───────────────────────────
+function onBizType() {
+  var val = document.querySelector('input[name="biz_type"]:checked');
+  if (!val) return;
+  var bizType = val.value;
+
+  // Highlight selected radio card
+  ['rc_service','rc_product','rc_both'].forEach(function(id) {
+    document.getElementById(id).classList.remove('selected');
+  });
+  document.getElementById('rc_' + bizType).classList.add('selected');
+
+  // Show occupation dropdown
+  document.getElementById('occGroup').style.display = 'block';
+  populateOccupation(bizType);
+
+  // Show/hide question sections
+  var showService = bizType === 'service' || bizType === 'both';
+  var showProduct = bizType === 'product' || bizType === 'both';
+  document.getElementById('serviceQuestions').style.display = showService ? 'block' : 'none';
+  document.getElementById('productQuestions').style.display = showProduct ? 'block' : 'none';
+  document.getElementById('commonQuestions').style.display  = 'block';
+}
+
+// ── Submit questionnaire ─────────────────────────────────────
+function submitSetup(e) {
+  e.preventDefault();
+  document.getElementById('socialError').style.display = 'none';
+  document.getElementById('formError').style.display   = 'none';
+
+  var token = localStorage.getItem('forgebot_token');
+  if (!token) { window.location.href = '/'; return; }
+
+  // Validate business type
+  var bizTypeEl = document.querySelector('input[name="biz_type"]:checked');
+  if (!bizTypeEl) {
+    showErr('Please select your business type.');
+    return;
+  }
+  var bizType = bizTypeEl.value;
 
   // Validate occupation
   var occupation = document.getElementById('occupation').value;
-  if (!occupation) { showErr('Please select your business type.'); return; }
+  if (!occupation) { showErr('Please select your industry / occupation.'); return; }
 
-  // Validate occupation-specific required fields
-  var questions = OCC_QUESTIONS[occupation] || OCC_QUESTIONS['general'];
-  var occData = {};
-  for (var i = 0; i < questions.length; i++) {
-    var q = questions[i];
-    var el = document.getElementById('occ_' + q.name);
-    if (el) {
-      var val = el.value.trim();
-      if (q.label.includes('*') && !val) {
-        showErr('Please fill in: ' + q.label.replace(' *', ''));
-        return;
-      }
-      if (val) occData[q.name] = val;
+  // Validate availability days
+  var days = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(function(c) { return c.value; });
+  if (!days.length) { showErr('Please select at least one availability day.'); return; }
+
+  // Validate payment methods
+  var payments = Array.from(document.querySelectorAll('input[name="payment"]:checked')).map(function(c) { return c.value; });
+  if (!payments.length) { showErr('Please select at least one payment method.'); return; }
+
+  // Validate social media (at least one)
+  var ig  = document.getElementById('instagram').value.trim();
+  var fb  = document.getElementById('facebook').value.trim();
+  var tt  = document.getElementById('tiktok').value.trim();
+  var wac = document.getElementById('whatsapp_channel').value.trim();
+  if (!ig && !fb && !tt && !wac) {
+    document.getElementById('socialError').style.display = 'block';
+    document.getElementById('socialError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // Validate service questions (if applicable)
+  if (bizType === 'service' || bizType === 'both') {
+    if (!document.getElementById('service_areas').value.trim()) {
+      showErr('Please fill in the areas you serve.'); return;
+    }
+    if (!document.getElementById('home_service').value) {
+      showErr('Please select whether you visit clients or they come to you.'); return;
+    }
+    if (!document.getElementById('advance_booking').value) {
+      showErr('Please select your bookings policy.'); return;
     }
   }
 
-  // Validate availability
-  var availability = document.getElementById('availability_days').value.trim();
-  if (!availability) { showErr('Please enter your business availability hours.'); return; }
-
-  // Validate payment methods
-  var paymentBoxes = document.querySelectorAll('input[name="payment"]:checked');
-  if (paymentBoxes.length === 0) { showErr('Please select at least one payment method.'); return; }
-  var paymentMethods = Array.from(paymentBoxes).map(function(cb){ return cb.value; }).join(', ');
-
-  // Validate social media — at least one required
-  var instagram = document.getElementById('instagram').value.trim();
-  var facebook = document.getElementById('facebook').value.trim();
-  var tiktok = document.getElementById('tiktok').value.trim();
-  var whatsapp_channel = document.getElementById('whatsapp_channel').value.trim();
-  if (!instagram && !facebook && !tiktok && !whatsapp_channel) {
-    document.getElementById('socialNote').style.display = 'block';
-    showErr('Please enter at least one social media handle.');
-    return;
+  // Validate product questions (if applicable)
+  if (bizType === 'product' || bizType === 'both') {
+    if (!document.getElementById('delivers_to').value.trim()) {
+      showErr('Please fill in your delivery info.'); return;
+    }
   }
-  document.getElementById('socialNote').style.display = 'none';
 
   // Build payload
   var payload = {
-    occupation: occupation,
-    occupation_data: occData,
-    availability_days: availability,
-    payment_methods: paymentMethods,
-    current_promo: document.getElementById('current_promo').value.trim(),
-    instagram: instagram,
-    facebook: facebook,
-    tiktok: tiktok,
-    whatsapp_channel: whatsapp_channel
+    occupation:         occupation,
+    occupation_data:    { biz_type: bizType },
+    availability_days:  days.join(','),
+    payment_methods:    payments.join(', '),
+    current_promo:      document.getElementById('current_promo').value.trim() || null,
+    instagram:          ig || null,
+    facebook:           fb || null,
+    tiktok:             tt || null,
+    whatsapp_channel:   wac || null
   };
 
-  // Disable button
-  var btn = document.getElementById('submitSetup');
+  if (bizType === 'service' || bizType === 'both') {
+    payload.service_areas    = document.getElementById('service_areas').value.trim();
+    payload.studio_location  = document.getElementById('studio_location').value.trim() || null;
+    payload.home_service     = document.getElementById('home_service').value || null;
+    payload.advance_booking  = document.getElementById('advance_booking').value || null;
+    payload.deposit_required = document.getElementById('deposit_required').value || null;
+    payload.session_duration = document.getElementById('session_duration').value.trim() || null;
+    payload.who_do_you_serve = document.getElementById('who_do_you_serve').value || null;
+    payload.free_consult     = document.getElementById('free_consult').value || null;
+  }
+
+  if (bizType === 'product' || bizType === 'both') {
+    payload.return_policy       = document.getElementById('return_policy').value.trim() || null;
+    payload.delivers_to         = document.getElementById('delivers_to').value.trim();
+    payload.delivery_fee_local  = document.getElementById('delivery_fee_local').value.trim() || null;
+    payload.delivery_time_local = document.getElementById('delivery_time_local').value.trim() || null;
+    payload.minimum_order       = document.getElementById('minimum_order').value.trim() || null;
+    payload.bulk_orders         = document.getElementById('bulk_orders').value || null;
+  }
+
+  var btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
-  try {
-    var token = localStorage.getItem('forgebot_token');
-    var r = await fetch('/api/client/bot-setup', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify(payload)
-    });
-
-    if (!r.ok) {
-      var err = await r.json().catch(function(){ return {}; });
-      throw new Error(err.error || 'Failed to save. Please try again.');
-    }
-
-    // Move to QR step
-    document.getElementById('setupSection').style.display = 'none';
-    document.getElementById('qrSection').style.display = 'block';
+  fetch('/api/client/bot-setup', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) throw new Error(data.error);
+    // Move to Step 2
+    document.getElementById('questionSection').style.display = 'none';
+    document.getElementById('qrSection').style.display       = 'block';
+    document.getElementById('prog1').classList.remove('active');
+    document.getElementById('prog1').classList.add('done');
+    document.getElementById('prog2').classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    connectSSE();
     if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
       document.getElementById('mobileNotice').style.display = 'block';
     }
-    connectSSE();
-
-  } catch(e) {
-    showErr(e.message);
+  })
+  .catch(function(err) {
+    showErr('Something went wrong: ' + err.message + '. Please try again.');
     btn.disabled = false;
-    btn.textContent = 'Save & Continue to WhatsApp →';
-  }
+    btn.textContent = 'Save & Continue to WhatsApp Setup →';
+  });
 }
 
 function showErr(msg) {
-  var el = document.getElementById('errMsg');
-  el.textContent = msg;
+  var el = document.getElementById('formError');
+  el.textContent = '⚠️ ' + msg;
   el.style.display = 'block';
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// ── QR Code logic (original preserved exactly) ────────────────────────────────
+// ── QR Code library ───────────────────────────────────────────
 var qrScript = document.createElement('script');
 qrScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
 document.head.appendChild(qrScript);
 
+// ── URL params: pick up token from payment callback ───────────
+var params   = new URLSearchParams(window.location.search);
+var urlToken = params.get('token');
+var refId    = params.get('ref');
+
+if (urlToken) {
+  localStorage.setItem('forgebot_token', urlToken);
+  // Clean token out of the URL bar
+  window.history.replaceState({}, '', window.location.pathname + (params.get('activated') ? '?activated=1' : ''));
+}
+
 var token = localStorage.getItem('forgebot_token');
-if (!token) { window.location.href = '/'; }
+
+// ── Decide what to show ───────────────────────────────────────
+if (token) {
+  document.getElementById('setupContent').style.display = 'block';
+} else if (refId) {
+  document.getElementById('loginSection').style.display = 'block';
+} else {
+  window.location.href = '/';
+}
+
+// ── Partner login ─────────────────────────────────────────────
+function doLogin() {
+  var btn   = document.getElementById('loginBtn');
+  var email = document.getElementById('loginEmail').value.trim();
+  var pw    = document.getElementById('loginPassword').value;
+  var errEl = document.getElementById('loginErr');
+
+  errEl.style.display = 'none';
+  if (!email || !pw) { errEl.textContent = 'Please enter your email and password.'; errEl.style.display = 'block'; return; }
+
+  btn.disabled    = true;
+  btn.textContent = 'Logging in...';
+
+  fetch('/api/client/login', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ email: email, password: pw })
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+  .then(function(r) {
+    if (!r.ok) {
+      errEl.textContent  = r.data.error || 'Login failed. Please check your email and password.';
+      errEl.style.display = 'block';
+      btn.disabled    = false;
+      btn.textContent = 'Log In & Set Up My Bot →';
+      return;
+    }
+    token = r.data.token;
+    localStorage.setItem('forgebot_token', token);
+    document.getElementById('loginSection').style.display  = 'none';
+    document.getElementById('setupContent').style.display = 'block';
+  })
+  .catch(function() {
+    errEl.textContent  = 'Network error — please check your connection and try again.';
+    errEl.style.display = 'block';
+    btn.disabled    = false;
+    btn.textContent = 'Log In & Set Up My Bot →';
+  });
+}
+
+// Allow Enter key to submit login
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    var ls = document.getElementById('loginSection');
+    if (ls && ls.style.display !== 'none') doLogin();
+  }
+});
 
 function setStatus(type, text) {
   var badge = document.getElementById('statusBadge');
@@ -503,26 +728,27 @@ function connectSSE() {
   sse = new EventSource('/api/client/qr-stream?token=' + token);
 
   sse.addEventListener('qr', function(e) {
-    var data = JSON.parse(e.data);
-    var qr = data.qr;
-    document.getElementById('spinner').style.display = 'none';
-    document.getElementById('qrBox').innerHTML = '<canvas id="qrCanvas"></canvas>';
+    var data    = JSON.parse(e.data);
+    var spinner = document.getElementById('spinner');
+    var qrBox   = document.getElementById('qrBox');
+    spinner.style.display = 'none';
+    qrBox.innerHTML = '<canvas id="qrCanvas"></canvas>';
     document.getElementById('stepsGuide').style.display = 'block';
-    qrScript.onload = function(){ renderQR(qr); };
-    if (window.QRCode) renderQR(qr);
+    qrScript.onload = function() { renderQR(data.qr); };
+    if (window.QRCode) renderQR(data.qr);
     setStatus('scanning', 'Ready to scan — point your WhatsApp camera here');
   });
 
-  sse.addEventListener('connected', function(e) {
+  sse.addEventListener('connected', function() {
     sse.close();
     setStatus('connected', 'Connected!');
     setTimeout(function() {
       document.getElementById('mainContent').style.display = 'none';
-      document.getElementById('successMsg').style.display = 'block';
+      document.getElementById('successMsg').style.display  = 'block';
     }, 1000);
   });
 
-  sse.addEventListener('disconnected', function(e) {
+  sse.addEventListener('disconnected', function() {
     setStatus('error', 'Disconnected — reconnecting...');
     setTimeout(connectSSE, 4000);
   });
@@ -540,6 +766,7 @@ function renderQR(text) {
   QRCode.toCanvas(canvas, text, { width: 210, margin: 1, color: { dark: '#000', light: '#fff' } });
 }
 
+// Show expire note after 25 seconds
 setTimeout(function() {
   var note = document.getElementById('expireNote');
   if (note) note.style.display = 'block';
