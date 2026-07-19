@@ -66,3 +66,49 @@ self.addEventListener('fetch', function(event) {
       })
   );
 });
+
+// ── Push: show notification when server sends one ────────────
+self.addEventListener('push', function(event) {
+  var data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = {
+      title: 'ForgeBot',
+      body: event.data ? event.data.text() : 'You have a new notification.'
+    };
+  }
+
+  var title   = data.title || 'ForgeBot';
+  var options = {
+    body:    data.body    || 'You have a new notification.',
+    icon:    '/icons/icon-192.png',
+    badge:   '/icons/icon-192.png',
+    tag:     data.tag     || 'forgebot-notification',
+    data:    { url: data.url || '/dashboard' },
+    vibrate: [200, 100, 200],
+    requireInteraction: data.requireInteraction || false
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// ── Notification click: open / focus dashboard ───────────────
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  var targetUrl = (event.notification.data && event.notification.data.url) || '/dashboard';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var c = clientList[i];
+        if (c.url.includes('/dashboard') && 'focus' in c) {
+          return c.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
+});

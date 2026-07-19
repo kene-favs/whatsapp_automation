@@ -4,102 +4,163 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ForgeBot"/>
+<meta name="theme-color" content="#22c55e"/>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
-  :root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
-  header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-  header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
-  header .logo span{color:#fff}
-  .status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
-  .status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
-  nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
-  nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
-  nav button.active{color:var(--green);border-bottom-color:var(--green)}
-  .container{max-width:900px;margin:0 auto;padding:28px 20px}
-  .section{display:none}
-  .section.active{display:block}
-  h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
-  label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
-  input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
-  input:focus,textarea:focus,select:focus{border-color:var(--blue)}
-  textarea{min-height:80px;resize:vertical}
-  .btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
-  .btn-green{background:var(--green);color:#000}
-  .btn-green:hover{background:#16a34a}
-  .btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
-  .btn-blue{background:var(--blue);color:#fff}
-  .btn-gray{background:#374151;color:#e2e8f0}
-  .row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
-  .row .grow{flex:1}
-  .flow-item,.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
-  .flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
-  .msg{padding:10px 14px;border-radius:6px;font-size:.85rem;margin-bottom:12px;display:none}
-  .msg.show{display:block}
-  .msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
-  .msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
-  .broadcast-log{font-size:.8rem;color:#64748b;padding:6px 0;border-bottom:1px solid var(--border)}
-  .coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:22px;margin-bottom:16px;text-align:center}
-  .coming-soon .cs-icon{font-size:2.4rem;margin-bottom:8px}
-  .coming-soon h3{color:var(--purple);font-size:1rem;margin-bottom:6px}
-  .coming-soon p{font-size:.82rem;color:#94a3b8;max-width:420px;margin:0 auto 12px}
-  .cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px}
-  .feat-card{background:var(--card);border-radius:10px;padding:18px;margin-bottom:14px}
-  .notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
-  .notif-box b{color:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
+:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
+header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
+header .logo span{color:#fff}
+.status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
+.status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
 
-  /* ── Onboarding notice ─────────────────────────────────────── */
-  #onboardNotice{background:#0c1a0e;border:1px solid #166534;border-left:4px solid var(--green);border-radius:10px;padding:16px 20px;margin:20px 24px 0;display:none}
-  #onboardNotice .ob-title{font-size:.92rem;font-weight:700;color:var(--green);margin-bottom:10px}
-  #onboardNotice .ob-sub{font-size:.8rem;color:#94a3b8;margin-bottom:12px}
-  .ob-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.83rem}
-  .ob-item:last-child{border-bottom:none}
-  .ob-check{width:20px;height:20px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0}
-  .ob-check.done{background:#14532d;border-color:var(--green);color:var(--green)}
-  .ob-check.todo{background:#1c1917;border-color:#4b5563;color:#4b5563}
-  .ob-label{flex:1;color:#cbd5e1}
-  .ob-label.done-text{color:#64748b;text-decoration:line-through}
-  .ob-action{font-size:.75rem;color:var(--blue);cursor:pointer;text-decoration:underline;white-space:nowrap}
+/* ── Onboarding Notice ── */
+#onboardNotice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:10px;padding:16px 20px;margin:16px 20px 0}
+#onboardNotice h3{font-size:.9rem;font-weight:800;color:#60a5fa;margin-bottom:10px}
+.checklist-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.83rem}
+.checklist-item:last-child{border-bottom:none}
+.ci-icon{font-size:1rem;flex-shrink:0}
+.ci-text{flex:1;color:#94a3b8}
+.ci-link{font-size:.78rem;font-weight:700;color:#60a5fa;cursor:pointer;white-space:nowrap;text-decoration:none}
+.ci-link:hover{color:#93c5fd}
+.done-icon{color:var(--green)}
+.todo-icon{color:#f59e0b}
+
+nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto}
+nav button{background:none;border:none;color:#94a3b8;padding:14px 18px;cursor:pointer;font-size:.88rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
+nav button.active{color:var(--green);border-bottom-color:var(--green)}
+.container{max-width:900px;margin:0 auto;padding:28px 20px}
+.section{display:none}
+.section.active{display:block}
+h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
+input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--blue)}
+textarea{min-height:80px;resize:vertical}
+.btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{background:#16a34a}
+.btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-gray{background:#374151;color:#e2e8f0}
+.row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
+.row .grow{flex:1}
+.flow-item,.post-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
+.flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
+.msg{padding:10px 14px;border-radius:6px;font-size:.85rem;margin-bottom:12px;display:none}
+.msg.show{display:block}
+.msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
+.msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+.broadcast-log{font-size:.8rem;color:#64748b;padding:6px 0;border-bottom:1px solid var(--border)}
+.coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:22px;margin-bottom:16px;text-align:center}
+.coming-soon .cs-icon{font-size:2.4rem;margin-bottom:8px}
+.coming-soon h3{color:var(--purple);font-size:1rem;margin-bottom:6px}
+.coming-soon p{font-size:.82rem;color:#94a3b8;max-width:420px;margin:0 auto 12px}
+.cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px}
+.feat-card{background:var(--card);border-radius:10px;padding:18px;margin-bottom:14px}
+.notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.82rem;color:#93c5fd;margin-bottom:14px}
+.notif-box b{color:#fff}
+
+/* ── PWA Install Overlay ── */
+#pwa-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(6px);z-index:99999;align-items:center;justify-content:center;padding:20px}
+#pwa-overlay.show{display:flex}
+#pwa-card{background:#111827;border:1px solid #1e2d3d;border-radius:20px;padding:32px 28px;max-width:360px;width:100%;text-align:center;animation:slideUp .35s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+#pwa-card .pwa-logo{font-size:2rem;font-weight:900;color:#22c55e;margin-bottom:4px}
+#pwa-card .pwa-logo span{color:#fff}
+#pwa-card .pwa-tag{font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:100px;padding:3px 10px;display:inline-block;margin-bottom:18px}
+#pwa-card h2{font-size:1.1rem;font-weight:800;color:#f1f5f9;margin-bottom:8px;line-height:1.3}
+#pwa-card p{font-size:.84rem;color:#64748b;margin-bottom:24px;line-height:1.5}
+.pwa-install-btn{width:100%;background:#22c55e;color:#000;border:none;border-radius:10px;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer;margin-bottom:10px}
+.pwa-skip{background:none;border:none;color:#374151;font-size:.78rem;cursor:pointer;text-decoration:underline}
+#ios-section{display:none}
+.ios-steps{text-align:left;margin-bottom:20px}
+.ios-step{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.ios-step .snum{width:26px;height:26px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#22c55e;flex-shrink:0;margin-top:1px}
+.ios-step .stxt{font-size:.83rem;color:#94a3b8;line-height:1.45}
+.ios-step .stxt strong{color:#f1f5f9}
+.pwa-done-btn{width:100%;background:#22c55e;color:#000;border:none;border-radius:10px;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer}
+.bounce-arrow{font-size:1.3rem;animation:bounce .8s infinite alternate;display:inline-block;margin-left:4px}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-5px)}}
 </style>
 </head>
 <body>
 
+<!-- ── PWA Install Overlay ─────────────────────────────────── -->
+<div id="pwa-overlay">
+  <div id="pwa-card">
+    <div class="pwa-logo">Forge<span>Bot</span></div>
+    <div class="pwa-tag">Quick Access</div>
+    <h2>Add ForgeBot to your Home Screen</h2>
+    <p>Install the app so you can open your dashboard in one tap — no browser, no links, just click and go.</p>
+    <div id="android-section">
+      <button class="pwa-install-btn" id="pwa-install-btn">📲 &nbsp;Add to Home Screen</button><br/>
+      <button class="pwa-skip" id="pwa-skip-btn">I'll do it later</button>
+    </div>
+    <div id="ios-section">
+      <div class="ios-steps">
+        <div class="ios-step">
+          <div class="snum">1</div>
+          <div class="stxt">Tap the <strong>Share</strong> button at the bottom of your screen <span class="bounce-arrow">⬆️</span></div>
+        </div>
+        <div class="ios-step">
+          <div class="snum">2</div>
+          <div class="stxt">Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+        </div>
+        <div class="ios-step">
+          <div class="snum">3</div>
+          <div class="stxt">Tap <strong>"Add"</strong> in the top right corner</div>
+        </div>
+      </div>
+      <button class="pwa-done-btn" id="pwa-done-btn">✅ &nbsp;I've Added It!</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
 <header>
   <div class="logo">Forge<span>Bot</span></div>
   <div style="display:flex;align-items:center;gap:12px">
-    <span id="waBadge" class="status-badge disc">&#9679; Disconnected</span>
+    <span id="waBadge" class="status-badge disc">● Disconnected</span>
     <button class="btn btn-gray" onclick="logout()" style="padding:6px 14px;font-size:.8rem">Logout</button>
   </div>
 </header>
 
-<!-- ── Onboarding notice ────────────────────────────────────────────────────── -->
-<div id="onboardNotice">
-  <div class="ob-title">⚡ Your bot is almost ready — complete these steps to go live</div>
-  <div class="ob-sub">Once all steps are done this notice will disappear automatically.</div>
-  <div class="ob-item" id="ob_wa">
-    <div class="ob-check todo" id="ob_wa_check">✕</div>
-    <div class="ob-label" id="ob_wa_label">Connect your WhatsApp (scan QR code)</div>
-    <span class="ob-action" onclick="switchTab('settings', document.querySelector('nav button:last-child'))">Go to Settings →</span>
+<!-- ── Onboarding Notice ───────────────────────────────────── -->
+<div id="onboardNotice" style="display:none">
+  <h3>⚡ Complete your setup — your bot needs a few more things to go live</h3>
+  <div class="checklist-item" id="ci-wa">
+    <span class="ci-icon todo-icon">⏳</span>
+    <span class="ci-text">Connect your WhatsApp number</span>
+    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
   </div>
-  <div class="ob-item" id="ob_notif">
-    <div class="ob-check todo" id="ob_notif_check">✕</div>
-    <div class="ob-label" id="ob_notif_label">Set your notification WhatsApp number</div>
-    <span class="ob-action" onclick="switchTab('settings', document.querySelector('nav button:last-child'))">Go to Settings →</span>
+  <div class="checklist-item" id="ci-notif">
+    <span class="ci-icon todo-icon">⏳</span>
+    <span class="ci-text">Set your notification number (so you get payment alerts)</span>
+    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
   </div>
-  <div class="ob-item" id="ob_fallback">
-    <div class="ob-check todo" id="ob_fallback_check">✕</div>
-    <div class="ob-label" id="ob_fallback_label">Set a fallback message for unknown questions</div>
-    <span class="ob-action" onclick="switchTab('settings', document.querySelector('nav button:last-child'))">Go to Settings →</span>
+  <div class="checklist-item" id="ci-fallback">
+    <span class="ci-icon todo-icon">⏳</span>
+    <span class="ci-text">Add a fallback message (what bot says when it doesn't know the answer)</span>
+    <a class="ci-link" onclick="goSettings()">Go to Settings →</a>
   </div>
-  <div class="ob-item" id="ob_flows">
-    <div class="ob-check todo" id="ob_flows_check">✕</div>
-    <div class="ob-label" id="ob_flows_label">Add at least one auto-reply rule</div>
-    <span class="ob-action" onclick="switchTab('replies', document.querySelector('nav button.active'))">Go to Auto-Replies →</span>
+  <div class="checklist-item" id="ci-flows">
+    <span class="ci-icon todo-icon">⏳</span>
+    <span class="ci-text">Add at least one auto-reply rule so your bot can start answering customers</span>
+    <a class="ci-link" onclick="goReplies()">Go to Auto-Replies →</a>
   </div>
 </div>
 
+<!-- ── Navigation ─────────────────────────────────────────── -->
 <nav>
   <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
   <button onclick="switchTab('status',this)">Status Posts</button>
@@ -140,7 +201,7 @@
         <input id="spMedia" placeholder="https://i.imgur.com/yourimage.jpg"/>
       </div>
       <div style="margin-bottom:12px">
-        <label>Caption (optional - leave blank for auto caption)</label>
+        <label>Caption (optional — leave blank for auto caption)</label>
         <textarea id="spCaption" placeholder="Optional custom caption..."></textarea>
       </div>
       <div class="row">
@@ -176,58 +237,36 @@
   <!-- FEATURES -->
   <div id="tab-features" class="section">
     <h2>Bot Features</h2>
-
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#127908;</span>
+        <span style="font-size:1.4rem">🎙️</span>
         <span style="font-weight:700;color:var(--green)">Voice Note Transcription</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
       <p style="font-size:.83rem;color:#94a3b8">Customers send voice notes in Yoruba, Igbo, Hausa, Pidgin or English. Your bot automatically transcribes and replies in English text. Powered by OpenAI Whisper.</p>
     </div>
-
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#128176;</span>
+        <span style="font-size:1.4rem">💰</span>
         <span style="font-weight:700;color:var(--green)">Payment Confirmation Alerts</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
       <p style="font-size:.83rem;color:#94a3b8">When a customer says they have paid, your bot alerts you on your personal WhatsApp. Reply <b style="color:#fff">1</b> to confirm, <b style="color:#fff">2</b> to ask them wait, <b style="color:#fff">3</b> if not received. Bot messages the customer automatically.</p>
       <p style="font-size:.78rem;color:var(--orange);margin-top:8px">Set your notification number in the Settings tab.</p>
     </div>
-
     <div class="feat-card" style="border:1px solid var(--green)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:1.4rem">&#128588;</span>
+        <span style="font-size:1.4rem">🙏</span>
         <span style="font-weight:700;color:var(--green)">Human Handoff Detection</span>
         <span style="background:var(--green);color:#000;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:20px">LIVE</span>
       </div>
       <p style="font-size:.83rem;color:#94a3b8">When a customer asks to speak to a real person, the bot tells them to hold on, pauses itself for 30 minutes, and alerts you immediately on your personal WhatsApp.</p>
     </div>
-
-    <div style="margin:28px 0 10px;padding:10px 14px;background:#0d1a2e;border-left:3px solid var(--purple);border-radius:6px">
-      <p style="font-size:.82rem;color:#93c5fd">&#128640; <b style="color:#fff">Upcoming Upgrades</b> &mdash; You joined ForgeBot early. All features below will be unlocked for you <b style="color:var(--green)">completely free</b> when they go live. No extra payment needed.</p>
-    </div>
-
     <div class="coming-soon">
-      <div class="cs-icon">&#128274;</div>
+      <div class="cs-icon">🔒</div>
       <h3>Fake Payment Receipt Detection</h3>
-      <p>Customers sometimes send edited or fake payment screenshots to collect goods without paying. Our AI will scan every payment receipt image customers send in chat, verify if it is genuine or manipulated, and alert you immediately if it looks suspicious &mdash; so you never get deceived again.</p>
+      <p>Our AI will automatically scan payment screenshots sent by customers and verify if they are real or edited. No more fake alerts fooling your business.</p>
       <div class="cs-badge">COMING SOON</div>
-    </div>
-
-    <div class="coming-soon" style="border-color:#f97316;background:#1a0a00">
-      <div class="cs-icon">&#128247;&#127916;</div>
-      <h3 style="color:#f97316">Social Media Bot + AI Video Creator</h3>
-      <p>This is an upgrade to your existing ForgeBot &mdash; not a separate product. The same bot that handles your WhatsApp will expand to automatically reply DMs on <b style="color:#fff">Instagram, TikTok, and Facebook</b> using the same auto-reply rules you set here. On top of that, it will use AI to create short promotional videos for your business, add captions and background music, then post them directly to your social pages on a schedule you choose. Your business stays active online 24/7 without you doing anything.</p>
-      <div class="cs-badge" style="background:#f97316">COMING SOON</div>
-    </div>
-
-    <div class="coming-soon" style="border-color:#ef4444;background:#1a0000">
-      <div class="cs-icon">&#128680;</div>
-      <h3 style="color:#ef4444">Community Fraud Blacklist</h3>
-      <p>If a customer scams your business, you will be able to flag their WhatsApp number directly inside ForgeBot with one tap. When <b style="color:#fff">5 or more ForgeBot businesses</b> flag the same number, that person gets automatically blacklisted across the entire ForgeBot network. Every business using ForgeBot gets warned the moment that number tries to contact them. Nigerian SMEs looking out for each other &mdash; as a community.</p>
-      <div class="cs-badge" style="background:#ef4444">COMING SOON</div>
     </div>
   </div>
 
@@ -235,7 +274,6 @@
   <div id="tab-settings" class="section">
     <h2>Settings</h2>
     <div id="msgSettings" class="msg"></div>
-
     <div class="card">
       <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--green)">Your Notification Number</h3>
       <div class="notif-box">
@@ -245,14 +283,12 @@
       <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:12px"/>
       <button class="btn btn-green" onclick="saveNotifNumber()">Save Number</button>
     </div>
-
     <div class="card">
       <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">Fallback Message</h3>
       <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">Sent when a customer message does not match any auto-reply rule.</p>
       <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
       <button class="btn btn-green" style="margin-top:12px" onclick="saveFallback()">Save Fallback</button>
     </div>
-
     <div class="card">
       <h3 style="font-size:.95rem;margin-bottom:12px;color:#f1f5f9">WhatsApp Connection</h3>
       <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">If your bot disconnects, click below to reconnect. Open the link on a computer to scan the QR code with your phone.</p>
@@ -263,27 +299,31 @@
 </div>
 
 <script>
-const API = '';
-let TOKEN = localStorage.getItem('forgebot_token');
+// ── Auth ──────────────────────────────────────────────────────
+var API   = '';
+var TOKEN = localStorage.getItem('forgebot_token');
 if (!TOKEN) {
-  const t = new URLSearchParams(window.location.search).get('token');
+  var t = new URLSearchParams(window.location.search).get('token');
   if (t) { TOKEN = t; localStorage.setItem('forgebot_token', t); }
   else window.location.href = '/';
 }
-const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
+var H = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
 
+// ── Tab switching ─────────────────────────────────────────────
 function switchTab(id, btn) {
-  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
-  document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
-  document.getElementById('tab-'+id).classList.add('active');
-  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('nav button').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
 }
+function goSettings() { document.querySelector('nav button:nth-child(5)').click(); }
+function goReplies()  { document.querySelector('nav button:nth-child(1)').click(); }
 
 function showMsg(id, text, type) {
   var el = document.getElementById(id);
   el.textContent = text;
   el.className = 'msg show ' + type;
-  setTimeout(function(){ el.classList.remove('show'); }, 4000);
+  setTimeout(function() { el.classList.remove('show'); }, 4000);
 }
 
 function logout() {
@@ -295,153 +335,324 @@ function reconnectWA() {
   window.open('/onboard?token=' + TOKEN, '_blank');
 }
 
-// ── Onboarding notice ─────────────────────────────────────────────────────────
-async function checkOnboarding(client, flows) {
-  var waOk = client.whatsapp_status === 'connected';
-  var notifOk = !!(client.notification_number);
+// ── Onboarding notice ─────────────────────────────────────────
+function checkOnboarding(client, flows) {
+  var notice    = document.getElementById('onboardNotice');
+  var ciWa      = document.getElementById('ci-wa');
+  var ciNotif   = document.getElementById('ci-notif');
+  var ciFallback = document.getElementById('ci-fallback');
+  var ciFlows   = document.getElementById('ci-flows');
+
+  var waOk       = client.whatsapp_status === 'connected';
+  var notifOk    = !!(client.notification_number);
   var fallbackOk = !!(client.fallback_message);
-  var flowsOk = flows && flows.length > 0;
+  var flowsOk    = flows && flows.length > 0;
 
-  var allDone = waOk && notifOk && fallbackOk && flowsOk;
-  var notice = document.getElementById('onboardNotice');
-
-  if (allDone) { notice.style.display = 'none'; return; }
-  notice.style.display = 'block';
-
-  function setItem(id, done, label) {
-    document.getElementById(id + '_check').className = 'ob-check ' + (done ? 'done' : 'todo');
-    document.getElementById(id + '_check').textContent = done ? '✓' : '✕';
-    document.getElementById(id + '_label').className = 'ob-label' + (done ? ' done-text' : '');
-    document.getElementById(id + '_label').textContent = label;
+  function setItem(el, done, doneText, todoText) {
+    var icon = el.querySelector('.ci-icon');
+    var text = el.querySelector('.ci-text');
+    if (done) {
+      icon.textContent = '✅';
+      icon.className   = 'ci-icon done-icon';
+      text.textContent = doneText;
+      el.querySelector('.ci-link').style.display = 'none';
+    } else {
+      icon.textContent = '⏳';
+      icon.className   = 'ci-icon todo-icon';
+      text.textContent = todoText;
+      el.querySelector('.ci-link').style.display = '';
+    }
   }
 
-  setItem('ob_wa', waOk, waOk ? 'WhatsApp connected ✓' : 'Connect your WhatsApp — go to Settings → Reconnect WhatsApp');
-  setItem('ob_notif', notifOk, notifOk ? 'Notification number set ✓' : 'Set your notification WhatsApp number (Settings tab)');
-  setItem('ob_fallback', fallbackOk, fallbackOk ? 'Fallback message set ✓' : 'Set a fallback message for unknown questions (Settings tab)');
-  setItem('ob_flows', flowsOk, flowsOk ? 'Auto-reply rules added ✓' : 'Add at least one auto-reply rule so your bot can respond');
+  setItem(ciWa,       waOk,       'WhatsApp connected ✓',              'Connect your WhatsApp number');
+  setItem(ciNotif,    notifOk,    'Notification number set ✓',         'Set your notification number (so you get payment alerts)');
+  setItem(ciFallback, fallbackOk, 'Fallback message set ✓',            'Add a fallback message (what bot says when it doesn\'t know the answer)');
+  setItem(ciFlows,    flowsOk,    'Auto-reply rules added ✓',          'Add at least one auto-reply rule so your bot can answer customers');
+
+  var allDone = waOk && notifOk && fallbackOk && flowsOk;
+  notice.style.display = allDone ? 'none' : 'block';
 }
 
+// ── Load all ──────────────────────────────────────────────────
 async function loadAll() {
-  await loadFlows();
+  var flows = await loadFlows();
   await loadStatusPosts();
   await loadBroadcastLogs();
-  pollWaStatus();
+  pollWaStatus(flows);
 }
 
-async function pollWaStatus() {
+async function pollWaStatus(cachedFlows) {
   try {
-    var r = await fetch(API+'/api/client/me', { headers: H });
+    var r = await fetch(API + '/api/client/me', { headers: H });
     if (r.ok) {
-      var c = await r.json();
+      var c     = await r.json();
       var badge = document.getElementById('waBadge');
       if (c.whatsapp_status === 'connected') {
-        badge.textContent = 'Connected';
-        badge.className = 'status-badge';
+        badge.textContent = '● Connected';
+        badge.className   = 'status-badge';
       } else {
-        badge.textContent = 'Disconnected';
-        badge.className = 'status-badge disc';
+        badge.textContent = '● Disconnected';
+        badge.className   = 'status-badge disc';
       }
       if (c.notification_number) document.getElementById('notifNumber').value = c.notification_number;
-      if (c.fallback_message) document.getElementById('fallbackMsg').value = c.fallback_message;
+      if (c.fallback_message)    document.getElementById('fallbackMsg').value  = c.fallback_message;
 
       // Update onboarding notice
-      var flowsEl = document.getElementById('flowList');
-      var flowCount = flowsEl ? flowsEl.querySelectorAll('.flow-item').length : 0;
-      checkOnboarding(c, { length: flowCount });
+      var flows = cachedFlows || [];
+      try {
+        var fr = await fetch(API + '/api/client/flows', { headers: H });
+        if (fr.ok) flows = await fr.json();
+      } catch(e) {}
+      checkOnboarding(c, flows);
     }
   } catch(e) {}
-  setTimeout(pollWaStatus, 10000);
+  setTimeout(function() { pollWaStatus(); }, 10000);
 }
 
+// ── Flows ─────────────────────────────────────────────────────
 async function loadFlows() {
-  var r = await fetch(API+'/api/client/flows', { headers: H });
-  var flows = await r.json();
-  var el = document.getElementById('flowList');
-  if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return; }
-  el.innerHTML = flows.map(function(f) {
-    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">' + f.keywords + '</div><div class="flow-resp">' + f.response + '</div></div><button class="btn btn-red" onclick="deleteFlow(\'' + f.id + '\')">Delete</button></div>';
-  }).join('');
-  return flows;
+  try {
+    var r     = await fetch(API + '/api/client/flows', { headers: H });
+    var flows = await r.json();
+    var el    = document.getElementById('flowList');
+    if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No auto-reply rules yet.</p>'; return flows; }
+    el.innerHTML = flows.map(function(f) {
+      return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">' + esc(f.keywords) + '</div><div class="flow-resp">' + esc(f.response) + '</div></div><button class="btn btn-red" onclick="deleteFlow(\'' + f.id + '\')">Delete</button></div>';
+    }).join('');
+    return flows;
+  } catch(e) { return []; }
 }
 
 async function addFlow() {
-  var kw = document.getElementById('newKw').value.trim();
+  var kw   = document.getElementById('newKw').value.trim();
   var resp = document.getElementById('newResp').value.trim();
-  if (!kw || !resp) { showMsg('msgReplies','Please fill in keywords and reply.','err'); return; }
-  var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:resp}) });
-  if (r.ok) { document.getElementById('newKw').value=''; document.getElementById('newResp').value=''; showMsg('msgReplies','Rule added!','ok'); loadFlows(); }
-  else showMsg('msgReplies','Failed to add rule.','err');
+  if (!kw || !resp) { showMsg('msgReplies', 'Please fill in keywords and reply.', 'err'); return; }
+  var r = await fetch(API + '/api/client/flows', { method: 'POST', headers: H, body: JSON.stringify({ keywords: kw, response: resp }) });
+  if (r.ok) {
+    document.getElementById('newKw').value   = '';
+    document.getElementById('newResp').value = '';
+    showMsg('msgReplies', 'Rule added!', 'ok');
+    loadFlows();
+  } else { showMsg('msgReplies', 'Failed to add rule.', 'err'); }
 }
 
 async function deleteFlow(id) {
   if (!confirm('Delete this rule?')) return;
-  var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
-  if (r.ok) { showMsg('msgReplies','Rule deleted.','ok'); loadFlows(); }
+  var r = await fetch(API + '/api/client/flows/' + id, { method: 'DELETE', headers: H });
+  if (r.ok) { showMsg('msgReplies', 'Rule deleted.', 'ok'); loadFlows(); }
 }
 
+// ── Status Posts ──────────────────────────────────────────────
 async function loadStatusPosts() {
-  var r = await fetch(API+'/api/client/status-posts', { headers: H });
-  var posts = await r.json();
-  var el = document.getElementById('postList');
-  if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
-  el.innerHTML = posts.map(function(p) {
-    return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">' + (p.caption || '(auto caption)') + '</div><div style="font-size:.78rem;color:#64748b">' + (p.scheduled_time || p.post_time || '') + ' - ' + (p.scheduled_days || p.days || '') + '</div></div><button class="btn btn-red" onclick="deletePost(\'' + p.id + '\')">Delete</button></div>';
-  }).join('');
+  try {
+    var r     = await fetch(API + '/api/client/status-posts', { headers: H });
+    var posts = await r.json();
+    var el    = document.getElementById('postList');
+    if (!posts.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No scheduled posts yet.</p>'; return; }
+    el.innerHTML = posts.map(function(p) {
+      var time = p.post_time || p.scheduled_time || '';
+      var days = p.scheduled_days || p.days || '';
+      return '<div class="post-item"><div><div style="font-size:.85rem;color:#e2e8f0">' + esc(p.caption || '(auto caption)') + '</div><div style="font-size:.78rem;color:#64748b">' + time + ' — ' + days + '</div></div><button class="btn btn-red" onclick="deletePost(\'' + p.id + '\')">Delete</button></div>';
+    }).join('');
+  } catch(e) {}
 }
 
 async function addStatusPost() {
-  var mediaUrl = document.getElementById('spMedia').value.trim();
-  var caption = document.getElementById('spCaption').value.trim();
+  var mediaUrl     = document.getElementById('spMedia').value.trim();
+  var caption      = document.getElementById('spCaption').value.trim();
   var scheduledTime = document.getElementById('spTime').value.trim();
   var scheduledDays = document.getElementById('spDays').value.trim();
-  if (!mediaUrl || !scheduledTime || !scheduledDays) { showMsg('msgStatus','Please fill media URL, time and days.','err'); return; }
-  var r = await fetch(API+'/api/client/status-posts', { method:'POST', headers:H, body:JSON.stringify({mediaUrl:mediaUrl,caption:caption,scheduledTime:scheduledTime,scheduledDays:scheduledDays}) });
+  if (!mediaUrl || !scheduledTime || !scheduledDays) { showMsg('msgStatus', 'Please fill media URL, time and days.', 'err'); return; }
+  var r = await fetch(API + '/api/client/status-posts', { method: 'POST', headers: H, body: JSON.stringify({ mediaUrl: mediaUrl, caption: caption, scheduledTime: scheduledTime, scheduledDays: scheduledDays }) });
   if (r.ok) {
-    document.getElementById('spMedia').value=''; document.getElementById('spCaption').value=''; document.getElementById('spTime').value=''; document.getElementById('spDays').value='';
-    showMsg('msgStatus','Post scheduled!','ok'); loadStatusPosts();
-  } else showMsg('msgStatus','Failed to schedule.','err');
+    document.getElementById('spMedia').value   = '';
+    document.getElementById('spCaption').value = '';
+    document.getElementById('spTime').value    = '';
+    document.getElementById('spDays').value    = '';
+    showMsg('msgStatus', 'Post scheduled!', 'ok');
+    loadStatusPosts();
+  } else { showMsg('msgStatus', 'Failed to schedule.', 'err'); }
 }
 
 async function deletePost(id) {
   if (!confirm('Delete this scheduled post?')) return;
-  var r = await fetch(API+'/api/client/status-posts/'+id, { method:'DELETE', headers:H });
-  if (r.ok) { showMsg('msgStatus','Post deleted.','ok'); loadStatusPosts(); }
+  var r = await fetch(API + '/api/client/status-posts/' + id, { method: 'DELETE', headers: H });
+  if (r.ok) { showMsg('msgStatus', 'Post deleted.', 'ok'); loadStatusPosts(); }
 }
 
+// ── Broadcasts ────────────────────────────────────────────────
 async function loadBroadcastLogs() {
-  var r = await fetch(API+'/api/client/broadcasts', { headers: H });
-  var logs = await r.json();
-  var el = document.getElementById('broadcastLog');
-  if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
-  el.innerHTML = logs.map(function(l) {
-    return '<div class="broadcast-log">' + new Date(l.created_at).toLocaleString() + ' - ' + l.recipients + ' recipients - "' + l.message.slice(0,60) + '..."</div>';
-  }).join('');
+  try {
+    var r    = await fetch(API + '/api/client/broadcasts', { headers: H });
+    var logs = await r.json();
+    var el   = document.getElementById('broadcastLog');
+    if (!logs.length) { el.innerHTML = '<p style="color:#64748b;font-size:.85rem">No broadcasts yet.</p>'; return; }
+    el.innerHTML = logs.map(function(l) {
+      return '<div class="broadcast-log">' + new Date(l.created_at).toLocaleString() + ' — ' + l.recipients + ' recipients — "' + esc(l.message.slice(0, 60)) + '..."</div>';
+    }).join('');
+  } catch(e) {}
 }
 
 async function sendBroadcast() {
   var message = document.getElementById('bcMsg').value.trim();
-  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
+  if (!message) { showMsg('msgBroadcast', 'Please type a message.', 'err'); return; }
   if (!confirm('Send this to all recent contacts?')) return;
-  var r = await fetch(API+'/api/client/broadcasts', { method:'POST', headers:H, body:JSON.stringify({message:message}) });
-  if (r.ok) { document.getElementById('bcMsg').value=''; showMsg('msgBroadcast','Broadcast sent!','ok'); loadBroadcastLogs(); }
-  else showMsg('msgBroadcast','Failed to send.','err');
+  var r = await fetch(API + '/api/client/broadcasts', { method: 'POST', headers: H, body: JSON.stringify({ message: message }) });
+  if (r.ok) { document.getElementById('bcMsg').value = ''; showMsg('msgBroadcast', 'Broadcast sent!', 'ok'); loadBroadcastLogs(); }
+  else { showMsg('msgBroadcast', 'Failed to send.', 'err'); }
 }
 
+// ── Settings ──────────────────────────────────────────────────
 async function saveNotifNumber() {
-  var num = document.getElementById('notifNumber').value.trim().replace(/\D/g,'');
-  if (!num) { showMsg('msgSettings','Please enter a valid number.','err'); return; }
-  var r = await fetch(API+'/api/client/settings', { method:'PUT', headers:H, body:JSON.stringify({notification_number:num}) });
-  if (r.ok) { showMsg('msgSettings','Notification number saved!','ok'); }
-  else showMsg('msgSettings','Save failed.','err');
+  var num = document.getElementById('notifNumber').value.trim().replace(/\D/g, '');
+  if (!num) { showMsg('msgSettings', 'Please enter a valid number.', 'err'); return; }
+  var r = await fetch(API + '/api/client/settings', { method: 'PUT', headers: H, body: JSON.stringify({ notification_number: num }) });
+  if (r.ok) showMsg('msgSettings', 'Notification number saved!', 'ok');
+  else showMsg('msgSettings', 'Save failed.', 'err');
 }
 
 async function saveFallback() {
   var msg = document.getElementById('fallbackMsg').value.trim();
-  if (!msg) { showMsg('msgSettings','Please type a fallback message.','err'); return; }
-  var r = await fetch(API+'/api/client/fallback', { method:'PUT', headers:H, body:JSON.stringify({fallback_message:msg}) });
-  if (r.ok) showMsg('msgSettings','Fallback saved!','ok');
-  else showMsg('msgSettings','Save failed.','err');
+  if (!msg) { showMsg('msgSettings', 'Please type a fallback message.', 'err'); return; }
+  var r = await fetch(API + '/api/client/fallback', { method: 'PUT', headers: H, body: JSON.stringify({ fallback_message: msg }) });
+  if (r.ok) showMsg('msgSettings', 'Fallback saved!', 'ok');
+  else showMsg('msgSettings', 'Save failed.', 'err');
 }
+
+// ── Escape HTML ───────────────────────────────────────────────
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── PWA Install Prompt ────────────────────────────────────────
+(function() {
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                  || window.navigator.standalone === true;
+  if (isStandalone) return;
+  if (localStorage.getItem('forgebot_pwa_installed')) return;
+
+  var overlay        = document.getElementById('pwa-overlay');
+  var androidSec     = document.getElementById('android-section');
+  var iosSec         = document.getElementById('ios-section');
+  var installBtn     = document.getElementById('pwa-install-btn');
+  var skipBtn        = document.getElementById('pwa-skip-btn');
+  var doneBtn        = document.getElementById('pwa-done-btn');
+  var deferredPrompt = null;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  // Show after 2 seconds
+  setTimeout(function() {
+    if (isIOS) {
+      androidSec.style.display = 'none';
+      iosSec.style.display     = 'block';
+    }
+    overlay.classList.add('show');
+  }, 2000);
+
+  if (installBtn) {
+    installBtn.addEventListener('click', function() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function(result) {
+          if (result.outcome === 'accepted') {
+            localStorage.setItem('forgebot_pwa_installed', '1');
+            overlay.classList.remove('show');
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        localStorage.setItem('forgebot_pwa_installed', '1');
+        overlay.classList.remove('show');
+      }
+    });
+  }
+
+  if (doneBtn) {
+    doneBtn.addEventListener('click', function() {
+      localStorage.setItem('forgebot_pwa_installed', '1');
+      overlay.classList.remove('show');
+    });
+  }
+
+  if (skipBtn) {
+    skipBtn.addEventListener('click', function() {
+      overlay.classList.remove('show');
+    });
+  }
+
+  window.addEventListener('appinstalled', function() {
+    localStorage.setItem('forgebot_pwa_installed', '1');
+    overlay.classList.remove('show');
+  });
+})();
+
+// ── Service Worker + Notification Permission ──────────────────
+(function() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.register('/sw.js').then(async function(registration) {
+    console.log('[ForgeBot] Service worker registered');
+
+    // Ask for notification permission after a short delay
+    setTimeout(async function() {
+      if (Notification.permission === 'default') {
+        var perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          console.log('[ForgeBot] Notification permission granted');
+          // Try to subscribe to push notifications if VAPID key is configured
+          tryPushSubscribe(registration);
+        }
+      } else if (Notification.permission === 'granted') {
+        tryPushSubscribe(registration);
+      }
+    }, 5000);
+
+  }).catch(function(err) {
+    console.warn('[ForgeBot] SW registration failed:', err);
+  });
+
+  async function tryPushSubscribe(registration) {
+    try {
+      // Fetch VAPID public key from server
+      var r = await fetch(API + '/api/push/vapid-key');
+      if (!r.ok) return; // VAPID not configured yet — skip
+      var data = await r.json();
+      if (!data.publicKey) return;
+
+      var existing = await registration.pushManager.getSubscription();
+      if (existing) return; // Already subscribed
+
+      var subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+      });
+
+      // Send subscription to server
+      await fetch(API + '/api/push/subscribe', {
+        method: 'POST',
+        headers: H,
+        body: JSON.stringify(subscription)
+      });
+      console.log('[ForgeBot] Push subscription saved');
+    } catch(e) {
+      console.warn('[ForgeBot] Push subscribe failed:', e.message);
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var raw     = window.atob(base64);
+    var output  = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+    return output;
+  }
+})();
 
 loadAll();
 </script>
