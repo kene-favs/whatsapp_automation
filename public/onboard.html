@@ -3,15 +3,51 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>ForgeBot — Connect Your WhatsApp</title>
+<title>ForgeBot — Setup &amp; Connect</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:40px 36px;width:100%;max-width:460px;text-align:center}
-.logo{font-size:20px;font-weight:900;color:#25D366;margin-bottom:30px;letter-spacing:-1px}
+.card{background:#0d1520;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:40px 36px;width:100%;max-width:520px;text-align:center}
+.logo{font-size:20px;font-weight:900;color:#25D366;margin-bottom:24px;letter-spacing:-1px}
 .logo span{color:#fff}
-h1{font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:8px}
-p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:28px}
+h1{font-size:22px;font-weight:900;letter-spacing:-1px;margin-bottom:6px}
+p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:22px}
+
+/* Progress bar */
+.progress-bar{display:flex;align-items:center;gap:8px;margin-bottom:28px;justify-content:center}
+.prog-step{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.prog-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.3)}
+.prog-dot.active{background:#25D366;border-color:#25D366;color:#000}
+.prog-dot.done{background:#166534;border-color:#25D366;color:#25D366}
+.prog-line{width:40px;height:2px;background:rgba(255,255,255,.1)}
+.prog-line.done{background:#25D366}
+
+/* Form styles */
+.form-group{text-align:left;margin-bottom:16px}
+.form-group label{display:block;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:6px;font-weight:600}
+.form-group select,.form-group input,.form-group textarea{width:100%;background:#0a1120;border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:10px 12px;font-size:13px;outline:none;-webkit-appearance:none}
+.form-group select:focus,.form-group input:focus,.form-group textarea:focus{border-color:#25D366}
+.form-group select option{background:#0a1120}
+.form-section-title{text-align:left;font-size:11px;font-weight:800;color:#25D366;text-transform:uppercase;letter-spacing:.8px;margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(37,211,102,.15)}
+
+/* Social media */
+.social-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.social-icon{font-size:18px;flex-shrink:0;width:28px;text-align:center}
+.social-row input{flex:1}
+.social-note{font-size:11px;color:#f59e0b;text-align:left;margin-top:4px;display:none}
+
+/* Payment checkboxes */
+.pay-options{display:flex;flex-wrap:wrap;gap:8px;text-align:left}
+.pay-opt{display:flex;align-items:center;gap:6px;background:#0a1120;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;flex-shrink:0}
+.pay-opt input{width:14px;height:14px;accent-color:#25D366;cursor:pointer;margin:0}
+
+/* Button */
+.btn-main{width:100%;background:#25D366;color:#000;padding:13px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;margin-top:8px;transition:.2s}
+.btn-main:hover{background:#1db954}
+.btn-main:disabled{opacity:.5;cursor:not-allowed}
+.err-msg{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;text-align:left;display:none}
+
+/* QR styles — original preserved */
 .qr-box{width:220px;height:220px;margin:0 auto 24px;border-radius:14px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.03);position:relative;overflow:hidden}
 .qr-box img{width:210px;height:210px;border-radius:10px}
 .qr-box canvas{width:210px;height:210px}
@@ -28,11 +64,6 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .step-item{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
 .step-num{width:24px;height:24px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0}
 .step-text{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5}
-.success-msg{display:none;text-align:center}
-.success-msg .big{font-size:56px;margin-bottom:16px}
-.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
-.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
-.btn{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
 .mobile-notice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:22px;text-align:left;display:none}
 .mobile-notice .mn-title{font-size:13px;font-weight:800;color:#60a5fa;margin-bottom:8px}
 .mobile-notice .mn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
@@ -41,110 +72,462 @@ p.sub{font-size:14px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .mobile-notice .mn-text b{color:#93c5fd}
 .qr-tip{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.5}
 .expire-note{font-size:12px;color:#ffa726;margin-top:8px;display:none}
+.success-msg{display:none;text-align:center}
+.success-msg .big{font-size:56px;margin-bottom:16px}
+.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
+.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
+.btn-go{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
 </style>
 </head>
 <body>
-
 <div class="card">
   <div class="logo">Forge<span>Bot</span></div>
 
-  <div id="mainContent">
-    <h1>Connect Your WhatsApp</h1>
-    <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
-
-    <!-- Mobile notice — shown only on phones -->
-    <div class="mobile-notice" id="mobileNotice">
-      <div class="mn-title">&#128242; Using your phone? Read this first</div>
-      <div class="mn-row"><div class="mn-icon">&#128073;</div><div class="mn-text">The QR code on this screen must be <b>scanned by your WhatsApp</b> — but WhatsApp cannot scan a QR code on the same phone it is installed on.</div></div>
-      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 1:</b> Open this link on a <b>laptop or computer</b>, then scan with your phone.</div></div>
-      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 2:</b> Send this link to a <b>friend or family member's phone</b>. Open it on their phone, then scan with your WhatsApp.</div></div>
-      <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 3:</b> Open this link on a <b>tablet</b> and scan with your phone.</div></div>
-      <div class="mn-row"><div class="mn-icon">&#128736;</div><div class="mn-text"><b>Cyber café:</b> You can also go to a cyber café, open this link on their computer, and scan from there.</div></div>
+  <!-- ══════════════════════════════════════════
+       STEP 1 — Business Setup Questionnaire
+  ══════════════════════════════════════════ -->
+  <div id="setupSection">
+    <div class="progress-bar">
+      <div class="prog-step">
+        <div class="prog-dot active" id="dot1">1</div>
+        <span style="font-size:11px;color:rgba(255,255,255,.4)">Setup</span>
+      </div>
+      <div class="prog-line" id="line1"></div>
+      <div class="prog-step">
+        <div class="prog-dot" id="dot2">2</div>
+        <span style="font-size:11px;color:rgba(255,255,255,.4)">Connect WhatsApp</span>
+      </div>
     </div>
 
-    <div class="status-badge waiting" id="statusBadge">
-      <div class="sdot"></div>
-      <span id="statusText">Generating QR code...</span>
+    <h1>Tell us about your business</h1>
+    <p class="sub">This helps your bot give accurate answers to your customers. Takes less than 2 minutes.</p>
+
+    <div id="errMsg" class="err-msg"></div>
+
+    <!-- Occupation -->
+    <div class="form-group">
+      <label>What type of business do you run? *</label>
+      <select id="occupation" onchange="showOccupationQuestions(this.value)" required>
+        <option value="">— Select your business type —</option>
+        <option value="real_estate">Real Estate (property sales, rentals, land)</option>
+        <option value="photography">Photography / Videography</option>
+        <option value="beauty">Beauty (hair, makeup, nails, skincare)</option>
+        <option value="fashion">Fashion (clothing, outfits, tailoring)</option>
+        <option value="food">Food (restaurant, catering, home chef, baking)</option>
+        <option value="medical">Medical / Healthcare</option>
+        <option value="legal">Legal Services (lawyer, solicitor)</option>
+        <option value="consulting">Consulting / Coaching</option>
+        <option value="logistics">Logistics / Dispatch / Delivery</option>
+        <option value="education">Education / Training / Tutoring</option>
+        <option value="events">Events (planning, decoration, MC)</option>
+        <option value="tech">Tech Services (web, app, IT support)</option>
+        <option value="auto">Automotive (repairs, sales, parts, car wash)</option>
+        <option value="agriculture">Agriculture / Farm Produce</option>
+        <option value="travel">Travel / Tourism / Visa</option>
+        <option value="fitness">Fitness / Gym / Personal Training</option>
+        <option value="interior">Interior Design / Renovation</option>
+        <option value="general">Other / General Business</option>
+      </select>
     </div>
 
-    <div class="qr-box" id="qrBox">
-      <div class="spinner" id="spinner"></div>
-      <img id="qrImage" style="display:none" src="" alt="QR Code"/>
+    <!-- Dynamic occupation-specific questions -->
+    <div id="occQuestions" style="display:none"></div>
+
+    <!-- Common questions (shown after occupation is selected) -->
+    <div id="commonQuestions" style="display:none">
+      <div class="form-section-title">General Business Info</div>
+
+      <div class="form-group">
+        <label>When are you available? (days and hours) *</label>
+        <input id="availability_days" type="text" placeholder="e.g. Mon–Sat, 8am–6pm. Sundays by appointment only" required/>
+      </div>
+
+      <div class="form-group">
+        <label>Payment methods you accept *</label>
+        <div class="pay-options">
+          <label class="pay-opt"><input type="checkbox" value="Bank Transfer" name="payment"/> Bank Transfer</label>
+          <label class="pay-opt"><input type="checkbox" value="POS Machine" name="payment"/> POS Machine</label>
+          <label class="pay-opt"><input type="checkbox" value="Cash" name="payment"/> Cash</label>
+          <label class="pay-opt"><input type="checkbox" value="USSD" name="payment"/> USSD (*737# etc)</label>
+          <label class="pay-opt"><input type="checkbox" value="Online Payment" name="payment"/> Online Payment</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Any current promotion or discount? (optional)</label>
+        <input id="current_promo" type="text" placeholder="e.g. 10% off all orders this week, Free delivery above ₦10,000"/>
+      </div>
+
+      <!-- Social Media -->
+      <div class="form-section-title">Social Media Handles <span style="font-size:10px;color:#f59e0b;font-weight:400;text-transform:none">(fill at least one)</span></div>
+
+      <div class="social-row">
+        <div class="social-icon">📸</div>
+        <input id="instagram" type="text" placeholder="Instagram handle e.g. @yourbusiness"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon">👤</div>
+        <input id="facebook" type="text" placeholder="Facebook page name or link"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon">🎵</div>
+        <input id="tiktok" type="text" placeholder="TikTok handle e.g. @yourbusiness"/>
+      </div>
+      <div class="social-row">
+        <div class="social-icon">💬</div>
+        <input id="whatsapp_channel" type="text" placeholder="WhatsApp Channel link"/>
+      </div>
+      <div class="social-note" id="socialNote">⚠️ Please enter at least one social media handle to continue.</div>
     </div>
 
-    <div class="steps" id="stepsGuide">
-      <h3>How to scan</h3>
-      <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <b style="color:#fff">WhatsApp</b> on the phone you want the bot to run on</div></div>
-      <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the <b style="color:#fff">three dots menu (⋮)</b> at the top right → tap <b style="color:#fff">Linked Devices</b></div></div>
-      <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> → point your phone camera at the QR code on this screen</div></div>
-      <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically &#127881;</div></div>
-      <div class="expire-note" id="expireNote">&#9203; QR code refreshes every 30 seconds &mdash; a new one loads automatically if it expires.</div>
-      <p class="qr-tip">&#128161; The QR code must be shown on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it. If you are on your phone now, see the blue box above.</p>
-    </div>
+    <button class="btn-main" id="submitSetup" onclick="submitQuestionnaire()" style="display:none">Save &amp; Continue to WhatsApp →</button>
   </div>
 
-  <!-- ── Success screen ── -->
-  <div class="success-msg" id="successMsg">
-    <div class="big">🎉</div>
-    <h2>WhatsApp Connected!</h2>
-    <p>One last step — tell us a little about your business so your bot knows exactly how to handle your customers.</p>
-    <!-- href is set dynamically below using the stored token -->
-    <a href="#" class="btn" id="setupLink">Set Up My Bot →</a>
+  <!-- ══════════════════════════════════════════
+       STEP 2 — QR Code (original content)
+  ══════════════════════════════════════════ -->
+  <div id="qrSection" style="display:none">
+    <div class="progress-bar">
+      <div class="prog-step">
+        <div class="prog-dot done">✓</div>
+        <span style="font-size:11px;color:rgba(255,255,255,.4)">Setup</span>
+      </div>
+      <div class="prog-line done"></div>
+      <div class="prog-step">
+        <div class="prog-dot active">2</div>
+        <span style="font-size:11px;color:rgba(255,255,255,.4)">Connect WhatsApp</span>
+      </div>
+    </div>
+
+    <div id="mainContent">
+      <h1>Connect Your WhatsApp</h1>
+      <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
+
+      <div class="mobile-notice" id="mobileNotice">
+        <div class="mn-title">📱 Using your phone? Read this first</div>
+        <div class="mn-row"><div class="mn-icon">👉</div><div class="mn-text">The QR code on this screen must be <b>scanned by your WhatsApp</b> — but WhatsApp cannot scan a QR code on the same phone it is installed on.</div></div>
+        <div class="mn-row"><div class="mn-icon">✅</div><div class="mn-text"><b>Option 1:</b> Open this link on a <b>laptop or computer</b>, then scan with your phone.</div></div>
+        <div class="mn-row"><div class="mn-icon">✅</div><div class="mn-text"><b>Option 2:</b> Send this link to a <b>friend or family member's phone</b>. Open it on their phone, then scan with your WhatsApp.</div></div>
+        <div class="mn-row"><div class="mn-icon">✅</div><div class="mn-text"><b>Option 3:</b> Open this link on a <b>tablet</b> and scan with your phone.</div></div>
+        <div class="mn-row"><div class="mn-icon">🔧</div><div class="mn-text"><b>Cyber café:</b> You can also go to a cyber café, open this link on their computer, and scan from there.</div></div>
+      </div>
+
+      <div class="status-badge waiting" id="statusBadge">
+        <div class="sdot"></div>
+        <span id="statusText">Generating QR code...</span>
+      </div>
+
+      <div class="qr-box" id="qrBox">
+        <div class="spinner" id="spinner"></div>
+        <img id="qrImage" style="display:none" src="" alt="QR Code"/>
+      </div>
+
+      <div class="steps" id="stepsGuide">
+        <h3>How to scan</h3>
+        <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <b style="color:#fff">WhatsApp</b> on the phone you want the bot to run on</div></div>
+        <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the <b style="color:#fff">three dots menu (⋮)</b> at the top right → tap <b style="color:#fff">Linked Devices</b></div></div>
+        <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> → point your phone camera at the QR code on this screen</div></div>
+        <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically 🎉</div></div>
+        <div class="expire-note" id="expireNote">⏱ QR code refreshes every 30 seconds — a new one loads automatically if it expires.</div>
+        <p class="qr-tip">💡 The QR code must be shown on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it. If you are on your phone now, see the blue box above.</p>
+      </div>
+    </div>
+
+    <div class="success-msg" id="successMsg">
+      <div class="big">🎉</div>
+      <h2>Your Bot is Live!</h2>
+      <p>WhatsApp connected successfully. Your bot is now replying customers, posting status, and running 24/7.</p>
+      <a href="/dashboard" class="btn-go">Go to My Dashboard →</a>
+    </div>
   </div>
 </div>
 
 <script>
-// QR library
-const script = document.createElement('script');
-script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
-document.head.appendChild(script);
+// ── Occupation questions ───────────────────────────────────────────────────────
+var OCC_QUESTIONS = {
+  real_estate: [
+    {label:"What areas/locations do you cover? *",name:"service_areas",type:"text",placeholder:"e.g. Lekki, Ajah, Victoria Island, Abuja"},
+    {label:"What types of properties do you deal with? *",name:"property_types",type:"text",placeholder:"e.g. Land, Duplex, Flat, Short-let, Commercial"},
+    {label:"Do you handle rentals, sales, or both? *",name:"deal_type",type:"select",options:["Rentals only","Sales only","Both rentals and sales"]},
+    {label:"Can clients schedule property viewings?",name:"viewings",type:"select",options:["Yes, by appointment","Yes, walk-in allowed","No, virtual tours only"]}
+  ],
+  photography: [
+    {label:"Do you work from a studio, go to clients, or both? *",name:"studio_location",type:"select",options:["Studio only","I go to clients","Both studio and client location"]},
+    {label:"What types of photography/videography do you offer? *",name:"photography_types",type:"text",placeholder:"e.g. Wedding, Portrait, Product, Events, Passport"},
+    {label:"How far in advance must clients book?",name:"advance_booking",type:"text",placeholder:"e.g. At least 3 days, 1 week minimum"},
+    {label:"Is a deposit required to confirm a booking?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment upfront","No deposit needed","Flexible"]}
+  ],
+  beauty: [
+    {label:"Do you offer home service? *",name:"home_service",type:"select",options:["Yes, I come to you","No, salon/studio only","Both available"]},
+    {label:"Where is your salon/studio? (leave blank if home-service only)",name:"studio_location",type:"text",placeholder:"e.g. Surulere, Lagos — near Total filling station"},
+    {label:"How far ahead must clients book?",name:"advance_booking",type:"text",placeholder:"e.g. 24 hours notice required, Same day okay"},
+    {label:"Is a deposit required for appointments?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment","No deposit needed"]}
+  ],
+  fashion: [
+    {label:"Do you make custom outfits, sell ready-made, or both? *",name:"fashion_type",type:"select",options:["Custom outfits only","Ready-made only","Both custom and ready-made"]},
+    {label:"How long does a custom order take? *",name:"delivery_time_local",type:"text",placeholder:"e.g. 3–5 days, 1 week for complex styles"},
+    {label:"Do you offer delivery? If yes, where?",name:"delivers_to",type:"text",placeholder:"e.g. Lagos only, Nationwide via courier"},
+    {label:"Return/exchange policy?",name:"return_policy",type:"text",placeholder:"e.g. No returns on custom orders, Exchange within 48hrs for ready-made"}
+  ],
+  food: [
+    {label:"Do you offer delivery? *",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup only","Both delivery and pickup"]},
+    {label:"Delivery areas and fees?",name:"delivers_to",type:"text",placeholder:"e.g. Lekki: ₦500, Mainland: ₦1,500, Free delivery above ₦15,000"},
+    {label:"Minimum order amount?",name:"minimum_order",type:"text",placeholder:"e.g. ₦2,000 minimum, No minimum"},
+    {label:"How far in advance should orders be placed?",name:"advance_booking",type:"text",placeholder:"e.g. Same day okay before 12pm, Next day for large orders"}
+  ],
+  medical: [
+    {label:"Do you offer online/telemedicine consultations? *",name:"home_service",type:"select",options:["Yes — online and physical","Physical only","Online only"]},
+    {label:"Do patients need appointments or can they walk in? *",name:"advance_booking",type:"select",options:["Appointment required","Walk-in accepted","Both — appointments preferred"]},
+    {label:"What services or specialties do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. General practice, Dental, Eye care, Physiotherapy"},
+    {label:"Do you offer home visits?",name:"home_visits",type:"select",options:["Yes, home visits available","No, clinic only"]}
+  ],
+  legal: [
+    {label:"What areas of law do you practice? *",name:"service_areas",type:"text",placeholder:"e.g. Property law, Family law, Business law, Criminal law"},
+    {label:"Do you offer a free initial consultation? *",name:"free_consult",type:"select",options:["Yes — free first consultation","No — all consultations are billed","Yes — 15 minute free call only"]},
+    {label:"How can clients reach you for urgent matters?",name:"availability_days",type:"text",placeholder:"e.g. Weekdays 9am–5pm, WhatsApp for urgent matters after hours"}
+  ],
+  consulting: [
+    {label:"What type of consulting do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Business strategy, HR, Finance, Marketing, Career coaching"},
+    {label:"Online or in-person sessions? *",name:"session_type",type:"select",options:["Online only","In-person only","Both online and in-person"]},
+    {label:"How long is a typical session?",name:"session_duration",type:"text",placeholder:"e.g. 1 hour, 2 hours, Half day workshop"},
+    {label:"Do you offer a free discovery call?",name:"free_consult",type:"select",options:["Yes — 30 min free call","No — all sessions are paid","Yes — 15 min free call"]}
+  ],
+  logistics: [
+    {label:"What areas do you deliver to? *",name:"delivers_to",type:"text",placeholder:"e.g. Lagos only, Southwest Nigeria, Nationwide"},
+    {label:"What is your typical delivery timeline? *",name:"delivery_time_local",type:"text",placeholder:"e.g. Same day within Lagos, 2–3 days outside Lagos"},
+    {label:"What types of items do you handle?",name:"service_areas",type:"text",placeholder:"e.g. Documents, Packages, Heavy goods, Fragile items"},
+    {label:"Minimum delivery fee?",name:"delivery_fee_local",type:"text",placeholder:"e.g. ₦1,000 within Lagos, ₦2,500 interstate"}
+  ],
+  education: [
+    {label:"Online or physical classes? *",name:"session_type",type:"select",options:["Physical classes only","Online classes only","Both online and physical"]},
+    {label:"Who do you teach? (age group or level) *",name:"who_do_you_serve",type:"text",placeholder:"e.g. Primary school, Secondary, University, Adults, Professionals"},
+    {label:"Group or individual sessions?",name:"session_duration",type:"select",options:["Group classes only","Individual/private only","Both available"]},
+    {label:"How do students enroll?",name:"advance_booking",type:"text",placeholder:"e.g. WhatsApp to book, Pay then get access, Monthly subscription"}
+  ],
+  events: [
+    {label:"What types of events do you handle? *",name:"service_areas",type:"text",placeholder:"e.g. Weddings, Birthdays, Corporate events, Conferences, Burials"},
+    {label:"What services do you provide? *",name:"event_services",type:"text",placeholder:"e.g. Full planning, Decoration only, Catering, MC, Full package"},
+    {label:"How far in advance should clients book?",name:"advance_booking",type:"text",placeholder:"e.g. Minimum 2 weeks, 1 month for large events"},
+    {label:"Is a deposit required to secure a date?",name:"deposit_required",type:"select",options:["Yes — 50% upfront","Yes — full payment upfront","Flexible"]}
+  ],
+  tech: [
+    {label:"What tech services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Website design, Mobile apps, IT support, CCTV, Network setup"},
+    {label:"Do you work remotely or on-site? *",name:"session_type",type:"select",options:["Remote only","On-site only","Both remote and on-site"]},
+    {label:"What is a typical project timeline?",name:"delivery_time_local",type:"text",placeholder:"e.g. Website: 2 weeks, App: 2–3 months"},
+    {label:"Do you offer ongoing maintenance/support?",name:"bulk_orders",type:"select",options:["Yes — monthly support plans available","No — one-time projects only","Yes — on request basis"]}
+  ],
+  auto: [
+    {label:"What automotive services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Car repair, Spray painting, Car sales, Auto parts, Car wash"},
+    {label:"Do you offer pickup/drop service for repairs?",name:"home_service",type:"select",options:["Yes — we pick up and return","No — drive in only","Yes, for additional fee"]},
+    {label:"Where are you located? *",name:"studio_location",type:"text",placeholder:"e.g. Ajegunle, Lagos — by Mile 2 bridge"}
+  ],
+  agriculture: [
+    {label:"What do you produce or sell? *",name:"service_areas",type:"text",placeholder:"e.g. Rice, Tomatoes, Poultry, Frozen fish, Vegetables"},
+    {label:"Do you offer delivery? *",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup only","Both available"]},
+    {label:"Minimum order quantity or amount?",name:"minimum_order",type:"text",placeholder:"e.g. Minimum 1 bag, ₦5,000 minimum order"},
+    {label:"Do you offer bulk/wholesale discounts?",name:"bulk_orders",type:"select",options:["Yes — contact me for wholesale prices","Negotiable for large orders","No discounts"]}
+  ],
+  travel: [
+    {label:"What type of travel packages do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Domestic tours, International packages, Hajj/Umrah, Honeymoon"},
+    {label:"Do you handle visa processing? *",name:"visa_service",type:"select",options:["Yes — full visa processing service","No — travel packages only","Yes, for select countries only"]},
+    {label:"How far in advance should clients book?",name:"advance_booking",type:"text",placeholder:"e.g. Minimum 2 weeks, 1 month for international"},
+    {label:"Group packages available?",name:"bulk_orders",type:"select",options:["Yes — group discounts available","Individual packages only","Both individual and group"]}
+  ],
+  fitness: [
+    {label:"Physical gym/studio or online training? *",name:"session_type",type:"select",options:["Physical gym/studio","Online coaching only","Both available"]},
+    {label:"One-on-one or group sessions? *",name:"session_duration",type:"select",options:["One-on-one only","Group classes only","Both available"]},
+    {label:"Your location (if physical)?",name:"studio_location",type:"text",placeholder:"e.g. Ikoyi, Lagos — open 6am to 9pm daily"},
+    {label:"Is a trial session available?",name:"free_consult",type:"select",options:["Yes — first session free","Yes — discounted trial class","No — regular pricing from day one"]}
+  ],
+  interior: [
+    {label:"What interior services do you offer? *",name:"service_areas",type:"text",placeholder:"e.g. Interior design, Renovation, Furniture supply, Space planning"},
+    {label:"Do you have a showroom?",name:"studio_location",type:"text",placeholder:"e.g. Yes — Victoria Island, Lagos OR No showroom, we visit clients"},
+    {label:"Typical project completion timeline?",name:"delivery_time_local",type:"text",placeholder:"e.g. Design concept: 2 weeks, Full renovation: 4–8 weeks"},
+    {label:"Minimum project budget?",name:"minimum_order",type:"text",placeholder:"e.g. ₦500,000 minimum, No minimum for consultation"}
+  ],
+  general: [
+    {label:"What products or services do you offer? *",name:"service_areas",type:"text",placeholder:"Describe your main products or services"},
+    {label:"How do customers order from you? *",name:"who_do_you_serve",type:"text",placeholder:"e.g. WhatsApp order, Visit our shop, Call us to book"},
+    {label:"Do you offer delivery?",name:"home_service",type:"select",options:["Yes — I deliver","No — pickup/visit only","Both available"]},
+    {label:"Return/refund policy?",name:"return_policy",type:"text",placeholder:"e.g. No returns after 24hrs, Full refund within 48hrs"}
+  ]
+};
 
-const token = localStorage.getItem('forgebot_token');
+function showOccupationQuestions(occ) {
+  var container = document.getElementById('occQuestions');
+  var common = document.getElementById('commonQuestions');
+  var btn = document.getElementById('submitSetup');
+
+  if (!occ) {
+    container.style.display = 'none';
+    common.style.display = 'none';
+    btn.style.display = 'none';
+    return;
+  }
+
+  var questions = OCC_QUESTIONS[occ] || OCC_QUESTIONS['general'];
+  var html = '<div class="form-section-title">About Your ' + document.getElementById('occupation').options[document.getElementById('occupation').selectedIndex].text.split('(')[0].trim() + '</div>';
+
+  questions.forEach(function(q) {
+    html += '<div class="form-group"><label>' + q.label + '</label>';
+    if (q.type === 'select') {
+      html += '<select id="occ_' + q.name + '"><option value="">— Select —</option>';
+      q.options.forEach(function(o) { html += '<option value="' + o + '">' + o + '</option>'; });
+      html += '</select>';
+    } else {
+      html += '<input type="text" id="occ_' + q.name + '" placeholder="' + q.placeholder + '"/>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+  container.style.display = 'block';
+  common.style.display = 'block';
+  btn.style.display = 'block';
+}
+
+async function submitQuestionnaire() {
+  var errEl = document.getElementById('errMsg');
+  errEl.style.display = 'none';
+
+  // Validate occupation
+  var occupation = document.getElementById('occupation').value;
+  if (!occupation) { showErr('Please select your business type.'); return; }
+
+  // Validate occupation-specific required fields
+  var questions = OCC_QUESTIONS[occupation] || OCC_QUESTIONS['general'];
+  var occData = {};
+  for (var i = 0; i < questions.length; i++) {
+    var q = questions[i];
+    var el = document.getElementById('occ_' + q.name);
+    if (el) {
+      var val = el.value.trim();
+      if (q.label.includes('*') && !val) {
+        showErr('Please fill in: ' + q.label.replace(' *', ''));
+        return;
+      }
+      if (val) occData[q.name] = val;
+    }
+  }
+
+  // Validate availability
+  var availability = document.getElementById('availability_days').value.trim();
+  if (!availability) { showErr('Please enter your business availability hours.'); return; }
+
+  // Validate payment methods
+  var paymentBoxes = document.querySelectorAll('input[name="payment"]:checked');
+  if (paymentBoxes.length === 0) { showErr('Please select at least one payment method.'); return; }
+  var paymentMethods = Array.from(paymentBoxes).map(function(cb){ return cb.value; }).join(', ');
+
+  // Validate social media — at least one required
+  var instagram = document.getElementById('instagram').value.trim();
+  var facebook = document.getElementById('facebook').value.trim();
+  var tiktok = document.getElementById('tiktok').value.trim();
+  var whatsapp_channel = document.getElementById('whatsapp_channel').value.trim();
+  if (!instagram && !facebook && !tiktok && !whatsapp_channel) {
+    document.getElementById('socialNote').style.display = 'block';
+    showErr('Please enter at least one social media handle.');
+    return;
+  }
+  document.getElementById('socialNote').style.display = 'none';
+
+  // Build payload
+  var payload = {
+    occupation: occupation,
+    occupation_data: occData,
+    availability_days: availability,
+    payment_methods: paymentMethods,
+    current_promo: document.getElementById('current_promo').value.trim(),
+    instagram: instagram,
+    facebook: facebook,
+    tiktok: tiktok,
+    whatsapp_channel: whatsapp_channel
+  };
+
+  // Disable button
+  var btn = document.getElementById('submitSetup');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    var token = localStorage.getItem('forgebot_token');
+    var r = await fetch('/api/client/bot-setup', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload)
+    });
+
+    if (!r.ok) {
+      var err = await r.json().catch(function(){ return {}; });
+      throw new Error(err.error || 'Failed to save. Please try again.');
+    }
+
+    // Move to QR step
+    document.getElementById('setupSection').style.display = 'none';
+    document.getElementById('qrSection').style.display = 'block';
+    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      document.getElementById('mobileNotice').style.display = 'block';
+    }
+    connectSSE();
+
+  } catch(e) {
+    showErr(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Save & Continue to WhatsApp →';
+  }
+}
+
+function showErr(msg) {
+  var el = document.getElementById('errMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── QR Code logic (original preserved exactly) ────────────────────────────────
+var qrScript = document.createElement('script');
+qrScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
+document.head.appendChild(qrScript);
+
+var token = localStorage.getItem('forgebot_token');
 if (!token) { window.location.href = '/'; }
 
-// Set the setup link with the token so the questionnaire page knows who the user is
-document.getElementById('setupLink').href = '/setup?token=' + token;
-
 function setStatus(type, text) {
-  const badge = document.getElementById('statusBadge');
+  var badge = document.getElementById('statusBadge');
   badge.className = 'status-badge ' + type;
   document.getElementById('statusText').textContent = text;
 }
 
-let sse;
+var sse;
 function connectSSE() {
-  sse = new EventSource(`/api/client/qr-stream?token=${token}`);
+  sse = new EventSource('/api/client/qr-stream?token=' + token);
 
-  sse.addEventListener('qr', (e) => {
-    const { qr } = JSON.parse(e.data);
-    const spinner = document.getElementById('spinner');
-    const qrBox = document.getElementById('qrBox');
-
-    spinner.style.display = 'none';
-    qrBox.innerHTML = '<canvas id="qrCanvas"></canvas>';
+  sse.addEventListener('qr', function(e) {
+    var data = JSON.parse(e.data);
+    var qr = data.qr;
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('qrBox').innerHTML = '<canvas id="qrCanvas"></canvas>';
     document.getElementById('stepsGuide').style.display = 'block';
-
-    script.onload = () => renderQR(qr);
+    qrScript.onload = function(){ renderQR(qr); };
     if (window.QRCode) renderQR(qr);
-
     setStatus('scanning', 'Ready to scan — point your WhatsApp camera here');
   });
 
-  sse.addEventListener('connected', (e) => {
+  sse.addEventListener('connected', function(e) {
     sse.close();
     setStatus('connected', 'Connected!');
-    setTimeout(() => {
+    setTimeout(function() {
       document.getElementById('mainContent').style.display = 'none';
       document.getElementById('successMsg').style.display = 'block';
     }, 1000);
   });
 
-  sse.addEventListener('disconnected', (e) => {
+  sse.addEventListener('disconnected', function(e) {
     setStatus('error', 'Disconnected — reconnecting...');
     setTimeout(connectSSE, 4000);
   });
 
-  sse.onerror = () => {
+  sse.onerror = function() {
     setStatus('error', 'Connection lost — retrying...');
     sse.close();
     setTimeout(connectSSE, 5000);
@@ -152,19 +535,11 @@ function connectSSE() {
 }
 
 function renderQR(text) {
-  const canvas = document.getElementById('qrCanvas');
+  var canvas = document.getElementById('qrCanvas');
   if (!canvas || !window.QRCode) return;
   QRCode.toCanvas(canvas, text, { width: 210, margin: 1, color: { dark: '#000', light: '#fff' } });
 }
 
-connectSSE();
-
-// Show mobile notice if user is on a phone
-if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-  document.getElementById('mobileNotice').style.display = 'block';
-}
-
-// Show expire note after 25 seconds
 setTimeout(function() {
   var note = document.getElementById('expireNote');
   if (note) note.style.display = 'block';

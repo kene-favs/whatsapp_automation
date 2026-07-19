@@ -2,14 +2,14 @@ const cron = require('node-cron');
 const { getCaption } = require('./captions');
 const { sessions } = require('../sessions/sessionManager');
 
-// ── Lazy Supabase init ────────────────────────────────────────────────────────
+// ── Lazy Supabase ─────────────────────────────────────────────────────────────
 let _supabase = null;
 function getSupabase() {
   if (!_supabase) {
     const { createClient } = require('@supabase/supabase-js');
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
-    if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+    if (!url || !key) throw new Error('Supabase env vars missing');
     _supabase = createClient(url, key);
   }
   return _supabase;
@@ -48,13 +48,9 @@ function getWeeklyMeme() {
 async function postStatus(clientId, mediaUrl, caption) {
   const sock = sessions.get(clientId);
   if (!sock) return;
-
   try {
     if (mediaUrl) {
-      await sock.sendMessage('status@broadcast', {
-        image: { url: mediaUrl },
-        caption: caption || ''
-      });
+      await sock.sendMessage('status@broadcast', { image: { url: mediaUrl }, caption: caption || '' });
     } else {
       await sock.sendMessage('status@broadcast', { text: caption });
     }
@@ -71,15 +67,15 @@ function startScheduler() {
       const supabase = getSupabase();
       const now = new Date();
       const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const today = days[now.getDay()];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const today = dayNames[now.getDay()];
       const todayDate = now.toISOString().split('T')[0];
 
-      // Fetch due status posts with client info
+      // Use post_time — the actual column name in status_posts table
       const { data: duePosts, error } = await supabase
         .from('status_posts')
         .select('*, clients(*)')
-        .eq('scheduled_time', timeStr)
+        .eq('post_time', timeStr)
         .ilike('days', '%' + today + '%');
 
       if (error) throw error;
@@ -93,7 +89,6 @@ function startScheduler() {
         const caption = post.caption || getCaption(client.business_type || 'general');
         await postStatus(client.id, post.media_url, caption);
 
-        // Mark as posted today
         await supabase
           .from('status_posts')
           .update({ last_posted_date: todayDate })
@@ -119,18 +114,15 @@ function startScheduler() {
       if (!clients || clients.length === 0) return;
 
       const meme = getWeeklyMeme();
-
       for (const client of clients) {
         const sock = sessions.get(client.id);
         if (!sock) continue;
-
         try {
           await sock.sendMessage('status@broadcast', { text: meme });
           console.log('[StatusScheduler] Weekly meme posted for client ' + client.id);
         } catch (err) {
           console.error('[StatusScheduler] Meme failed for client ' + client.id + ':', err.message);
         }
-
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
     } catch (err) {
