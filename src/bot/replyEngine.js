@@ -1,16 +1,13 @@
 // ============================================================
-//  ForgeBot — Reply Engine v3
+//  ForgeBot — Reply Engine v4
 //  src/bot/replyEngine.js
 //
-//  v3 changes (surgical only):
-//   - Updated import names to match paymentNotifier v3
-//   - Added image detection for receipt routing
-//   - Payment claim now calls handlePaymentClaim (asks for receipt)
-//   - handleOwnerReply updated to new signature
-//   - notifyOwnerHumanRequest → notifyOwnerOfHandoff
+//  v4 changes:
+//   - Removed handleOwnerReply (owner confirms on dashboard now)
+//   - Added lead push notification after listing match
+//   - sendPushToClient imported for lead alerts
 //   ALL OTHER LOGIC 100% PRESERVED
 // ============================================================
-
 'use strict';
 
 const db = require('../db/supabase');
@@ -21,8 +18,9 @@ const {
   isAwaitingReceipt,
   handlePaymentClaim,
   handleReceiptImage,
-  handleOwnerReply,
-  notifyOwnerOfHandoff
+  notifyOwnerOfHandoff,
+  notifyOwnerOfLead,
+  sendPushToClient
 } = require('./paymentNotifier');
 
 // ── Human handoff pause map ────────────────────────────────
@@ -46,15 +44,11 @@ function wantsHuman(text) {
 }
 
 // ── Smart listings search ──────────────────────────────────
-// Searches the client's service_listings for relevant matches
-// to the customer's message, returns up to 3 results.
-
 async function searchListings(clientId, query) {
   try {
-    var sb = db.getSupabase();
+    var sb    = db.getSupabase();
     var lower = query.toLowerCase();
 
-    // Fetch all available listings for this client
     var result = await sb
       .from('service_listings')
       .select('*, listing_media(url, media_type, sort_order)')
@@ -64,9 +58,8 @@ async function searchListings(clientId, query) {
 
     if (result.error || !result.data || !result.data.length) return [];
 
-    // Score each listing by how well it matches the query
     var scored = result.data.map(function(listing) {
-      var score = 0;
+      var score  = 0;
       var fields = [
         listing.name        || '',
         listing.description || '',
@@ -76,33 +69,27 @@ async function searchListings(clientId, query) {
         listing.price_label || ''
       ].map(function(f) { return f.toLowerCase(); });
 
-      // Split query into words and score each
       var words = lower.split(/\s+/).filter(function(w) { return w.length > 2; });
       words.forEach(function(word) {
         fields.forEach(function(field) {
-          if (field.includes(word)) score += word.length; // longer word match = higher score
+          if (field.includes(word)) score += word.length;
         });
       });
-
-      // Bonus: exact phrase match in name
       if (fields[0].includes(lower)) score += 20;
-
       return { listing: listing, score: score };
     });
 
-    // Filter to matches with score > 0, sort by score desc, return top 3
     return scored
       .filter(function(s) { return s.score > 0; })
       .sort(function(a, b) { return b.score - a.score; })
       .slice(0, 3)
       .map(function(s) { return s.listing; });
-  } catch (e) {
+  } catch(e) {
     console.error('[ReplyEngine] Listing search error:', e.message);
     return [];
   }
 }
 
-// Detect if customer is asking about products/services/availability
 const LISTING_TRIGGERS = [
   'do you have', 'do you sell', 'do you offer', 'is it available', 'price of',
   'how much is', 'how much for', 'what is the price', 'i want to buy', 'i want to order',
@@ -118,34 +105,27 @@ function isListingQuery(text) {
   return LISTING_TRIGGERS.some(function(t) { return lower.includes(t); });
 }
 
-// Format and send listing results to customer
 async function sendListingResults(sock, jid, listings, client) {
   if (!listings.length) return false;
 
-  var businessName = client.business_name || 'us';
-
   if (listings.length === 1) {
-    var l = listings[0];
+    var l   = listings[0];
     var msg = '✅ Yes! Here is what we have:\n\n';
     msg += '*' + l.name + '*\n';
     if (l.price) msg += '💰 *Price:* ' + l.price + '\n';
     if (l.description) msg += '📝 ' + l.description + '\n';
     if (l.location) msg += '📍 *Location:* ' + l.location + '\n';
     msg += '\nInterested? DM us or reply to place your order! 😊';
-
-    // Send text first
     await sock.sendMessage(jid, { text: msg });
 
-    // Then send images if any
     var media = (l.listing_media || []).filter(function(m) { return m.media_type === 'image'; });
     for (var i = 0; i < Math.min(media.length, 3); i++) {
       try {
         await sock.sendMessage(jid, { image: { url: media[i].url }, caption: l.name });
         await new Promise(function(r) { setTimeout(r, 800); });
-      } catch (e) {}
+      } catch(e) {}
     }
 
-    // Send PDF if any
     var pdf = (l.listing_media || []).find(function(m) { return m.media_type === 'pdf'; });
     if (pdf) {
       try {
@@ -153,12 +133,11 @@ async function sendListingResults(sock, jid, listings, client) {
           document: { url: pdf.url },
           mimetype: 'application/pdf',
           fileName: l.name + '.pdf',
-          caption: 'Full details for ' + l.name
+          caption:  'Full details for ' + l.name
         });
-      } catch (e) {}
+      } catch(e) {}
     }
   } else {
-    // Multiple results
     var intro = '✅ We found *' + listings.length + ' options* for you:\n\n';
     listings.forEach(function(l, i) {
       intro += '*' + (i + 1) + '. ' + l.name + '*\n';
@@ -170,17 +149,16 @@ async function sendListingResults(sock, jid, listings, client) {
     intro += 'Reply with the *number* of the one you want more details on, or DM us directly! 😊';
     await sock.sendMessage(jid, { text: intro });
 
-    // Send first image from each listing
     for (var j = 0; j < listings.length; j++) {
       var imgs = (listings[j].listing_media || []).filter(function(m) { return m.media_type === 'image'; });
       if (imgs.length) {
         try {
           await sock.sendMessage(jid, {
-            image: { url: imgs[0].url },
+            image:   { url: imgs[0].url },
             caption: '*' + (j + 1) + '.* ' + listings[j].name + (listings[j].price ? ' — ' + listings[j].price : '')
           });
           await new Promise(function(r) { setTimeout(r, 800); });
-        } catch (e) {}
+        } catch(e) {}
       }
     }
   }
@@ -188,7 +166,6 @@ async function sendListingResults(sock, jid, listings, client) {
 }
 
 // ── Main message handler ───────────────────────────────────
-
 async function handleMessage(sock, msg, clientId) {
   try {
     var jid = msg.key.remoteJid;
@@ -196,7 +173,7 @@ async function handleMessage(sock, msg, clientId) {
 
     var msgContent = msg.message;
 
-    // ── IMAGE DETECTION — receipt routing (v3) ──────────────
+    // ── IMAGE DETECTION — receipt routing ──────────────────
     var isImage = !!(msgContent && msgContent.imageMessage);
     if (isImage) {
       if (isAwaitingReceipt(clientId, jid)) {
@@ -205,7 +182,6 @@ async function handleMessage(sock, msg, clientId) {
         return;
       }
     }
-    // ────────────────────────────────────────────────────────
 
     var isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
     var isAudio = !!(msgContent && msgContent.audioMessage);
@@ -237,7 +213,7 @@ async function handleMessage(sock, msg, clientId) {
     var client = await db.getClientById(clientId);
     if (!client || client.status !== 'active' || !client.subscription_active) return;
 
-    // ── Track customer (for bot errands) ───────────────────
+    // ── Track customer ──────────────────────────────────────
     try {
       var sb = db.getSupabase();
       await sb.from('customers').upsert({
@@ -246,14 +222,10 @@ async function handleMessage(sock, msg, clientId) {
         last_contact: new Date().toISOString(),
         last_seen:    new Date().toISOString()
       }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
-    } catch (e) {}
-
-    // ── Owner reply check (1/2/3 confirmation) ──────────────
-    var ownerHandled = await handleOwnerReply(sock, msg, clientId, jid, text);
-    if (ownerHandled) return;
+    } catch(e) {}
 
     // ── Human pause check ───────────────────────────────────
-    var pauseKey   = clientId + ':' + jid;
+    var pauseKey    = clientId + ':' + jid;
     var pausedUntil = humanPaused.get(pauseKey);
     if (pausedUntil && Date.now() < pausedUntil) return;
     if (pausedUntil && Date.now() >= pausedUntil) humanPaused.delete(pauseKey);
@@ -282,22 +254,26 @@ async function handleMessage(sock, msg, clientId) {
     await humanDelay();
     await sock.sendPresenceUpdate('paused', jid);
 
-    // ── SMART LISTINGS SEARCH (before keyword matching) ─────
-    // If the message looks like a product/service query, search listings first
+    // ── SMART LISTINGS SEARCH ───────────────────────────────
     if (isListingQuery(text)) {
       var matches = await searchListings(clientId, text);
       if (matches.length > 0) {
         var sent = await sendListingResults(sock, jid, matches, client);
-        if (sent) return;
+        if (sent) {
+          // 🔥 Notify owner — this is a live lead
+          var names = matches.map(function(m) { return m.name; });
+          notifyOwnerOfLead(clientId, jid, names).catch(function() {});
+          return;
+        }
       }
     }
 
     // ── Flow keyword matching ───────────────────────────────
-    var flows = await db.getFlows(clientId, true);
+    var flows   = await db.getFlows(clientId, true);
     var matched = null;
     for (var i = 0; i < flows.length; i++) {
-      var flow = flows[i];
-      var kws  = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
+      var flow      = flows[i];
+      var kws       = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
       var textLower = text.toLowerCase();
       if (kws.some(function(kw) { return textLower.includes(kw); })) {
         matched = flow;
@@ -314,22 +290,25 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
-    // ── No keyword match — show related listings or fallback ─
-    // Try a broader search if we haven't already
+    // ── Broad listing search before fallback ────────────────
     if (!isListingQuery(text)) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length > 0) {
         var broadSent = await sendListingResults(sock, jid, broadMatches, client);
-        if (broadSent) return;
+        if (broadSent) {
+          var bNames = broadMatches.map(function(m) { return m.name; });
+          notifyOwnerOfLead(clientId, jid, bNames).catch(function() {});
+          return;
+        }
       }
     }
 
-    // ── Fallback message ────────────────────────────────────
+    // ── Fallback ────────────────────────────────────────────
     var fallback = client.fallback_message ||
       'Thank you for reaching out! Someone will get back to you shortly.';
     await sock.sendMessage(jid, { text: fallback });
 
-  } catch (err) {
+  } catch(err) {
     console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message);
   }
 }
