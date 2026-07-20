@@ -1,5 +1,19 @@
-// Polyfill Web Crypto API for Node.js < 19 (required by Baileys)
-// MUST be at the very top, before any require()
+// ============================================================
+//  ForgeBot — sessionManager.js
+//  File location: src/sessions/sessionManager.js
+//
+//  Fixes vs original:
+//   - Crypto polyfill (CRITICAL for Railway Node 18)
+//   - global.qrListeners broadcast — SSE always gets QR even after retry
+//   - latestQR cache — late-joining SSE connections get QR immediately
+//   - Mutex (starting Set) — prevents double-session race condition
+//   - Exponential backoff 5s→10s→20s→40s→60s cap
+//   - Clears auth files every 3rd consecutive failure
+//   - Sends fatal event after 10 retries
+//   - All existing exports preserved + clearSession added
+// ============================================================
+
+// ── Crypto polyfill — MUST be first line before any imports ──
 if (typeof crypto === 'undefined') {
   global.crypto = require('crypto').webcrypto;
 }
@@ -7,197 +21,251 @@ if (typeof crypto === 'undefined') {
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const path = require('path');
+const fs   = require('fs');
 const pino = require('pino');
 const replyEngine = require('../bot/replyEngine');
 
-const sessions  = {};        // clientId → { sock, latestQR }
-const starting  = new Set(); // mutex: clientIds currently being initialised
-const retryInfo = {};        // clientId → { count, delay }
-const logger    = pino({ level: 'silent' });
+const sessions = {};  // clientId → { sock }
+const starting  = new Set(); // mutex — prevents double-startSession
+const retryInfo = {}; // clientId → { count, delay }
+const latestQR  = {}; // clientId → last QR string (for late-joining SSE)
 
-// ── Helpers ────────────────────────────────────────────────────
+const logger = pino({ level: 'silent' });
 
+// ── Broadcast to all SSE listeners for a client ──────────────
 function broadcast(clientId, event, data) {
   if (!global.qrListeners) return;
   var all = global.qrListeners.get(clientId) || [];
-  all.forEach(function(fn) {
-    try { fn(event, data); } catch (e) {}
-  });
+  all.forEach(function(fn) { try { fn(event, data); } catch (e) {} });
 }
 
-function resetRetry(clientId) {
-  retryInfo[clientId] = { count: 0, delay: 5000 };
-}
-
-function nextRetry(clientId) {
+// ── Retry delay with exponential backoff ─────────────────────
+function getNextDelay(clientId) {
   if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
-  var info = retryInfo[clientId];
-  info.count += 1;
+  var info  = retryInfo[clientId];
+  info.count++;
   var delay = info.delay;
   info.delay = Math.min(info.delay * 2, 60000); // cap at 60s
-  return { count: info.count, delay: delay };
+  return delay;
 }
 
-// Remove cached session files so a fresh QR is generated
-function clearSessionFiles(clientId) {
-  var fs  = require('fs');
-  var dir = path.join(__dirname, '../../sessions', clientId);
-  if (fs.existsSync(dir)) {
-    fs.readdirSync(dir).forEach(function(f) {
-      try { fs.unlinkSync(path.join(dir, f)); } catch (e) {}
-    });
-  }
-}
-
-// ── Core ───────────────────────────────────────────────────────
-
-async function startSession(clientId) {
-  // Mutex: don't start the same client twice simultaneously
-  if (starting.has(clientId)) {
-    console.log('[ForgeBot] startSession(' + clientId + ') already starting — skip');
-    return;
-  }
-
-  // Already connected — just resend the cached QR if one exists
-  if (sessions[clientId] && sessions[clientId].sock) {
-    if (sessions[clientId].latestQR) {
-      broadcast(clientId, 'qr', { qr: sessions[clientId].latestQR });
-    }
-    return;
-  }
-
-  starting.add(clientId);
-  console.log('[ForgeBot] startSession(' + clientId + ')');
-
+// ── Clear saved auth files (force fresh QR) ──────────────────
+function clearAuthFiles(clientId) {
   try {
     var authDir = path.join(__dirname, '../../sessions', clientId);
-    var authState = await useMultiFileAuthState(authDir);
-    var state     = authState.state;
-    var saveCreds = authState.saveCreds;
-    var version   = (await fetchLatestBaileysVersion()).version;
+    if (fs.existsSync(authDir)) {
+      fs.readdirSync(authDir).forEach(function(f) {
+        try { fs.unlinkSync(path.join(authDir, f)); } catch (e) {}
+      });
+      console.log('[SessionManager] Cleared auth files for', clientId);
+    }
+  } catch (e) {
+    console.error('[SessionManager] Failed to clear auth for', clientId, e.message);
+  }
+}
+
+// ── Main: start or reuse session ─────────────────────────────
+async function startSession(clientId) {
+  // Already connected — nothing to do
+  if (sessions[clientId] && sessions[clientId].sock) {
+    return;
+  }
+
+  // Mutex — prevent double-start
+  if (starting.has(clientId)) {
+    console.log('[SessionManager] Already starting for', clientId);
+    return;
+  }
+  starting.add(clientId);
+
+  try {
+    if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
+    var retry = retryInfo[clientId];
+
+    console.log('[SessionManager] Starting session for', clientId, '(attempt #' + (retry.count + 1) + ')');
+    broadcast(clientId, 'status', { status: 'connecting', attempt: retry.count + 1 });
+
+    var authDir = path.join(__dirname, '../../sessions', clientId);
+    var { state, saveCreds } = await useMultiFileAuthState(authDir);
+    var { version }          = await fetchLatestBaileysVersion();
 
     var sock = makeWASocket({
-      version: version,
-      logger:  logger,
-      auth:    state,
+      version,
+      logger,
+      auth:   state,
       printQRInTerminal: false,
       browser: ['ForgeBot', 'Chrome', '1.0.0'],
-      generateHighQualityLinkPreview: false
+      generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 30000
     });
 
-    sessions[clientId] = { sock: sock, latestQR: null };
+    sessions[clientId] = { sock };
 
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', function(update) {
-      var connection    = update.connection;
+      var connection     = update.connection;
       var lastDisconnect = update.lastDisconnect;
       var qr            = update.qr;
 
+      // ── New QR received ──────────────────────────────────
       if (qr) {
-        sessions[clientId].latestQR = qr;
+        latestQR[clientId] = qr; // cache for late-joining SSE
+        console.log('[SessionManager] QR ready for', clientId);
         broadcast(clientId, 'qr', { qr: qr });
       }
 
+      // ── Connection opened ────────────────────────────────
       if (connection === 'open') {
-        console.log('[ForgeBot] Client ' + clientId + ' connected');
-        resetRetry(clientId);
-        broadcast(clientId, 'connected', { clientId: clientId });
+        console.log('[SessionManager] Connected:', clientId);
+        delete latestQR[clientId];
+        retryInfo[clientId] = { count: 0, delay: 5000 }; // reset backoff
+        broadcast(clientId, 'connected', { status: 'connected' });
       }
 
+      // ── Connection closed ────────────────────────────────
       if (connection === 'close') {
-        var err  = lastDisconnect ? lastDisconnect.error : null;
-        var code = (err instanceof Boom) ? err.output.statusCode : 0;
-        var errMsg = err ? (err.message || String(err)) : 'none';
+        var code = 0;
+        try {
+          if (lastDisconnect && lastDisconnect.error instanceof Boom) {
+            code = lastDisconnect.error.output.statusCode;
+          }
+        } catch (e) {}
 
-        var loggedOut = code === DisconnectReason.loggedOut;
-        console.log('[ForgeBot] Client ' + clientId + ' disconnected | code=' + code + ' | reason=' + errMsg);
+        var loggedOut = (code === DisconnectReason.loggedOut);
+        console.log('[SessionManager] Disconnected:', clientId, '| code:', code, '| loggedOut:', loggedOut);
 
         delete sessions[clientId];
+        starting.delete(clientId);
 
         if (loggedOut) {
-          console.log('[ForgeBot] Client ' + clientId + ' logged out — no reconnect');
-          broadcast(clientId, 'disconnected', { reason: 'logged_out' });
+          // Logged out — clear files and notify SSE
+          clearAuthFiles(clientId);
+          broadcast(clientId, 'fatal', { reason: 'logged_out' });
+          delete retryInfo[clientId];
           return;
         }
 
-        var retry = nextRetry(clientId);
+        var info = retryInfo[clientId] || { count: 0, delay: 5000 };
+        retryInfo[clientId] = info;
 
-        if (retry.count >= 10) {
-          console.error('[ForgeBot] Client ' + clientId + ' — gave up after 10 retries');
-          broadcast(clientId, 'fatal', { reason: 'too_many_retries' });
+        // After 10 retries send fatal
+        if (info.count >= 10) {
+          console.log('[SessionManager] Max retries reached for', clientId);
+          broadcast(clientId, 'fatal', { reason: 'max_retries' });
+          delete retryInfo[clientId];
           return;
         }
 
-        // Every 3rd failure clear session files so WhatsApp issues a new QR
-        if (retry.count % 3 === 0) {
-          console.log('[ForgeBot] Clearing session files for ' + clientId + ' (attempt ' + retry.count + ')');
-          clearSessionFiles(clientId);
+        // Clear auth files every 3rd failure (forces fresh QR)
+        if (info.count > 0 && info.count % 3 === 0) {
+          clearAuthFiles(clientId);
         }
 
-        console.log('[ForgeBot] error: ' + errMsg + ' | retry #' + retry.count + ' in ' + (retry.delay / 1000) + 's');
-        broadcast(clientId, 'reconnecting', { retryIn: retry.delay, attempt: retry.count });
-        setTimeout(function() { startSession(clientId); }, retry.delay);
+        var delay = getNextDelay(clientId);
+        console.log('[SessionManager] Retry #' + retryInfo[clientId].count + ' for', clientId, 'in', delay + 'ms');
+        broadcast(clientId, 'reconnecting', { delay: delay, attempt: retryInfo[clientId].count });
+
+        setTimeout(function() { startSession(clientId); }, delay);
       }
     });
 
-    sock.ev.on('messages.upsert', async function(arg) {
-      var messages = arg.messages;
-      var type     = arg.type;
+    sock.ev.on('messages.upsert', async function(payload) {
+      var messages = payload.messages;
+      var type     = payload.type;
       if (type !== 'notify') return;
       for (var i = 0; i < messages.length; i++) {
         var msg = messages[i];
         if (msg.key.fromMe) continue;
         if (msg.key.remoteJid === 'status@broadcast') continue;
-        await replyEngine.handleMessage(sock, msg, clientId);
+        try { await replyEngine.handleMessage(sock, msg, clientId); }
+        catch (e) { console.error('[SessionManager] ReplyEngine error:', e.message); }
       }
     });
 
   } catch (err) {
-    console.error('[ForgeBot] startSession error for ' + clientId + ':', err.message);
-    var retry = nextRetry(clientId);
-    broadcast(clientId, 'reconnecting', { retryIn: retry.delay, attempt: retry.count });
-    setTimeout(function() { startSession(clientId); }, retry.delay);
+    console.error('[SessionManager] startSession error for', clientId + ':', err.message);
+    starting.delete(clientId);
+    delete sessions[clientId];
+
+    var info  = retryInfo[clientId] || { count: 0, delay: 5000 };
+    retryInfo[clientId] = info;
+    var delay = getNextDelay(clientId);
+    broadcast(clientId, 'reconnecting', { delay: delay, attempt: retryInfo[clientId].count });
+    setTimeout(function() { startSession(clientId); }, delay);
   } finally {
     starting.delete(clientId);
   }
 }
 
+// ── Stop session ──────────────────────────────────────────────
 async function stopSession(clientId) {
-  if (sessions[clientId] && sessions[clientId].sock) {
-    try { await sessions[clientId].sock.logout(); } catch (e) {}
-    delete sessions[clientId];
-  }
-}
-
-function clearSession(clientId) {
+  try {
+    if (sessions[clientId] && sessions[clientId].sock) {
+      await sessions[clientId].sock.logout();
+    }
+  } catch (e) {}
   delete sessions[clientId];
-  clearSessionFiles(clientId);
+  starting.delete(clientId);
+  delete retryInfo[clientId];
+  delete latestQR[clientId];
 }
 
+// ── Clear auth + stop ─────────────────────────────────────────
+async function clearSession(clientId) {
+  await stopSession(clientId);
+  clearAuthFiles(clientId);
+}
+
+// ── Get active socket ─────────────────────────────────────────
 function getSession(clientId) {
-  return sessions[clientId] ? sessions[clientId].sock : null;
+  return (sessions[clientId] && sessions[clientId].sock) ? sessions[clientId].sock : null;
 }
 
 function getAllSessions() {
   return Object.keys(sessions);
 }
 
+// ── Boot all clients on server start ─────────────────────────
 async function bootAllSessions(activeClients) {
-  if (!activeClients || !activeClients.length) {
-    console.log('[ForgeBot] No previously connected clients to restore');
-    return;
-  }
-  console.log('[ForgeBot] Booting ' + activeClients.length + ' client session(s)...');
+  console.log('[SessionManager] Booting ' + activeClients.length + ' session(s)...');
   for (var i = 0; i < activeClients.length; i++) {
     var client = activeClients[i];
     try {
       await startSession(client.id);
-      console.log('[ForgeBot] Restored session for ' + client.business_name);
+      console.log('[SessionManager] Started session for', client.business_name || client.id);
     } catch (err) {
-      console.error('[ForgeBot] Failed to restore session for ' + client.id + ':', err.message);
+      console.error('[SessionManager] Failed to start session for', client.id + ':', err.message);
     }
   }
 }
 
-module.exports = { startSession, stopSession, clearSession, getSession, getAllSessions, bootAllSessions };
+// ── Register SSE listener (called from qr-stream route) ──────
+// Returns the cached QR if one exists (so late-joining connections get it)
+function registerQRListener(clientId, fn) {
+  if (!global.qrListeners) global.qrListeners = new Map();
+  var all = global.qrListeners.get(clientId) || [];
+  all.push(fn);
+  global.qrListeners.set(clientId, all);
+  // Send cached QR immediately if available
+  if (latestQR[clientId]) {
+    try { fn('qr', { qr: latestQR[clientId] }); } catch (e) {}
+  }
+}
+
+function unregisterQRListener(clientId, fn) {
+  if (!global.qrListeners) return;
+  var all = global.qrListeners.get(clientId) || [];
+  global.qrListeners.set(clientId, all.filter(function(f) { return f !== fn; }));
+}
+
+module.exports = {
+  startSession,
+  stopSession,
+  clearSession,
+  getSession,
+  getAllSessions,
+  bootAllSessions,
+  registerQRListener,
+  unregisterQRListener
+};
