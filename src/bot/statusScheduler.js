@@ -1,320 +1,320 @@
 // ============================================================
-//  ForgeBot — Status Poster
-//  File location: src/bot/statusPoster.js
+//  ForgeBot — Status Scheduler
+//  File location: src/bot/statusScheduler.js
 //
-//  Runs a scheduler that checks every 60 seconds whether it is
-//  time to post a WhatsApp status for any active client.
+//  v3 fix: getSock() now uses sessionManager.getSession() instead
+//  of importing `sessions` directly (which was never exported).
+//  That was the reason status posts never fired.
 //
-//  Posts:
-//   1. Product status  — picks a random available listing,
-//      sends the image + caption to status@broadcast
-//   2. Meme / promo    — sends a random URL from meme_media_urls
-//
-//  Uses bot_status_log to prevent double-posting on the same day.
-//  All Supabase calls are wrapped in try/catch (fixes .catch() crash).
+//  Jobs:
+//    1. Every minute → check & post due status posts
+//    2. Mon/Wed/Fri/Sat/Sun 8pm → Nigerian business meme
+//    3. 1st of month, 9am → monthly analytics WhatsApp summary
+//    4. Every minute → run client bot errands (auto-outreach)
+//    5. Daily 3am → subscription expiry check + renewal reminders
 // ============================================================
 
 'use strict';
 
-const { createClient } = require('@supabase/supabase-js');
-const sessionManager   = require('../sessions/sessionManager');
+const cron           = require('node-cron');
+const db             = require('../db/supabase');
+const { getCaption } = require('./captions');
+const sessionManager = require('../sessions/sessionManager'); // ✅ FIXED: was `{ sessions }` which was undefined
 
-// ── Lazy Supabase init ────────────────────────────────────────
-let _supabase = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-  }
-  return _supabase;
+// ── Nigerian Business Memes (rotate by day) ──────────────────
+const MEMES = [
+  "Me before ForgeBot: reading 200 unread WhatsApp messages at midnight 😭\nMe after ForgeBot: sleeping peacefully while bot closes sales 🤖💰 #SmallBusinessNaija",
+  "Customer: Are you available?\nMe at 3am: 💤💤💤\nForgeBot: YES! We are open 24/7! How can I help you today? 😊\n\nThis bot dey do pass me 😭🔥 #ForgeBot",
+  "The WhatsApp message that came in at 2am while you were sleeping:\n'I want to buy 10 pieces'\n\nForgeBot: Already replied, collected details and sent payment info. You're welcome. 🤖💸",
+  "Nigerian customer: How much?\nOther businesses: *no reply for 3 hours*\nForgeBot businesses: Instant reply with price list, availability AND payment details 😎\n\nThe difference is clear. #AutomateYourBusiness",
+  "2015: I will hustle my way to the top 💪\n2025: I automated my WhatsApp and let a bot do the hustling for me 🤖\n\nWork smarter, not harder. #ForgeBot #NaijaEntrepreneur",
+  "Boss energy = waking up to WhatsApp notifications that say 'Payment confirmed' from sales your bot closed while you slept 💰🛌 #PassiveIncome",
+  "Them: You need to be online 24/7 to run a successful business\nMe: 😂 Nah. My bot works the night shift.\n\n#ForgeBot is that 24/7 employee that never asks for salary 🤖",
+  "Imagine missing a sale because you were busy or sleeping 😩\nImagine not missing ANY sale because your bot replies instantly, always ✅\n\nThat second one? That's us. #ForgeBot",
+  "Customer texts at 7am before you're even awake:\n'Good morning, do you have this in red?'\n\nYour ForgeBot: Good morning! Yes we do! Here are the available sizes and prices 😊\n\nYou wake up to a confirmed order. Beautiful. 💪",
+  "Things that are working even when you're resting:\n✅ Your lungs\n✅ Your heart\n✅ Your ForgeBot\n\nLet the automation breathe for your business 🔥 #NaijaHustle",
+  "Small business owner starter pack:\n😩 Late nights replying customers\n😫 Missing messages\n💸 Lost sales\n\nForgeBot owner starter pack:\n😎 Automated replies\n✅ Zero missed messages\n💰 Sales while sleeping\n\nChoose wisely.",
+  "The fact that my WhatsApp bot just replied a customer in Pidgin and made a sale while I was at church 🙏🤖\n\nGod and technology working together 😂 #ForgeBot",
+  "Your competition: manually replying WhatsApp 24/7, stressed, burning out\nYou with ForgeBot: automated, organized, sleeping well AND making more sales\n\n2025 is for those who work smart 💡 #NaijaEntrepreneur",
+  "Customer: Do you deliver to my area?\nMe (before): Let me check... *30 min later* Sorry I was busy!\nMe (after ForgeBot): Bot replied in 2 seconds with full delivery info 😌\n\nNever lose a customer to slow replies again.",
+  "The audacity of this bot 😂\nCustomer sent a voice note in Yoruba at midnight\nForgeBot: *transcribed it* *replied in English* *sent price list*\n\nI woke up to a completed order. This thing is something else 🔥 #ForgeBot",
+  "Top 3 things Nigerian business owners worry about:\n1. Sales dropping\n2. Missing customers\n3. NEPA taking light\n\nForgeBot handles number 1 and 2.\nFor number 3... we're working on it 😂 #NaijaProblems",
+  "Plot twist: The bot is more professional than me 😭\n\nCustomer: Can I get a discount?\nMe: *would have said yes immediately*\nForgeBot: Thank you for asking! Our prices are fixed but we offer bulk discounts for 10+ orders 😊\n\nThe bot has better business sense 🤣 #ForgeBot",
+  "Hustle culture said work 18 hours a day 😤\nForgeBot said: work smart, automate the rest, and enjoy your life 😌\n\nThe real glow up is automating your WhatsApp and getting your time back 💯 #NaijaEntrepreneur",
+  "When the customer says 'I'll think about it' at 9pm\nAnd your ForgeBot sends a follow-up at 10am the next day saying 'Hi! Just checking if you made a decision? We still have stock available 😊'\n\nThat's how you close deals in your sleep 💪",
+  "My business hours used to be: whenever I'm awake and not busy\nNow my business hours are: 24 hours, 7 days a week, 365 days a year\n\nAll because of a WhatsApp bot. The game has changed. 🤖💰 #ForgeBot"
+];
+
+function getWeeklyMeme() {
+  const weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  return MEMES[weekNumber % MEMES.length];
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-
-// Returns true if today's 3-letter abbreviation is in the schedule string
-// e.g. schedule_days = "Mon,Wed,Fri"
-function isTodayScheduled(scheduleDays) {
-  if (!scheduleDays) return true; // no schedule = every day
-  var days  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  var today = days[new Date().getDay()];
-  return scheduleDays.split(',').map(function(s) { return s.trim(); }).indexOf(today) !== -1;
+// ── Helper: get session sock ──────────────────────────────────
+// ✅ FIXED: was using `sessions[clientId]` from a non-exported variable.
+//    Now uses sessionManager.getSession() which is the proper exported API.
+function getSock(clientId) {
+  return sessionManager.getSession(clientId);
 }
 
-// Returns true if the current HH:MM matches targetTime (e.g. "09:00")
-function isTimeNow(targetTime) {
-  if (!targetTime) return false;
-  var now = new Date();
-  var hh  = String(now.getHours()).padStart(2, '0');
-  var mm  = String(now.getMinutes()).padStart(2, '0');
-  return (hh + ':' + mm) === targetTime.trim();
-}
-
-// Check if we already logged this post type today
-async function alreadyPostedToday(clientId, logType) {
+// ── Post WhatsApp status for a single client ─────────────────
+async function postStatus(clientId, mediaUrl, caption) {
+  const sock = getSock(clientId);
+  if (!sock) return;
   try {
-    var sb    = getSupabase();
-    var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    var result = await sb
-      .from('bot_status_log')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('log_type',  logType)
-      .gte('created_at', today + 'T00:00:00Z')
-      .limit(1);
-    return !!(result.data && result.data.length > 0);
-  } catch (e) {
-    return false;
-  }
-}
-
-async function logPost(clientId, logType, note) {
-  try {
-    var sb = getSupabase();
-    await sb.from('bot_status_log').insert({
-      client_id: clientId,
-      log_type:  logType,
-      note:      note || ''
-    });
-  } catch (e) {}
-}
-
-// ── Post a product listing as a WhatsApp status ───────────────
-async function postProductStatus(clientId, sock) {
-  try {
-    var sb = getSupabase();
-
-    // Pick all available listings for this client
-    var result = await sb
-      .from('service_listings')
-      .select('*, listing_media(url, media_type, sort_order)')
-      .eq('client_id', clientId)
-      .eq('available', true)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (!result.data || !result.data.length) {
-      console.log('[StatusPoster] No listings to post for', clientId);
-      return;
-    }
-
-    // Pick a random one
-    var listing = result.data[Math.floor(Math.random() * result.data.length)];
-    var images  = (listing.listing_media || [])
-      .filter(function(m) { return m.media_type === 'image'; })
-      .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
-
-    var caption = '*' + listing.name + '*';
-    if (listing.price)       caption += '\n💰 ' + listing.price;
-    if (listing.description) caption += '\n\n' + listing.description;
-    if (listing.location)    caption += '\n📍 ' + listing.location;
-    caption += '\n\nDM us to order! 📩';
-
-    if (images.length > 0) {
-      await sock.sendMessage('status@broadcast', {
-        image:   { url: images[0].url },
-        caption: caption
-      });
+    if (mediaUrl) {
+      await sock.sendMessage('status@broadcast', { image: { url: mediaUrl }, caption: caption || '' });
     } else {
       await sock.sendMessage('status@broadcast', { text: caption });
     }
-
-    await logPost(clientId, 'product_post', 'Posted: ' + listing.name);
-    console.log('[StatusPoster] Product status posted for', clientId, '-', listing.name);
-  } catch (e) {
-    console.error('[StatusPoster] postProductStatus error for', clientId + ':', e.message);
+    console.log('[StatusScheduler] Status posted for client', clientId);
+  } catch (err) {
+    console.error('[StatusScheduler] Status post failed for client', clientId + ':', err.message);
   }
 }
 
-// ── Post a meme / promo image as a WhatsApp status ───────────
-async function postMemeStatus(clientId, sock, setup) {
-  try {
-    if (!setup.meme_media_urls) {
-      console.log('[StatusPoster] No meme_media_urls set for', clientId);
-      return;
-    }
-
-    var urls = setup.meme_media_urls
-      .split(',')
-      .map(function(u) { return u.trim(); })
-      .filter(Boolean);
-
-    if (!urls.length) return;
-
-    var url     = urls[Math.floor(Math.random() * urls.length)];
-    var caption = setup.current_promo || '🔥 Check us out!';
-
-    await sock.sendMessage('status@broadcast', {
-      image:   { url: url },
-      caption: caption
-    });
-
-    await logPost(clientId, 'meme_post', 'Posted meme: ' + url);
-    console.log('[StatusPoster] Meme status posted for', clientId);
-  } catch (e) {
-    console.error('[StatusPoster] postMemeStatus error for', clientId + ':', e.message);
-  }
+// ── Send WhatsApp to a phone number ──────────────────────────
+async function sendToPhone(sock, phone, message) {
+  const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
+  await sock.sendMessage(jid, { text: message });
 }
 
-// ── Main check — runs every 60 seconds ───────────────────────
-async function checkAndPost() {
-  try {
-    var sb = getSupabase();
+// ── Build monthly analytics report ───────────────────────────
+function buildMonthlyReport(client, stats, month) {
+  const [year, monthNum] = month.split('-');
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = monthNames[parseInt(monthNum) - 1] + ' ' + year;
+  const revenue = stats.total_revenue ? '₦' + Number(stats.total_revenue).toLocaleString() : '₦0';
 
-    // Get all active, paying clients
-    var result = await sb
-      .from('clients')
-      .select('id')
-      .eq('status', 'active')
-      .eq('subscription_active', true);
-
-    if (!result.data || !result.data.length) return;
-
-    for (var i = 0; i < result.data.length; i++) {
-      var clientId = result.data[i].id;
-
-      // Only process clients that have an active WhatsApp connection
-      var sock = sessionManager.getSession(clientId);
-      if (!sock) continue;
-
-      try {
-        var setupResult = await sb
-          .from('bot_setup')
-          .select('product_post_time, meme_post_time, schedule_days, meme_media_urls, current_promo')
-          .eq('client_id', clientId)
-          .single();
-
-        if (!setupResult.data) continue;
-        var setup = setupResult.data;
-
-        // Check if today is a scheduled day
-        if (!isTodayScheduled(setup.schedule_days)) continue;
-
-        // Product post
-        if (setup.product_post_time && isTimeNow(setup.product_post_time)) {
-          var doneProduct = await alreadyPostedToday(clientId, 'product_post');
-          if (!doneProduct) {
-            await postProductStatus(clientId, sock);
-          }
-        }
-
-        // Meme / promo post
-        if (setup.meme_post_time && isTimeNow(setup.meme_post_time)) {
-          var doneMeme = await alreadyPostedToday(clientId, 'meme_post');
-          if (!doneMeme) {
-            await postMemeStatus(clientId, sock, setup);
-          }
-        }
-      } catch (e) {
-        console.error('[StatusPoster] Error for client', clientId + ':', e.message);
-      }
-    }
-  } catch (e) {
-    console.error('[StatusPoster] checkAndPost error:', e.message);
-  }
+  return (
+    '📊 *ForgeBot Monthly Report — ' + monthLabel + '*\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━\n' +
+    '*Business:* ' + (client.business_name || 'Your Business') + '\n\n' +
+    '👥 *New Customers:* '          + (stats.new_customers   || 0) + '\n' +
+    '🎯 *Price Inquiries (Leads):* ' + (stats.leads           || 0) + '\n' +
+    '🛒 *Orders Placed:* '          + (stats.orders_placed   || 0) + '\n' +
+    '✅ *Orders Confirmed:* '        + (stats.orders_confirmed || 0) + '\n' +
+    '💰 *Revenue Confirmed:* '       + revenue + '\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '_View full analytics: ' + (process.env.APP_URL || 'https://forgebot.ng') + '/dashboard_\n\n' +
+    'Keep going! 💪 Your ForgeBot is working hard for your business. 🤖'
+  );
 }
 
-// ── Subscription auto-expiry ──────────────────────────────────
-// Runs once a day. Checks every active client:
-//  1. If subscription_expires_at has passed → deactivate, notify
-//  2. If 3 days away from expiry → send renewal reminder
-async function checkSubscriptionExpiry() {
-  try {
-    var sb  = getSupabase();
-    var now = new Date();
+// ══════════════════════════════════════════════════════════════
+//  MAIN SCHEDULER
+// ══════════════════════════════════════════════════════════════
 
-    // Fetch all active clients that have an expiry date
-    var result = await sb
-      .from('clients')
-      .select('id, email, full_name, notification_number, subscription_expires_at, plan')
-      .eq('subscription_active', true)
-      .not('subscription_expires_at', 'is', null);
-
-    if (!result.data || !result.data.length) return;
-
-    for (var i = 0; i < result.data.length; i++) {
-      var c      = result.data[i];
-      var expiry = new Date(c.subscription_expires_at);
-      var daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-
-      if (daysLeft <= 0) {
-        // ── Subscription expired ───────────────────────────────
-        console.log('[Scheduler] Subscription expired for', c.id);
-        await sb.from('clients')
-          .update({ subscription_active: false })
-          .eq('id', c.id);
-
-        // Stop the bot for this client
-        try { sessionManager.getSession(c.id) && (await sessionManager.stopSession(c.id)); } catch (e) {}
-
-        // Notify the client via WhatsApp if they have a notification number
-        var sock = null; // session is stopped, send from another connected session if possible
-        // Best effort: log the expiry
-        await sb.from('partner_log').insert({
-          client_id: c.id,
-          action:    'subscription_expired',
-          note:      'Auto-expired. subscription_expires_at was ' + c.subscription_expires_at
-        }).catch(function() {});
-
-        console.log('[Scheduler] Deactivated expired account:', c.email);
-
-      } else if (daysLeft === 3) {
-        // ── 3-day renewal reminder ─────────────────────────────
-        console.log('[Scheduler] Sending 3-day renewal reminder to', c.email);
-
-        // Try to send a WhatsApp message to the client's notification number
-        var reminderSock = null;
-        try {
-          // Pick any connected session to relay the message
-          var allSessions = sessionManager.getAllSessions();
-          if (allSessions.length > 0) {
-            reminderSock = sessionManager.getSession(allSessions[0]);
-          }
-        } catch (e) {}
-
-        if (reminderSock && c.notification_number) {
-          var ownerJid = c.notification_number.replace(/\D/g, '') + '@s.whatsapp.net';
-          var appUrl   = process.env.APP_URL || 'https://forgebot.up.railway.app';
-          try {
-            await reminderSock.sendMessage(ownerJid, {
-              text:
-                '⚠️ *ForgeBot Renewal Reminder*\n\n' +
-                'Your ForgeBot subscription expires in *3 days*.\n\n' +
-                'To keep your bot running without interruption, renew now:\n' +
-                appUrl + '/?renew=1\n\n' +
-                '_If you\'ve already renewed, ignore this message._'
-            });
-          } catch (e) {}
-        }
-      }
-    }
-  } catch (e) {
-    console.error('[Scheduler] checkSubscriptionExpiry error:', e.message);
-  }
-}
-
-// ── Scheduler ─────────────────────────────────────────────────
-// Call startScheduler() once from index.js / app startup
 function startScheduler() {
-  console.log('[StatusPoster] Scheduler started — checking every 60s');
 
-  // Status posts: check every 60 seconds
-  setTimeout(checkAndPost, 10 * 1000);
-  setInterval(checkAndPost, 60 * 1000);
+  // ── JOB 1: Every minute — due status posts ─────────────────
+  cron.schedule('* * * * *', async function() {
+    try {
+      const now       = new Date();
+      const timeStr   = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today     = dayNames[now.getDay()];
+      const todayDate = now.toISOString().split('T')[0];
 
-  // Subscription expiry: check once every 24 hours
-  // Wait 30s on startup (let everything boot first)
-  setTimeout(checkSubscriptionExpiry, 30 * 1000);
-  setInterval(checkSubscriptionExpiry, 24 * 60 * 60 * 1000);
+      const duePosts = await db.getDueStatusPosts(timeStr, todayDate);
 
-  console.log('[StatusPoster] Subscription expiry checker started — runs daily');
+      for (const post of duePosts) {
+        if (post.last_posted === todayDate) continue;
+
+        const scheduledDays = (post.scheduled_days || post.days || '').toLowerCase();
+        if (scheduledDays && !scheduledDays.includes(today.toLowerCase())) continue;
+
+        const client = post.clients;
+        if (!client || client.status !== 'active' || !client.subscription_active) continue;
+
+        const caption = post.caption || getCaption(client.business_type || 'general');
+        await postStatus(client.id, post.media_url, caption);
+        await db.markStatusPosted(post.id, todayDate);
+      }
+    } catch (err) {
+      console.error('[StatusScheduler] Status post cron error:', err.message);
+    }
+  });
+
+  // ── JOB 2: Mon/Wed/Fri/Sat/Sun at 8pm — post meme ─────────
+  cron.schedule('0 20 * * 0,1,3,5,6', async function() {
+    console.log('[StatusScheduler] Posting meme to all active clients...');
+    try {
+      const clients = await db.getActiveClients();
+      const meme    = getWeeklyMeme();
+      for (const client of clients) {
+        if (!client.subscription_active) continue;
+        const sock = getSock(client.id);
+        if (!sock) continue;
+        try {
+          await sock.sendMessage('status@broadcast', { text: meme });
+          console.log('[StatusScheduler] Meme posted for client', client.id);
+        } catch (err) {
+          console.error('[StatusScheduler] Meme failed for client', client.id + ':', err.message);
+        }
+        await new Promise(function(r) { setTimeout(r, 2000); });
+      }
+    } catch (err) {
+      console.error('[StatusScheduler] Meme cron error:', err.message);
+    }
+  });
+
+  // ── JOB 3: 1st of month at 9am — monthly analytics report ──
+  cron.schedule('0 9 1 * *', async function() {
+    console.log('[StatusScheduler] Running monthly analytics reports...');
+    try {
+      const clients   = await db.getActiveClients();
+      const now       = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const month     = lastMonth.getFullYear() + '-' +
+                        String(lastMonth.getMonth() + 1).padStart(2, '0');
+
+      for (const client of clients) {
+        if (!client.subscription_active || !client.notification_number) continue;
+        const sock = getSock(client.id);
+        if (!sock) continue;
+        try {
+          const stats  = await db.getMonthlyStats(client.id, month);
+          const report = buildMonthlyReport(client, stats, month);
+          await sendToPhone(sock, client.notification_number, report);
+          console.log('[StatusScheduler] Monthly report sent for client', client.id);
+        } catch (err) {
+          console.error('[StatusScheduler] Monthly report failed for client', client.id + ':', err.message);
+        }
+        await new Promise(function(r) { setTimeout(r, 3000); });
+      }
+    } catch (err) {
+      console.error('[StatusScheduler] Monthly report cron error:', err.message);
+    }
+  });
+
+  // ── JOB 4: Every minute — run due bot errands ──────────────
+  cron.schedule('* * * * *', async function() {
+    try {
+      const now       = new Date();
+      const timeStr   = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+      const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const today     = dayNames[now.getDay()];
+      const todayDate = now.toISOString().split('T')[0];
+
+      const tasks = await db.getDueBotTasks(timeStr);
+
+      for (const task of tasks) {
+        if (task.last_run_date === todayDate) continue;
+
+        const scheduledDays = (task.schedule_days || '').toLowerCase();
+        if (scheduledDays && !scheduledDays.includes(today.toLowerCase())) continue;
+
+        const client = task.clients;
+        if (!client || !client.subscription_active) continue;
+
+        const sock = getSock(task.client_id);
+        if (!sock) continue;
+
+        const sb     = db.getSupabase();
+        let jids     = [];
+        const cutoff = new Date();
+
+        if (task.filter_type === 'all_customers') {
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+
+        } else if (task.filter_type === 'pending_orders') {
+          const { data } = await sb.from('orders')
+            .select('customer_jid')
+            .eq('client_id', task.client_id)
+            .in('status', ['pending', 'awaiting_receipt', 'confirmed'])
+            .eq('payment_status', 'unpaid');
+          jids = [...new Set((data || []).map(function(o) { return o.customer_jid; }).filter(Boolean))];
+
+        } else if (task.filter_type === 'inactive_14d') {
+          cutoff.setDate(cutoff.getDate() - 14);
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id)
+            .lt('last_contact', cutoff.toISOString()).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+
+        } else if (task.filter_type === 'inactive_7d') {
+          cutoff.setDate(cutoff.getDate() - 7);
+          const { data } = await sb.from('customers')
+            .select('jid').eq('client_id', task.client_id)
+            .lt('last_contact', cutoff.toISOString()).limit(500);
+          jids = (data || []).map(function(c) { return c.jid; });
+        }
+
+        if (!jids.length) {
+          await db.updateBotTask(task.id, { last_run_date: todayDate });
+          continue;
+        }
+
+        let sent = 0;
+        for (const jid of jids) {
+          try {
+            await sock.sendMessage(jid, { text: task.message });
+            sent++;
+            await new Promise(function(r) { setTimeout(r, 1500); });
+          } catch (e) {
+            console.error('[BotErrands] Failed for', jid + ':', e.message);
+          }
+        }
+
+        await db.updateBotTask(task.id, {
+          last_run_date: todayDate,
+          run_count:     (task.run_count || 0) + 1
+        });
+
+        console.log('[BotErrands] Task "' + task.name + '" sent to ' + sent + '/' + jids.length + ' customers for client', task.client_id);
+      }
+    } catch (err) {
+      console.error('[BotErrands] Cron error:', err.message);
+    }
+  });
+
+  // ── JOB 5: Daily at 3am — subscription expiry check ────────
+  cron.schedule('0 3 * * *', async function() {
+    console.log('[StatusScheduler] Running subscription expiry check...');
+    try {
+      var { createClient } = require('@supabase/supabase-js');
+      var sb  = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      var now = new Date();
+
+      var r = await sb.from('clients')
+        .select('id,email,notification_number,subscription_expires_at')
+        .eq('subscription_active', true)
+        .not('subscription_expires_at', 'is', null);
+
+      if (!r.data || !r.data.length) return;
+
+      for (var i = 0; i < r.data.length; i++) {
+        var c        = r.data[i];
+        var expiry   = new Date(c.subscription_expires_at);
+        var daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+
+        if (daysLeft <= 0) {
+          // Expired — stop bot
+          await sb.from('clients').update({ subscription_active: false }).eq('id', c.id);
+          console.log('[StatusScheduler] Subscription expired:', c.email);
+        } else if (daysLeft === 3 && c.notification_number) {
+          // 3 days left — send renewal reminder
+          var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+          var sock   = getSock(c.id);
+          if (sock) {
+            try {
+              var jid = c.notification_number.replace(/\D/g,'') + '@s.whatsapp.net';
+              await sock.sendMessage(jid, {
+                text: '*ForgeBot Renewal Reminder*\n\nYour subscription expires in 3 days.\n\nRenew here to keep your bot running: ' + appUrl
+              });
+            } catch(e) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[StatusScheduler] Expiry check error:', err.message);
+    }
+  });
+
+  console.log('[StatusScheduler] Started — status posts: every minute | memes: Mon/Wed/Fri/Sat/Sun 8pm | reports: 1st of month 9am | bot errands: every minute | expiry check: daily 3am');
 }
 
-module.exports = {
-  startScheduler,
-  checkAndPost,
-  checkSubscriptionExpiry,
-  postProductStatus,
-  postMemeStatus
-};
+module.exports = { startScheduler };
