@@ -1,18 +1,18 @@
 // ============================================================
-//  ForgeBot — Payment Notifier v4
+//  ForgeBot — Payment Notifier v3
 //  src/bot/paymentNotifier.js
 //
-//  v4 changes:
-//   - Owner confirms payment on DASHBOARD only (no WhatsApp 1/2/3)
-//   - When receipt received: upload to storage → save URL on order
-//     → push notification + WhatsApp link to dashboard
-//   - Lead notifications for listing queries (called from replyEngine)
-//   - Human handoff notification preserved
+//  v3 changes:
+//   - Asks customer for receipt photo BEFORE notifying owner
+//   - handleReceiptImage: forwards image to owner with 1/2/3 prompt
+//   - Real push notifications on payment events
+//   - Receipt URL stored so dashboard can display it
 // ============================================================
 'use strict';
 
 const { createClient } = require('@supabase/supabase-js');
 
+// ── Lazy Supabase ─────────────────────────────────────────────
 let _supabase = null;
 function getSupabase() {
   if (!_supabase) {
@@ -24,6 +24,7 @@ function getSupabase() {
   return _supabase;
 }
 
+// ── Lazy webpush ──────────────────────────────────────────────
 let _webpush = null;
 function getWebPush() {
   if (!_webpush) {
@@ -41,9 +42,12 @@ function getWebPush() {
   return _webpush;
 }
 
-// ── Receipt request state ─────────────────────────────────────
-// key: clientId + ':' + customerJid → { ownerJid, customerName, ts }
+// ── State maps ────────────────────────────────────────────────
+//  key: clientId + ':' + customerJid → { ownerJid, customerName, originalMessage, ts }
 var pendingReceiptRequests = new Map();
+
+//  key: ownerJid + ':' + clientId → { customerJid, receiptUrl, ts }
+var pendingConfirmations = new Map();
 
 // ── Payment keywords ──────────────────────────────────────────
 var PAYMENT_CLAIM_KEYWORDS = [
@@ -57,11 +61,11 @@ var PAYMENT_CLAIM_KEYWORDS = [
 ];
 
 // ══════════════════════════════════════════════════════════════
-//  Push Notifications
+//  Push Notification Helper
 // ══════════════════════════════════════════════════════════════
 async function sendPushToClient(clientId, title, body, url) {
   var wp = getWebPush();
-  if (!wp) return;
+  if (!wp) { console.log('[Push] web-push not available'); return; }
   try {
     var sb     = getSupabase();
     var result = await sb.from('push_subscriptions').select('subscription').eq('client_id', clientId);
@@ -76,14 +80,15 @@ async function sendPushToClient(clientId, title, body, url) {
       try {
         var sub = JSON.parse(result.data[i].subscription);
         await wp.sendNotification(sub, payload);
-        console.log('[Push] Sent:', title);
+        console.log('[Push] Sent to client', clientId, ':', title);
       } catch(e) {
         if (e.statusCode === 410) {
+          // Subscription expired — remove it
           await sb.from('push_subscriptions').delete().eq('client_id', clientId);
         }
       }
     }
-  } catch(e) { console.error('[Push]', e.message); }
+  } catch(e) { console.error('[Push] Error:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -94,14 +99,15 @@ function formatPhone(jid) {
 }
 
 async function humanDelay(min, max) {
-  min = min || 800; max = max || 1800;
+  min = min || 800;
+  max = max || 1800;
   return new Promise(function(r) { setTimeout(r, min + Math.random() * (max - min)); });
 }
 
 async function getClientData(clientId) {
   var sb = getSupabase();
   var cr = await sb.from('clients').select(
-    'full_name,whatsapp_number,notification_number,bank_name,account_number,account_name,business_name'
+    'full_name,whatsapp_number,notification_number,bank_name,account_number,account_name'
   ).eq('id', clientId).single();
   return cr.data || null;
 }
@@ -115,7 +121,7 @@ async function getCustomerName(clientId, jid) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Receipt State
+//  Receipt State Management
 // ══════════════════════════════════════════════════════════════
 function isPaymentKeyword(text) {
   var t = (text || '').toLowerCase().trim();
@@ -123,14 +129,19 @@ function isPaymentKeyword(text) {
 }
 
 function isAwaitingReceipt(clientId, jid) {
-  var key   = clientId + ':' + jid;
+  var key = clientId + ':' + jid;
   var entry = pendingReceiptRequests.get(key);
   if (!entry) return false;
+  // Expire after 10 minutes
   if (Date.now() - entry.ts > 10 * 60 * 1000) {
     pendingReceiptRequests.delete(key);
     return false;
   }
   return true;
+}
+
+function getPendingReceiptEntry(clientId, jid) {
+  return pendingReceiptRequests.get(clientId + ':' + jid) || null;
 }
 
 function clearReceiptRequest(clientId, jid) {
@@ -144,179 +155,241 @@ async function handlePaymentClaim(sock, msg, clientId, customerJid, originalMess
   try {
     var client       = await getClientData(clientId);
     var customerName = await getCustomerName(clientId, customerJid);
-    if (!client) return;
 
+    if (!client) {
+      console.error('[PaymentNotifier] Client not found:', clientId);
+      return;
+    }
+
+    // Ask customer for receipt photo
     await humanDelay();
-    await sock.sendMessage(customerJid, {
-      text: 'Thank you! 🙏 To confirm your payment quickly, please send a *photo or screenshot* of your payment receipt/alert 📸\n\nThis helps us verify and process your order faster!'
+    var receiptPrompt =
+      'Thank you! 🙏 To confirm your payment, could you please send a *photo or screenshot* of your payment receipt/alert? 📸\n\n' +
+      'This helps us verify and confirm your order faster! 😊';
+    await sock.sendMessage(customerJid, { text: receiptPrompt });
+
+    // Store pending receipt request
+    var key = clientId + ':' + customerJid;
+    pendingReceiptRequests.set(key, {
+      ownerJid:        client.notification_number
+                        ? client.notification_number.replace(/\D/g,'') + '@s.whatsapp.net'
+                        : client.whatsapp_number.replace(/\D/g,'') + '@s.whatsapp.net',
+      customerName:    customerName,
+      originalMessage: originalMessage,
+      ts:              Date.now()
     });
 
-    var ownerJid = (client.notification_number || client.whatsapp_number)
-      .replace(/\D/g,'') + '@s.whatsapp.net';
-
-    pendingReceiptRequests.set(clientId + ':' + customerJid, {
-      ownerJid:     ownerJid,
-      customerName: customerName,
-      ts:           Date.now()
-    });
-
-    console.log('[PaymentNotifier] Awaiting receipt from', customerJid);
-  } catch(e) { console.error('[PaymentNotifier] handlePaymentClaim:', e.message); }
+    console.log('[PaymentNotifier] Awaiting receipt from', customerJid, 'for client', clientId);
+  } catch(e) { console.error('[PaymentNotifier] handlePaymentClaim error:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Step 2 — Customer sends receipt image
-//  → upload to storage → save on order → push owner to dashboard
+//  Step 2 — Customer sends receipt image → forward to owner
 // ══════════════════════════════════════════════════════════════
 async function handleReceiptImage(sock, msg, clientId, customerJid) {
   try {
-    var entry = pendingReceiptRequests.get(clientId + ':' + customerJid);
+    var entry = getPendingReceiptEntry(clientId, customerJid);
     if (!entry) return;
-
-    var imageMessage = msg.message && msg.message.imageMessage;
-    if (!imageMessage) return;
 
     var ownerJid     = entry.ownerJid;
     var customerName = entry.customerName;
     var phone        = formatPhone(customerJid);
-    var appUrl       = process.env.APP_URL || 'https://forgebot.up.railway.app';
-    var sb           = getSupabase();
-    var receiptUrl   = null;
 
-    // ── Download & upload receipt to Supabase Storage ─────
+    // Download image from message
+    var imageMessage = msg.message && msg.message.imageMessage;
+    if (!imageMessage) return;
+
+    var msgType  = 'imageMessage';
+    var msgForward = msg.message;
+
+    // Forward the actual image to owner
+    await humanDelay();
+
+    // Send text alert to owner first
+    var alertText =
+      '*💰 PAYMENT RECEIPT RECEIVED*\n\n' +
+      'Customer: *' + customerName + '* (+' + phone + ')\n' +
+      'Time: ' + new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }) + '\n\n' +
+      '_Verify the receipt below, then reply with a number:_\n\n' +
+      '*1* ✅ Payment confirmed — notify customer\n' +
+      '*2* ⏳ Ask customer to wait\n' +
+      '*3* ❌ Payment not received — notify customer';
+
+    await sock.sendMessage(ownerJid, { text: alertText });
+    await humanDelay(500, 1000);
+
+    // Forward the receipt image
     try {
       var { downloadMediaMessage } = require('@whiskeysockets/baileys');
       var buffer = await downloadMediaMessage(msg, 'buffer', {}, {
-        logger:          console,
+        logger:        console,
         reuploadRequest: sock.updateMediaMessage
       });
       if (buffer) {
-        var filename = 'receipts/' + clientId + '/' + Date.now() + '.jpg';
-        var up = await sb.storage.from('forgebot-listings').upload(filename, buffer, {
-          contentType: 'image/jpeg',
-          upsert:      false
+        await sock.sendMessage(ownerJid, {
+          image:   buffer,
+          caption: '📎 Receipt from ' + customerName + ' (+' + phone + ')'
         });
-        if (!up.error) {
-          var urlRes = sb.storage.from('forgebot-listings').getPublicUrl(filename);
-          receiptUrl = urlRes.data.publicUrl;
-        }
       }
-    } catch(e) { console.error('[PaymentNotifier] Image upload failed:', e.message); }
-
-    // ── Attach receipt to the customer's latest pending order ─
-    if (receiptUrl) {
-      try {
-        var orderRes = await sb.from('orders')
-          .select('id')
-          .eq('client_id', clientId)
-          .eq('customer_jid', customerJid)
-          .in('status', ['pending', 'awaiting_payment'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (orderRes.data) {
-          await sb.from('orders').update({
-            receipt_url:    receiptUrl,
-            payment_status: 'receipt_received',
-            updated_at:     new Date().toISOString()
-          }).eq('id', orderRes.data.id);
-        } else {
-          // No order yet — create a payment_receipts record
-          await sb.from('payment_receipts').insert({
-            client_id:    clientId,
-            customer_jid: customerJid,
-            customer_name: customerName,
-            receipt_url:  receiptUrl,
-            status:       'pending',
-            created_at:   new Date().toISOString()
-          }).catch(function() {});
-        }
-      } catch(e) { console.error('[PaymentNotifier] Order update:', e.message); }
+    } catch(e) {
+      // If download fails, just send a placeholder
+      console.error('[PaymentNotifier] Image download failed:', e.message);
+      await sock.sendMessage(ownerJid, { text: '_[Image receipt could not be forwarded — check WhatsApp directly]_' });
     }
 
-    // ── Tell customer receipt was received ─────────────────
-    await humanDelay();
-    await sock.sendMessage(customerJid, {
-      text: '✅ Receipt received! Your payment is being reviewed.\n\nWe will confirm your order shortly. Thank you for your patience! 🙏'
-    });
-
-    // ── Notify owner via WhatsApp (link only, no 1/2/3) ───
-    var waAlert =
-      '💰 *Payment Receipt Received*\n\n' +
-      'Customer: *' + customerName + '* (+' + phone + ')\n' +
-      'Time: ' + new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }) + '\n\n' +
-      '👆 Confirm or reject the payment on your dashboard:\n' +
-      appUrl + '/dashboard';
-
-    try { await sock.sendMessage(ownerJid, { text: waAlert }); } catch(e) {}
-
-    // ── Push notification to owner's app ──────────────────
+    // Send push notification to client
     await sendPushToClient(clientId,
       '💰 Payment Receipt Received',
-      customerName + ' (+' + phone + ') sent their receipt. Tap to confirm on dashboard.',
+      customerName + ' (+' + phone + ') sent their payment receipt. Confirm in dashboard.',
       '/dashboard'
     );
 
+    // Store pending confirmation (awaiting owner's 1/2/3 reply)
+    var confirmKey = ownerJid + ':' + clientId;
+    pendingConfirmations.set(confirmKey, {
+      customerJid:  customerJid,
+      customerName: customerName,
+      phone:        phone,
+      ts:           Date.now()
+    });
+
+    // Clear receipt request — we've received it
     clearReceiptRequest(clientId, customerJid);
-    console.log('[PaymentNotifier] Receipt handled for', customerJid);
-  } catch(e) { console.error('[PaymentNotifier] handleReceiptImage:', e.message); }
+
+    console.log('[PaymentNotifier] Receipt forwarded to owner for client', clientId);
+  } catch(e) { console.error('[PaymentNotifier] handleReceiptImage error:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Lead Notification — called from replyEngine after listing match
+//  Owner replies 1 / 2 / 3
 // ══════════════════════════════════════════════════════════════
-async function notifyOwnerOfLead(clientId, customerJid, listingNames) {
+async function handleOwnerReply(sock, msg, clientId, ownerJid, replyText) {
   try {
-    var phone   = formatPhone(customerJid);
-    var preview = (listingNames || []).slice(0, 2).join(', ');
-    await sendPushToClient(clientId,
-      '🔥 New Lead!',
-      '+' + phone + ' is asking about: ' + preview + '. They may want to order!',
-      '/dashboard'
-    );
-  } catch(e) { console.error('[PaymentNotifier] notifyOwnerOfLead:', e.message); }
+    var choice = replyText.trim();
+
+    // Find pending confirmation for this owner+client combo
+    var confirmKey    = ownerJid + ':' + clientId;
+    var confirmation  = pendingConfirmations.get(confirmKey);
+    if (!confirmation) return false;
+
+    // Expire after 30 minutes
+    if (Date.now() - confirmation.ts > 30 * 60 * 1000) {
+      pendingConfirmations.delete(confirmKey);
+      return false;
+    }
+
+    if (choice !== '1' && choice !== '2' && choice !== '3') return false;
+
+    var { customerJid, customerName } = confirmation;
+
+    await humanDelay();
+
+    if (choice === '1') {
+      // Confirmed
+      pendingConfirmations.delete(confirmKey);
+      await sock.sendMessage(customerJid, {
+        text: '✅ *Payment confirmed!*\n\nThank you ' + customerName + '! Your payment has been verified.\n\nYour order is being processed and we\'ll keep you updated. 🎉'
+      });
+      // Push to client app
+      await sendPushToClient(clientId,
+        '✅ Payment Confirmed',
+        'You confirmed payment from ' + customerName + ' (+' + confirmation.phone + ').',
+        '/dashboard'
+      );
+      // Log in DB
+      try {
+        var sb = getSupabase();
+        await sb.from('bot_status_log').insert({
+          client_id: clientId,
+          log_type:  'payment_confirmed',
+          note:      'Confirmed payment from ' + customerName + ' (+' + confirmation.phone + ')'
+        });
+      } catch(e) {}
+    } else if (choice === '2') {
+      // Wait
+      await sock.sendMessage(customerJid, {
+        text: '⏳ *Payment processing*\n\nHi ' + customerName + '! We\'ve received your receipt and are verifying your payment. We\'ll confirm shortly. Please be patient! 🙏'
+      });
+      // Keep confirmation in map for further reply
+    } else if (choice === '3') {
+      // Not received
+      pendingConfirmations.delete(confirmKey);
+      var client = await getClientData(clientId);
+      var bankInfo = '';
+      if (client && client.account_number) {
+        bankInfo = '\n\n*Payment Details:*\n' +
+          (client.bank_name      ? '🏦 Bank: ' + client.bank_name + '\n'          : '') +
+          (client.account_number ? '📋 Account: ' + client.account_number + '\n'  : '') +
+          (client.account_name   ? '👤 Name: ' + client.account_name               : '');
+      }
+      await sock.sendMessage(customerJid, {
+        text: '❌ *Payment not found*\n\nHi ' + customerName + ', we could not verify your payment yet.\n\nKindly check and ensure you sent to the correct account.' + bankInfo + '\n\nIf you believe this is an error, please contact us directly.'
+      });
+    }
+
+    return true;
+  } catch(e) {
+    console.error('[PaymentNotifier] handleOwnerReply error:', e.message);
+    return false;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Human Handoff Notification
+//  Check if message is from owner and is a 1/2/3 reply
+// ══════════════════════════════════════════════════════════════
+async function isOwnerConfirmationReply(clientId, senderJid) {
+  try {
+    var client = await getClientData(clientId);
+    if (!client) return false;
+    var ownerNum  = (client.notification_number || client.whatsapp_number).replace(/\D/g,'');
+    var senderNum = senderJid.replace('@s.whatsapp.net','').replace('@g.us','');
+    return ownerNum === senderNum;
+  } catch(e) { return false; }
+}
+
+function hasPendingConfirmation(clientId, ownerJid) {
+  return pendingConfirmations.has(ownerJid + ':' + clientId);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Notify owner of human handoff (from replyEngine)
 // ══════════════════════════════════════════════════════════════
 async function notifyOwnerOfHandoff(sock, clientId, customerJid, customerName, reason) {
   try {
-    var client   = await getClientData(clientId);
+    var client = await getClientData(clientId);
     if (!client) return;
-    var ownerJid = (client.notification_number || client.whatsapp_number).replace(/\D/g,'') + '@s.whatsapp.net';
-    var phone    = formatPhone(customerJid);
-    var appUrl   = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    var ownerJid   = (client.notification_number || client.whatsapp_number).replace(/\D/g,'') + '@s.whatsapp.net';
+    var phone      = formatPhone(customerJid);
+    var appUrl     = process.env.APP_URL || 'https://forgebot.up.railway.app';
 
     var alertText =
-      '🤝 *Customer Needs Attention*\n\n' +
+      '*🤝 CUSTOMER NEEDS ATTENTION*\n\n' +
       'Customer: *' + (customerName || phone) + '* (+' + phone + ')\n' +
       (reason ? 'Reason: ' + reason + '\n' : '') +
       'Time: ' + new Date().toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }) + '\n\n' +
-      '👆 View on your dashboard:\n' + appUrl + '/dashboard';
+      '📲 Reply to them directly or view in dashboard:\n' + appUrl + '/dashboard';
 
-    try { await sock.sendMessage(ownerJid, { text: alertText }); } catch(e) {}
+    await sock.sendMessage(ownerJid, { text: alertText });
 
     await sendPushToClient(clientId,
       '🤝 Customer Needs You',
-      (customerName || phone) + ' requested a human. Check WhatsApp.',
+      (customerName || phone) + ' needs your personal attention. Check WhatsApp.',
       '/dashboard'
     );
-  } catch(e) { console.error('[PaymentNotifier] notifyOwnerOfHandoff:', e.message); }
+  } catch(e) { console.error('[PaymentNotifier] notifyOwnerOfHandoff error:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Order Notification
+//  Notify owner of new order
 // ══════════════════════════════════════════════════════════════
 async function notifyOwnerOfOrder(clientId, customerName, orderSummary) {
   try {
     await sendPushToClient(clientId,
       '🛍️ New Order!',
-      (customerName || 'A customer') + ' placed an order: ' + (orderSummary || '').slice(0, 60),
+      (customerName || 'A customer') + ' just placed an order: ' + (orderSummary || '').slice(0, 60),
       '/dashboard'
     );
-  } catch(e) { console.error('[PaymentNotifier] notifyOwnerOfOrder:', e.message); }
+  } catch(e) { console.error('[PaymentNotifier] notifyOwnerOfOrder error:', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -327,8 +400,10 @@ module.exports = {
   isAwaitingReceipt,
   handlePaymentClaim,
   handleReceiptImage,
+  handleOwnerReply,
+  isOwnerConfirmationReply,
+  hasPendingConfirmation,
   notifyOwnerOfHandoff,
-  notifyOwnerOfLead,
   notifyOwnerOfOrder,
   sendPushToClient
 };
