@@ -1,0 +1,50 @@
+# ── Dependencies ──────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ── Environment variables (NEVER commit these) ────────
+.env
+.env.local
+.env.development
+.env.production
+.env.*
+
+# ── WhatsApp session auth files ───────────────────────
+# These are auto-generated per user — never commit them
+sessions/
+auth_info_multi/
+auth_info_baileys/
+*.session
+baileys_store.json
+
+# ── Uploaded / temp files ─────────────────────────────
+uploads/
+temp/
+tmp/
+
+# ── Logs ──────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS files ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor files ──────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Build / cache ─────────────────────────────────────
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# ── Railway / deployment ──────────────────────────────
+.railway/
