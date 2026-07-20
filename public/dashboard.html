@@ -1,373 +1,220 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
-<link rel="manifest" href="/manifest.json"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root[data-theme="dark"]{
-  --bg:#080c18;--surface:#0d1220;--card:#111827;--card2:#131f30;
-  --border:#1a2540;--text:#e2e8f0;--muted:#64748b;--sub:#94a3b8;
-  --green:#22c55e;--green2:#16a34a;--glow:rgba(34,197,94,.18);
-  --blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--purple:#a855f7;
-  --topbar:#0d1220;--nav:#0a0f1c;
-}
-:root[data-theme="light"]{
-  --bg:#f0f4f8;--surface:#fff;--card:#fff;--card2:#f8fafc;
-  --border:#e2e8f0;--text:#1a202c;--muted:#94a3b8;--sub:#64748b;
-  --green:#16a34a;--green2:#15803d;--glow:rgba(22,163,74,.12);
-  --blue:#2563eb;--red:#dc2626;--orange:#d97706;--purple:#7c3aed;
-  --topbar:#1a2540;--nav:#fff;
-}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
-
-/* ── HEADER ─────────────────────────────── */
-header{
-  background:linear-gradient(135deg,#0d1220 0%,#111827 50%,#0a1628 100%);
-  border-bottom:1px solid var(--border);
-  padding:0 24px;height:60px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:100;
-  box-shadow:0 2px 20px rgba(0,0,0,.4);
-}
-.logo{
-  font-size:1.35rem;font-weight:900;letter-spacing:-1px;
-  background:linear-gradient(135deg,#22c55e,#34d399);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.logo span{background:linear-gradient(135deg,#fff,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.trial-badge{
-  background:linear-gradient(135deg,rgba(245,158,11,.2),rgba(245,158,11,.1));
-  color:var(--orange);border:1px solid rgba(245,158,11,.4);
-  padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:700;
-}
-.wa-badge{
-  display:flex;align-items:center;gap:6px;
-  padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:700;
-  border:1px solid;cursor:pointer;transition:.2s;
-}
-.wa-badge.conn{background:rgba(34,197,94,.12);color:var(--green);border-color:rgba(34,197,94,.35)}
-.wa-badge.disc{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3)}
-.wa-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.theme-btn{
-  background:rgba(255,255,255,.07);border:1px solid var(--border);
-  color:var(--sub);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:.8rem;
-  transition:.2s;
-}
-.theme-btn:hover{background:rgba(255,255,255,.12)}
-.logout-btn{
-  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
-  color:var(--red);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:.8rem;
-  transition:.2s;
-}
-.logout-btn:hover{background:rgba(239,68,68,.2)}
-
-/* ── NAV ─────────────────────────────── */
-nav{
-  background:var(--nav);border-bottom:1px solid var(--border);
-  display:flex;padding:0 20px;overflow-x:auto;gap:0;
-  position:sticky;top:60px;z-index:99;
-}
-nav::-webkit-scrollbar{height:0}
-nav button{
-  background:none;border:none;color:var(--muted);
-  padding:13px 15px;cursor:pointer;font-size:.82rem;white-space:nowrap;
-  border-bottom:2px solid transparent;transition:.2s;position:relative;
-  font-family:inherit;font-weight:500;
-}
-nav button:hover{color:var(--text)}
-nav button.active{color:var(--green);border-bottom-color:var(--green);font-weight:700}
-.nav-badge{
-  position:absolute;top:7px;right:3px;
-  background:var(--red);color:#fff;font-size:.6rem;font-weight:800;
-  padding:1px 5px;border-radius:8px;min-width:15px;text-align:center;
-}
-
-/* ── LAYOUT ─────────────────────────────── */
-.container{max-width:960px;margin:0 auto;padding:24px 18px}
-.section{display:none}.section.active{display:block;animation:fadeIn .25s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
-/* ── CARDS ─────────────────────────────── */
-.card{
-  background:var(--card);border:1px solid var(--border);
-  border-radius:14px;padding:20px;margin-bottom:16px;
-  transition:border-color .2s,box-shadow .2s;
-}
-.card:hover{border-color:rgba(34,197,94,.2);box-shadow:0 0 20px rgba(34,197,94,.05)}
-.card-glow{border-color:rgba(34,197,94,.3);box-shadow:0 0 30px rgba(34,197,94,.08)}
-
-.page-header{margin-bottom:22px}
-.page-header h2{font-size:1.15rem;font-weight:700;color:var(--text);margin-bottom:4px}
-.page-header p{font-size:.82rem;color:var(--muted)}
-
-/* ── FORM ELEMENTS ─────────────────────────────── */
-label{display:block;font-size:.78rem;color:var(--sub);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
-input,textarea,select{
-  width:100%;background:var(--surface);border:1px solid var(--border);
-  color:var(--text);border-radius:9px;padding:10px 13px;font-size:.86rem;
-  outline:none;transition:.2s;font-family:inherit;
-}
-input:focus,textarea:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--glow)}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#07090f;color:#e2e8f0;min-height:100vh}
+:root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#0f1623;--border:#1e2d3d;--purple:#a855f7;--glow:rgba(34,197,94,.15)}
+header{background:rgba(15,22,35,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:1.4rem;font-weight:800;background:linear-gradient(135deg,#22c55e,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-right{display:flex;align-items:center;gap:12px}
+.trial-badge{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:700}
+.status-badge{padding:5px 14px;border-radius:20px;font-size:.75rem;font-weight:600;transition:.3s}
+.status-badge.connected{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.status-badge.disc{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+nav{background:rgba(10,14,26,.9);border-bottom:1px solid var(--border);display:flex;padding:0 28px;overflow-x:auto;gap:0}
+nav button{background:none;border:none;color:#64748b;padding:14px 18px;cursor:pointer;font-size:.83rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s;position:relative;font-weight:500}
+nav button:hover{color:#94a3b8}
+nav button.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+nav button .badge{position:absolute;top:8px;right:4px;background:var(--red);color:#fff;font-size:.6rem;font-weight:700;padding:2px 5px;border-radius:8px;min-width:16px;text-align:center}
+.container{max-width:960px;margin:0 auto;padding:28px 20px}
+.section{display:none}.section.active{display:block}
+.page-title{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.page-title h2{font-size:1.25rem;font-weight:700;color:#f1f5f9}
+.page-title .sub{font-size:.8rem;color:#64748b;margin-top:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px;transition:.2s}
+.card:hover{border-color:rgba(34,197,94,.2)}
+label{display:block;font-size:.78rem;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+input,textarea,select{width:100%;background:#0a0f1e;border:1px solid var(--border);color:#e2e8f0;border-radius:8px;padding:10px 14px;font-size:.88rem;outline:none;transition:.2s}
+input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 textarea{min-height:80px;resize:vertical}
-select option{background:var(--card)}
-
-/* ── BUTTONS ─────────────────────────────── */
-.btn{
-  padding:9px 20px;border:none;border-radius:9px;cursor:pointer;
-  font-size:.84rem;font-weight:700;transition:.2s;font-family:inherit;
-}
-.btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000}
-.btn-green:hover{background:linear-gradient(135deg,#16a34a,#15803d);transform:translateY(-1px);box-shadow:0 4px 16px rgba(34,197,94,.3)}
-.btn-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:5px 12px;font-size:.78rem}
-.btn-red:hover{background:rgba(239,68,68,.2)}
-.btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
-.btn-blue:hover{background:linear-gradient(135deg,#2563eb,#1d4ed8);transform:translateY(-1px)}
-.btn-gray{background:rgba(255,255,255,.07);color:var(--sub);border:1px solid var(--border)}
-.btn-gray:hover{background:rgba(255,255,255,.12)}
-.btn-sm{padding:5px 12px;border:none;border-radius:7px;cursor:pointer;font-size:.76rem;font-weight:700;font-family:inherit}
-
-/* ── GRID HELPERS ─────────────────────────────── */
-.row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
+.btn{padding:10px 22px;border:none;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn-green{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000}.btn-green:hover{opacity:.9;transform:translateY(-1px)}
+.btn-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);padding:6px 14px;font-size:.78rem}
+.btn-red:hover{background:rgba(239,68,68,.25)}
+.btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}.btn-blue:hover{opacity:.9}
+.btn-gray{background:#1e2d3d;color:#94a3b8;border:1px solid var(--border)}.btn-gray:hover{background:#253347}
+.btn-sm{padding:5px 12px;border:none;border-radius:6px;cursor:pointer;font-size:.75rem;font-weight:600}
+.row{display:flex;gap:12px;margin-bottom:14px;align-items:flex-end}
 .row .grow{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:22px}
-
-/* ── STAT CARDS ─────────────────────────────── */
-.stat-card{
-  background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:20px 16px;text-align:center;position:relative;overflow:hidden;
-}
-.stat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--glow),transparent);pointer-events:none}
-.stat-val{font-size:2rem;font-weight:900;color:var(--green);margin-bottom:4px;line-height:1}
-.stat-lbl{font-size:.74rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-
-/* ── FLOW / LIST ITEMS ─────────────────────────────── */
-.flow-item{
-  background:var(--card2);border:1px solid var(--border);border-radius:10px;
-  padding:13px 15px;margin-bottom:8px;display:flex;justify-content:space-between;
-  align-items:center;gap:10px;transition:.2s;
-}
-.flow-item:hover{border-color:rgba(34,197,94,.25)}
-.flow-kw{font-size:.82rem;color:var(--green);font-weight:700}
-.flow-resp{font-size:.8rem;color:var(--muted);margin-top:2px}
-
-/* ── MSG ALERTS ─────────────────────────────── */
-.msg{padding:10px 14px;border-radius:9px;font-size:.84rem;margin-bottom:12px;display:none}
+.msg{padding:10px 16px;border-radius:8px;font-size:.85rem;margin-bottom:14px;display:none}
 .msg.show{display:block}
 .msg.ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
 .msg.err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-
-/* ── ORDERS ─────────────────────────────── */
-.filter-bar{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
-.filter-btn{
-  background:var(--card2);border:1px solid var(--border);color:var(--muted);
-  padding:6px 14px;border-radius:20px;font-size:.78rem;cursor:pointer;transition:.2s;
-  font-family:inherit;font-weight:600;
-}
-.filter-btn:hover{border-color:var(--green);color:var(--green)}
-.filter-btn.active{background:linear-gradient(135deg,rgba(34,197,94,.2),rgba(34,197,94,.1));color:var(--green);border-color:rgba(34,197,94,.5)}
-.order-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;transition:.2s}
-.order-card:hover{border-color:rgba(34,197,94,.2);box-shadow:0 4px 20px rgba(0,0,0,.2)}
+/* Flow items */
+.flow-item{background:#0a0f1e;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
+.flow-resp{font-size:.8rem;color:#64748b;margin-top:3px}
+/* Orders */
+.filter-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filter-btn{background:#0a0f1e;border:1px solid var(--border);color:#64748b;padding:6px 14px;border-radius:20px;font-size:.78rem;cursor:pointer;transition:.2s;font-weight:500}
+.filter-btn.active{background:var(--green);color:#000;border-color:var(--green);font-weight:600}
+.order-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:12px;transition:.2s}
+.order-card:hover{border-color:rgba(34,197,94,.2)}
 .order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.order-ref{font-size:.76rem;color:var(--muted);margin-top:2px}
-.order-status{padding:3px 10px;border-radius:12px;font-size:.73rem;font-weight:800}
-.order-status.pending{background:rgba(245,158,11,.1);color:var(--orange);border:1px solid rgba(245,158,11,.3)}
-.order-status.confirmed{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.order-status.packaging{background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
-.order-status.shipped{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
-.order-status.delivered{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.4)}
-.order-status.rejected{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.order-meta{font-size:.79rem;color:var(--muted);margin:6px 0}
-.order-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
-.receipt-thumb{width:46px;height:46px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border);vertical-align:middle}
-
-/* ── LISTINGS ─────────────────────────────── */
-.listing-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;transition:.2s}
-.listing-card:hover{border-color:rgba(34,197,94,.25)}
-.listing-name{font-weight:700;font-size:.95rem;margin-bottom:3px}
-.listing-price{color:var(--green);font-weight:800;font-size:.95rem}
-.listing-cat{font-size:.75rem;background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.25);padding:2px 9px;border-radius:8px;display:inline-block;margin-top:4px}
-.listing-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.listing-badge{display:inline-block;padding:2px 9px;border-radius:8px;font-size:.72rem;font-weight:700}
-.listing-badge.avail{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.listing-badge.unavail{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-
-/* ── MODAL ─────────────────────────────── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
-.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
-.modal h3{font-size:1.05rem;font-weight:700;margin-bottom:18px;color:var(--text)}
-.modal-footer{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
-
-/* ── BOT ERRANDS ─────────────────────────────── */
-.errand-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;transition:.2s}
-.errand-card:hover{border-color:rgba(168,85,247,.25)}
-.errand-meta{font-size:.78rem;color:var(--muted);margin-top:5px}
-.days-grid{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-.day-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:7px;font-size:.76rem;cursor:pointer;transition:.2s;font-family:inherit;font-weight:600}
-.day-btn.on{background:rgba(34,197,94,.15);color:var(--green);border-color:rgba(34,197,94,.4)}
-
-/* ── TOGGLE ─────────────────────────────── */
-.toggle{display:inline-flex;align-items:center;cursor:pointer;gap:8px;font-size:.82rem;color:var(--sub)}
+.order-ref{font-size:.75rem;color:#475569;margin-top:3px}
+.order-status{padding:3px 12px;border-radius:12px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.order-status.pending{background:rgba(245,158,11,.12);color:var(--orange);border:1px solid rgba(245,158,11,.3)}
+.order-status.confirmed{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.order-status.packaging{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.order-status.shipped{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+.order-status.delivered{background:rgba(34,197,94,.18);color:#86efac;border:1px solid rgba(34,197,94,.4)}
+.order-status.rejected{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.order-meta{font-size:.78rem;color:#475569;margin:8px 0}
+.order-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.receipt-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid var(--border)}
+/* Analytics */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;inset:0;background:var(--glow);opacity:0;transition:.3s}
+.stat-card:hover::before{opacity:1}
+.stat-val{font-size:2rem;font-weight:800;color:var(--green);margin-bottom:5px;font-variant-numeric:tabular-nums}
+.stat-lbl{font-size:.75rem;color:#475569;text-transform:uppercase;letter-spacing:.05em}
+/* QR */
+#qrContainer{text-align:center;padding:24px;background:#0a0f1e;border:1px solid var(--border);border-radius:12px;margin-top:16px}
+#qrImg{max-width:220px;margin:0 auto 12px}
+/* Errands */
+.errand-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:12px}
+.errand-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.errand-meta{font-size:.76rem;color:#475569;margin-top:6px}
+.days-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.day-btn{background:#0a0f1e;border:1px solid var(--border);color:#64748b;padding:5px 10px;border-radius:6px;font-size:.76rem;cursor:pointer;transition:.2s;font-weight:500}
+.day-btn.on{background:rgba(34,197,94,.15);color:var(--green);border-color:rgba(34,197,94,.4);font-weight:600}
+.toggle{display:inline-flex;align-items:center;cursor:pointer;gap:8px;font-size:.8rem;color:#64748b}
 .toggle input{display:none}
-.toggle-track{width:38px;height:21px;background:#374151;border-radius:11px;position:relative;transition:.3s}
+.toggle-track{width:38px;height:20px;background:#1e2d3d;border-radius:10px;position:relative;transition:.3s}
 .toggle input:checked + .toggle-track{background:var(--green)}
-.toggle-thumb{position:absolute;top:3px;left:3px;width:15px;height:15px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-.toggle input:checked ~ .toggle-track .toggle-thumb,.toggle input:checked + .toggle-track .toggle-thumb{left:20px}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.toggle input:checked ~ .toggle-track .toggle-thumb,.toggle input:checked + .toggle-track .toggle-thumb{left:21px}
 
-/* ── TARGET AUDIENCE PICKER (broadcast) ─────────────── */
-.audience-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.audience-opt{
-  background:var(--surface);border:2px solid var(--border);border-radius:10px;
-  padding:12px 14px;cursor:pointer;transition:.2s;position:relative;
-}
-.audience-opt input{position:absolute;opacity:0;pointer-events:none}
-.audience-opt.selected{border-color:var(--green);background:rgba(34,197,94,.07)}
-.audience-opt .ao-icon{font-size:1.3rem;margin-bottom:5px}
-.audience-opt .ao-label{font-size:.82rem;font-weight:700;color:var(--text)}
-.audience-opt .ao-desc{font-size:.74rem;color:var(--muted);margin-top:2px}
+/* ── LISTINGS ── */
+.listing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px}
+.listing-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:.2s}
+.listing-card:hover{border-color:rgba(34,197,94,.3);transform:translateY(-2px)}
+.listing-thumb{width:100%;height:160px;object-fit:cover;background:#0a0f1e;display:flex;align-items:center;justify-content:center;color:#1e2d3d;font-size:2.5rem}
+.listing-thumb img{width:100%;height:100%;object-fit:cover}
+.listing-body{padding:14px}
+.listing-name{font-weight:700;font-size:.95rem;margin-bottom:4px}
+.listing-price{color:var(--green);font-weight:700;font-size:.88rem}
+.listing-cat{font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.listing-actions{display:flex;gap:8px;margin-top:10px}
+.avail-badge{padding:2px 10px;border-radius:10px;font-size:.68rem;font-weight:600;margin-left:auto}
+.avail-badge.yes{background:rgba(34,197,94,.15);color:var(--green)}
+.avail-badge.no{background:rgba(239,68,68,.1);color:var(--red)}
 
-/* ── SETUP CHECKLIST ─────────────────────────────── */
-#setupChecklist{
-  position:fixed;bottom:20px;right:20px;z-index:800;
-  background:var(--card);border:1px solid rgba(34,197,94,.35);
-  border-radius:16px;padding:16px 18px;min-width:220px;
-  box-shadow:0 8px 40px rgba(0,0,0,.4),0 0 0 1px rgba(34,197,94,.1);
-}
-.cl-title{font-size:.8rem;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-.cl-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem;color:var(--muted)}
-.cl-item:last-child{border-bottom:none;padding-bottom:0}
-.cl-item.done{color:var(--green)}
-.cl-check{width:18px;height:18px;border-radius:5px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.7rem;transition:.2s}
-.cl-item.done .cl-check{background:var(--green);border-color:var(--green);color:#000}
-.cl-progress{margin-top:12px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
-.cl-progress-bar{height:100%;background:linear-gradient(90deg,#22c55e,#34d399);border-radius:2px;transition:.4s}
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:#0f1623;border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#0f1623;z-index:1}
+.modal-header h3{font-size:1.05rem;font-weight:700}
+.modal-close{background:none;border:none;color:#64748b;font-size:1.5rem;cursor:pointer;line-height:1;padding:4px}
+.modal-close:hover{color:#fff}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#0f1623}
+.fgroup{margin-bottom:14px}
 
-/* ── PWA INSTALL BANNER ─────────────────────────────── */
-#pwaBar{
-  display:none;position:fixed;bottom:0;left:0;right:0;z-index:900;
-  background:linear-gradient(135deg,#0d1220,#111827);
-  border-top:1px solid rgba(34,197,94,.3);
-  padding:14px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;
-  box-shadow:0 -4px 20px rgba(0,0,0,.3);
-}
-.pwa-text{font-size:.86rem;color:var(--text)}
-.pwa-text b{color:var(--green)}
-.pwa-btns{display:flex;gap:8px;flex-shrink:0}
+/* ── FILE UPLOAD AREA ── */
+.upload-area{border:2px dashed var(--border);border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;transition:.2s;position:relative;background:#0a0f1e}
+.upload-area:hover,.upload-area.drag{border-color:var(--green);background:rgba(34,197,94,.05)}
+.upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:2rem;margin-bottom:8px}
+.upload-text{font-size:.85rem;color:#64748b}
+.upload-text strong{color:var(--green)}
+.upload-hint{font-size:.72rem;color:#475569;margin-top:4px}
+.media-previews{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.media-thumb{width:80px;height:80px;border-radius:8px;object-fit:cover;border:1px solid var(--border);position:relative;background:#0a0f1e;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover}
+.media-thumb .rm{position:absolute;top:2px;right:2px;background:rgba(239,68,68,.9);border:none;border-radius:50%;width:18px;height:18px;color:#fff;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.media-thumb .type-icon{font-size:1.5rem;color:#475569}
+.upload-progress{height:4px;background:#1e2d3d;border-radius:2px;margin-top:8px;overflow:hidden;display:none}
+.upload-progress .bar{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));width:0%;transition:width .3s;border-radius:2px}
 
-/* ── TOAST ─────────────────────────────── */
-#toast{
-  position:fixed;bottom:100px;right:20px;
-  background:var(--green);color:#000;
-  padding:10px 18px;border-radius:10px;font-weight:700;font-size:.84rem;
-  z-index:9999;transform:translateY(80px);opacity:0;transition:.3s;
-  box-shadow:0 4px 20px rgba(34,197,94,.3);
-}
-#toast.err{background:var(--red);color:#fff;box-shadow:0 4px 20px rgba(239,68,68,.3)}
-#toast.show{transform:translateY(0);opacity:1}
+/* ── STATUS POSTS ── */
+.upload-or{display:flex;align-items:center;gap:10px;margin:10px 0;color:#475569;font-size:.78rem}
+.upload-or::before,.upload-or::after{content:'';flex:1;height:1px;background:var(--border)}
+.status-post-item{background:#0a0f1e;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.status-post-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;background:#0d1526;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#475569}
+.status-post-info{flex:1;min-width:0}
+.status-post-time{font-size:.72rem;color:var(--green);font-weight:700;margin-bottom:2px}
+.status-post-cap{font-size:.82rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* ── SETTINGS ─────────────────────────────── */
-.settings-section{border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:20px}
-.settings-section:last-child{border-bottom:none;padding-bottom:0;margin-bottom:0}
-.pay-methods{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
-.pay-cb{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--sub);cursor:pointer}
+/* Settings */
+.settings-section{border-bottom:1px solid var(--border);padding-bottom:22px;margin-bottom:22px}
+.settings-section:last-child{border-bottom:none}
+.pay-methods{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.pay-cb{display:flex;align-items:center;gap:7px;font-size:.82rem;color:#94a3b8;cursor:pointer;background:#0a0f1e;border:1px solid var(--border);padding:8px 14px;border-radius:8px;transition:.2s}
+.pay-cb:hover{border-color:var(--green)}
 .pay-cb input{width:auto;accent-color:var(--green)}
-
-/* ── QR ─────────────────────────────── */
-#qrContainer{text-align:center;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-top:14px}
-#qrImg{max-width:220px;margin:0 auto 10px}
-
-/* ── BROADCAST LOGS ─────────────────────────────── */
-.blog-item{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:11px 14px;margin-bottom:8px;font-size:.82rem;color:var(--sub)}
-.blog-item b{color:var(--text)}
-
-/* ── RESPONSIVE ─────────────────────────────── */
-@media(max-width:600px){
-  .grid2,.grid3,.audience-grid{grid-template-columns:1fr}
-  .order-top{flex-direction:column}
-  header{padding:0 14px}
-  #setupChecklist{right:10px;bottom:10px;min-width:200px}
-}
+/* Toast */
+#toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-weight:700;font-size:.85rem;z-index:9999;transform:translateY(80px);opacity:0;transition:.3s;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{background:linear-gradient(135deg,#22c55e,#16a34a);color:#000}
+#toast.err{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
+/* Broadcast audience */
+.audience-btn{background:#0a0f1e;border:1px solid var(--border);color:#64748b;padding:8px 16px;border-radius:8px;font-size:.8rem;cursor:pointer;transition:.2s;font-weight:500}
+.audience-btn.active{background:rgba(59,130,246,.15);color:var(--blue);border-color:rgba(59,130,246,.4);font-weight:600}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}.order-top{flex-direction:column}.listing-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════ HEADER ═══════════════════════ -->
 <header>
-  <div class="logo">Forge<span>Bot</span></div>
+  <div class="logo">Forge<span style="-webkit-text-fill-color:#fff;background:none">Bot</span></div>
   <div class="header-right">
-    <span class="trial-badge" id="trialBadge">⚡ 7 days left</span>
-    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
-    <div class="wa-badge disc" id="waBadge" onclick="switchTab('settings', document.querySelector('[data-tab=settings]'))">
-      <span class="wa-dot"></span><span id="waText">Disconnected</span>
-    </div>
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <span id="trialBadge" class="trial-badge" style="display:none">⚡ 7 days left</span>
+    <span id="waBadge" class="status-badge disc">● Disconnected</span>
+    <button class="btn btn-gray" onclick="logout()" style="padding:7px 16px;font-size:.78rem">Logout</button>
   </div>
 </header>
 
-<!-- ═══════════════════════ NAV ═══════════════════════ -->
 <nav>
-  <button class="active" onclick="switchTab('replies',this)" data-tab="replies">Auto-Replies</button>
-  <button onclick="switchTab('listings',this)" data-tab="listings">Listings</button>
-  <button onclick="switchTab('orders',this)" data-tab="orders" id="navOrders">Orders</button>
-  <button onclick="switchTab('status',this)" data-tab="status">Status Posts</button>
-  <button onclick="switchTab('broadcast',this)" data-tab="broadcast">Broadcast</button>
-  <button onclick="switchTab('analytics',this)" data-tab="analytics">Analytics</button>
-  <button onclick="switchTab('errands',this)" data-tab="errands">Bot Errands</button>
-  <button onclick="switchTab('settings',this)" data-tab="settings">Settings</button>
+  <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
+  <button onclick="switchTab('listings',this)">Listings</button>
+  <button onclick="switchTab('orders',this)" id="navOrders">Orders</button>
+  <button onclick="switchTab('status',this)">Status Posts</button>
+  <button onclick="switchTab('broadcast',this)">Broadcast</button>
+  <button onclick="switchTab('analytics',this)">Analytics</button>
+  <button onclick="switchTab('errands',this)">Bot Errands</button>
+  <button onclick="switchTab('settings',this)">Settings</button>
 </nav>
 
 <div class="container">
 
-<!-- ══════════════════ AUTO-REPLIES ══════════════════ -->
+<!-- AUTO-REPLIES -->
 <div id="tab-replies" class="section active">
-  <div class="page-header"><h2>⚡ Auto-Reply Rules</h2><p>Keywords your bot responds to automatically</p></div>
+  <div class="page-title"><div><h2>Auto-Reply Rules</h2><div class="sub">Automated responses to customer keywords</div></div></div>
   <div id="msgReplies" class="msg"></div>
-  <div class="card card-glow">
+  <div class="card">
     <div class="row">
-      <div class="grow">
-        <label>Keywords (comma-separated)</label>
-        <input type="text" id="rKeywords" placeholder="price, how much, cost"/>
-      </div>
-      <div style="width:110px">
-        <label>Type</label>
-        <select id="rType"><option value="text">Text</option><option value="image">Image</option></select>
-      </div>
+      <div class="grow"><label>Keywords (comma-separated)</label><input type="text" id="rKeywords" placeholder="price, how much, cost"/></div>
+      <div><label>Type</label><select id="rType"><option value="text">Text</option><option value="image">Image</option></select></div>
     </div>
-    <div style="margin-bottom:10px">
-      <label>Response</label>
-      <textarea id="rResponse" placeholder="Our prices start from ₦5,000..."></textarea>
-    </div>
-    <div style="margin-bottom:14px">
-      <label>Media URL (optional)</label>
-      <input type="text" id="rMedia" placeholder="https://..."/>
-    </div>
+    <div class="fgroup"><label>Response</label><textarea id="rResponse" placeholder="Our prices start from ₦5,000..."></textarea></div>
+    <div class="fgroup"><label>Media URL (optional)</label><input type="text" id="rMedia" placeholder="https://..."/></div>
     <button class="btn btn-green" onclick="addFlow()">+ Add Rule</button>
   </div>
   <div id="flowList"></div>
 </div>
 
-<!-- ══════════════════ LISTINGS ══════════════════ -->
+<!-- LISTINGS -->
 <div id="tab-listings" class="section">
-  <div class="page-header">
-    <h2>📦 Listings</h2><p>Products and services your bot can show customers</p>
-  </div>
-  <div id="msgListings" class="msg"></div>
-  <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+  <div class="page-title" style="justify-content:space-between">
+    <div><h2>Listings</h2><div class="sub">Your products and services</div></div>
     <button class="btn btn-green" onclick="openListingModal()">+ Add Listing</button>
   </div>
-  <div id="listingsList"><div style="color:var(--muted);text-align:center;padding:40px">Loading listings...</div></div>
+  <div id="msgListings" class="msg"></div>
+  <div id="listingsGrid" class="listing-grid"><div style="text-align:center;padding:40px;color:#475569;grid-column:1/-1">Loading listings...</div></div>
 </div>
 
-<!-- ══════════════════ ORDERS ══════════════════ -->
+<!-- ORDERS -->
 <div id="tab-orders" class="section">
-  <div class="page-header"><h2>🛒 Orders</h2><p>Track and manage customer orders</p></div>
+  <div class="page-title"><div><h2>Orders</h2><div class="sub">Manage customer orders</div></div></div>
   <div class="filter-bar">
     <button class="filter-btn active" onclick="filterOrders('all',this)">All</button>
     <button class="filter-btn" onclick="filterOrders('pending',this)">Pending</button>
@@ -377,127 +224,107 @@ select option{background:var(--card)}
     <button class="filter-btn" onclick="filterOrders('delivered',this)">Delivered</button>
     <button class="filter-btn" onclick="filterOrders('rejected',this)">Rejected</button>
   </div>
-  <div id="ordersList"><div style="color:var(--muted);text-align:center;padding:40px">Loading orders...</div></div>
+  <div id="ordersList"><div style="text-align:center;padding:40px;color:#475569">Loading orders...</div></div>
 </div>
 
-<!-- ══════════════════ STATUS POSTS ══════════════════ -->
+<!-- STATUS POSTS -->
 <div id="tab-status" class="section">
-  <div class="page-header"><h2>📸 Status Posts</h2><p>Schedule WhatsApp status updates</p></div>
+  <div class="page-title"><div><h2>Status Posts</h2><div class="sub">The bot automatically posts your listing images & videos. Use this to set the schedule.</div></div></div>
   <div id="msgStatus" class="msg"></div>
   <div class="card">
-    <div style="margin-bottom:10px">
-      <label>Caption</label>
-      <textarea id="sCaption" placeholder="Check out our latest offer..."></textarea>
-    </div>
-    <div class="grid2" style="margin-bottom:10px">
-      <div>
-        <label>Media URL (optional)</label>
-        <input type="text" id="sMedia" placeholder="https://..."/>
-      </div>
-      <div>
-        <label>Post Time</label>
-        <input type="time" id="sTime"/>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px;line-height:1.6">
+      ℹ️ Your bot automatically picks product images and videos from your Listings to post as WhatsApp statuses.
+      Use this form to add a custom scheduled post with your own caption at a specific time.
+    </p>
+    <div class="fgroup"><label>Caption (optional — bot uses its own captions if empty)</label><textarea id="sCaption" placeholder="Check out our latest deals..."></textarea></div>
+    <div class="grid2" style="margin-bottom:14px">
+      <div><label>Post Time</label><input type="time" id="sTime"/></div>
+      <div><label>Repeat Days</label>
+        <select id="sDays">
+          <option value="Mon,Tue,Wed,Thu,Fri,Sat,Sun">Every day</option>
+          <option value="Mon,Tue,Wed,Thu,Fri">Weekdays only (Mon–Fri)</option>
+          <option value="Sat,Sun">Weekends only</option>
+          <option value="Mon,Wed,Fri">Mon, Wed, Fri</option>
+          <option value="Tue,Thu">Tue, Thu</option>
+        </select>
       </div>
     </div>
     <button class="btn btn-green" onclick="addStatusPost()">+ Schedule Post</button>
   </div>
+
+  <!-- Product post time setting -->
+  <div class="card" style="border-color:rgba(34,197,94,.2)">
+    <h3 style="margin-bottom:4px;color:#cbd5e1;font-size:.9rem">🤖 Auto-Post Schedule</h3>
+    <p style="font-size:.78rem;color:#64748b;margin-bottom:14px">Set what time the bot automatically posts product media each day</p>
+    <div class="grid2">
+      <div class="fgroup"><label>Product Post Time (daily)</label><input type="time" id="productPostTime"/></div>
+      <div class="fgroup"><label>Meme Post Time (Mon–Fri only)</label><input type="time" id="memePostTime"/></div>
+    </div>
+    <button class="btn btn-green" onclick="savePostSchedule()">Save Schedule</button>
+  </div>
+
+  <h3 style="margin-bottom:12px;color:#cbd5e1;font-size:.9rem">Scheduled Posts</h3>
   <div id="statusList"></div>
 </div>
 
-<!-- ══════════════════ BROADCAST ══════════════════ -->
+<!-- BROADCAST -->
 <div id="tab-broadcast" class="section">
-  <div class="page-header"><h2>📢 Broadcast Message</h2><p>Send a message to a group of your customers</p></div>
+  <div class="page-title"><div><h2>Broadcast</h2><div class="sub">Send messages to your customers</div></div></div>
   <div id="msgBroadcast" class="msg"></div>
   <div class="card">
-    <div style="margin-bottom:16px">
-      <label>Message</label>
-      <textarea id="bcMsg" placeholder="Hello! We have a special offer for you today 🎉" style="min-height:100px"></textarea>
-    </div>
-    <label>Who to send to</label>
-    <div class="audience-grid" id="audienceGrid">
-      <div class="audience-opt selected" onclick="selectAudience(this,'all')">
-        <input type="radio" name="audience" value="all" checked/>
-        <div class="ao-icon">👥</div>
-        <div class="ao-label">All Customers</div>
-        <div class="ao-desc">Everyone who has messaged you</div>
-      </div>
-      <div class="audience-opt" onclick="selectAudience(this,'inactive_7d')">
-        <input type="radio" name="audience" value="inactive_7d"/>
-        <div class="ao-icon">😴</div>
-        <div class="ao-label">Inactive 7 Days</div>
-        <div class="ao-desc">Haven't messaged in a week</div>
-      </div>
-      <div class="audience-opt" onclick="selectAudience(this,'inactive_14d')">
-        <input type="radio" name="audience" value="inactive_14d"/>
-        <div class="ao-icon">🕒</div>
-        <div class="ao-label">Inactive 14 Days</div>
-        <div class="ao-desc">Long-term win-back targets</div>
-      </div>
-      <div class="audience-opt" onclick="selectAudience(this,'custom')">
-        <input type="radio" name="audience" value="custom"/>
-        <div class="ao-icon">📋</div>
-        <div class="ao-label">Custom Numbers</div>
-        <div class="ao-desc">Paste specific numbers below</div>
+    <div class="fgroup"><label>Audience</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button type="button" class="audience-btn active" onclick="setAudience('all_customers',this)">All Customers</button>
+        <button type="button" class="audience-btn" onclick="setAudience('inactive_7d',this)">Inactive 7 Days</button>
+        <button type="button" class="audience-btn" onclick="setAudience('inactive_14d',this)">Inactive 14 Days</button>
+        <button type="button" class="audience-btn" onclick="setAudience('custom',this)">Custom Numbers</button>
       </div>
     </div>
-    <div id="customPhonesWrap" style="display:none;margin-bottom:14px">
+    <div id="customPhonesWrap" class="fgroup" style="display:none">
       <label>Phone Numbers (one per line, with country code)</label>
-      <textarea id="bcPhones" placeholder="2348012345678&#10;2349087654321" style="min-height:90px"></textarea>
+      <textarea id="bcPhones" placeholder="2348012345678&#10;2349087654321" style="min-height:100px"></textarea>
     </div>
-    <button class="btn btn-green" onclick="sendBroadcast()">📤 Send Broadcast</button>
+    <div class="fgroup"><label>Message</label><textarea id="bcMsg" placeholder="Hello! We have a special offer for you today..."></textarea></div>
+    <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
   </div>
   <div id="broadcastLogs"></div>
 </div>
 
-<!-- ══════════════════ ANALYTICS ══════════════════ -->
+<!-- ANALYTICS -->
 <div id="tab-analytics" class="section">
-  <div class="page-header"><h2>📊 Analytics</h2><p>Your bot's performance this month</p></div>
-  <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:20px">
-    <label style="margin:0;white-space:nowrap">Month:</label>
-    <input type="month" id="analyticsMonth" style="width:180px" onchange="loadAnalytics()"/>
-    <button class="btn btn-blue" onclick="loadAnalytics()" style="padding:8px 18px">Load</button>
+  <div class="page-title"><div><h2>Analytics</h2><div class="sub">Your bot's performance this month</div></div></div>
+  <div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:22px">
+    <label style="margin:0;white-space:nowrap">MONTH:</label>
+    <input type="month" id="analyticsMonth" style="width:180px"/>
+    <button class="btn btn-blue" onclick="loadAnalytics()" style="padding:9px 20px">Load</button>
   </div>
-  <div id="statGrid" class="grid4"></div>
+  <div id="statGrid" class="stat-grid"></div>
   <div id="statSummary" class="card" style="display:none">
-    <h3 style="margin-bottom:10px;color:var(--sub)">Summary</h3>
-    <p id="statText" style="font-size:.88rem;color:var(--sub);line-height:1.8"></p>
+    <h3 style="margin-bottom:10px;color:#cbd5e1">Summary</h3>
+    <p id="statText" style="font-size:.88rem;color:#94a3b8;line-height:1.7"></p>
   </div>
 </div>
 
-<!-- ══════════════════ BOT ERRANDS ══════════════════ -->
+<!-- BOT ERRANDS -->
 <div id="tab-errands" class="section">
-  <div class="page-header">
-    <h2>🤖 Bot Errands <span style="font-size:.72rem;background:rgba(168,85,247,.15);color:var(--purple);padding:3px 10px;border-radius:10px;margin-left:8px;font-weight:700">NEW</span></h2>
-    <p>Schedule your bot to proactively reach out to customers — no manual work needed</p>
-  </div>
-  <div class="card" style="border-color:rgba(168,85,247,.25)">
+  <div class="page-title"><div><h2>Bot Errands <span style="font-size:.72rem;background:rgba(168,85,247,.15);color:var(--purple);padding:3px 10px;border-radius:12px;margin-left:8px;font-weight:600">AUTO</span></h2><div class="sub">Schedule your bot to send messages automatically</div></div></div>
+  <div class="card" style="border-color:rgba(168,85,247,.2)">
     <div id="msgErrands" class="msg"></div>
     <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Errand Name</label>
-        <input type="text" id="eName" placeholder="e.g. Weekly promo reminder"/>
-      </div>
-      <div>
-        <label>Send Time</label>
-        <input type="time" id="eTime"/>
-      </div>
+      <div class="fgroup"><label>Errand Name</label><input type="text" id="eName" placeholder="Weekly promo reminder"/></div>
+      <div class="fgroup"><label>Send Time</label><input type="time" id="eTime"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Message</label>
-      <textarea id="eMessage" placeholder="Hi! Just checking in — we have new arrivals you'll love. Reply YES to see them 😊"></textarea>
-    </div>
+    <div class="fgroup"><label>Message</label><textarea id="eMessage" placeholder="Hi {name}! Just checking in — we have new arrivals you'll love. Reply YES to see them 😊"></textarea></div>
     <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Send to</label>
+      <div class="fgroup"><label>Send To</label>
         <select id="eFilter">
-          <option value="all_customers">All Customers</option>
+          <option value="all_customers">All Customers (everyone who's messaged)</option>
           <option value="inactive_7d">Inactive 7+ days (win-back)</option>
           <option value="inactive_14d">Inactive 14+ days (long win-back)</option>
           <option value="pending_orders">Customers with pending orders</option>
         </select>
       </div>
-      <div>
-        <label>Repeat on days</label>
+      <div><label>Repeat Days</label>
         <div class="days-grid" id="eDaysGrid">
           <button type="button" class="day-btn on" data-day="Mon">Mon</button>
           <button type="button" class="day-btn on" data-day="Tue">Tue</button>
@@ -511,71 +338,57 @@ select option{background:var(--card)}
     </div>
     <button class="btn btn-green" onclick="createErrand()">+ Create Errand</button>
   </div>
-  <h3 style="margin:0 0 12px;color:var(--sub);font-size:.88rem;text-transform:uppercase;letter-spacing:.5px">Your Scheduled Errands</h3>
-  <div id="errandsList"><div style="color:var(--muted);text-align:center;padding:30px">No errands yet.</div></div>
+  <h3 style="margin-bottom:14px;color:#cbd5e1;font-size:.95rem">Scheduled Errands</h3>
+  <div id="errandsList"><div style="text-align:center;padding:30px;color:#475569">No errands yet.</div></div>
 </div>
 
-<!-- ══════════════════ SETTINGS ══════════════════ -->
+<!-- SETTINGS -->
 <div id="tab-settings" class="section">
-  <div class="page-header"><h2>⚙️ Settings</h2><p>Configure your bot and business details</p></div>
+  <div class="page-title"><div><h2>Settings</h2><div class="sub">Configure your bot and business</div></div></div>
   <div id="msgSettings" class="msg"></div>
 
   <div class="card settings-section">
-    <h3>WhatsApp Connection</h3>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Scan a QR code to connect or reconnect your bot.</p>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">WhatsApp Connection</h3>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:16px">Scan the QR code below with your WhatsApp to connect your bot.</p>
     <div id="qrContainer" style="display:none">
+      <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">Scan with your phone:</p>
       <div id="qrImg"></div>
-      <p style="font-size:.76rem;color:var(--muted);margin-top:8px" id="qrStatus">Waiting for QR...</p>
+      <p style="font-size:.75rem;color:#64748b;margin-top:8px" id="qrStatus">Waiting for QR code...</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-green" onclick="showQR()">Connect WhatsApp</button>
-      <button class="btn btn-gray" onclick="checkWaStatus()">Check Status</button>
+      <button class="btn btn-gray" onclick="checkConnectionStatus()">Check Status</button>
     </div>
   </div>
 
   <div class="card settings-section">
-    <h3>Appearance</h3>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Choose dashboard theme.</p>
-    <div style="display:flex;gap:10px">
-      <button class="btn btn-gray" onclick="setTheme('dark')">🌙 Dark Mode</button>
-      <button class="btn btn-gray" onclick="setTheme('light')">☀️ Light Mode</button>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Notifications</h3>
+    <div class="fgroup"><label>Your Personal WhatsApp Number (for order alerts)</label><input type="text" id="sNotifNum" placeholder="2348012345678"/></div>
+    <button class="btn btn-green" onclick="saveSettings()" style="margin-bottom:16px">Save</button>
+    <div>
+      <label style="margin-bottom:10px">Push Notifications (browser)</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-blue" onclick="subscribePush()">Enable Push Notifications</button>
+        <button class="btn btn-gray" onclick="testPush()">Test Push</button>
+      </div>
     </div>
   </div>
 
   <div class="card settings-section">
-    <h3>Notifications</h3>
-    <div style="margin-bottom:12px">
-      <label>Personal WhatsApp (for order alerts)</label>
-      <input type="text" id="sNotifNum" placeholder="2348012345678"/>
-    </div>
-    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <button class="btn btn-blue" onclick="subscribePush()">Enable Push Notifications</button>
-      <button class="btn btn-gray" onclick="testPush()">Test Push</button>
-    </div>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Bot Messages</h3>
+    <div class="fgroup"><label>Welcome Message</label><textarea id="sWelcome" placeholder="Hi! Welcome to our store. How can I help you today?"></textarea></div>
+    <div class="fgroup"><label>Fallback Message (when bot doesn't understand)</label><textarea id="sFallback" placeholder="Sorry, I didn't quite get that. Type MENU to see our products."></textarea></div>
     <button class="btn btn-green" onclick="saveSettings()">Save</button>
   </div>
 
   <div class="card settings-section">
-    <h3>Bot Messages</h3>
-    <div style="margin-bottom:12px">
-      <label>Welcome Message</label>
-      <textarea id="sWelcome" placeholder="Hi! Welcome to our store. How can I help you today?"></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Fallback Message</label>
-      <textarea id="sFallback" placeholder="Sorry, I didn't quite get that. Type MENU to see options."></textarea>
-    </div>
-    <button class="btn btn-green" onclick="saveSettings()">Save</button>
-  </div>
-
-  <div class="card settings-section">
-    <h3>Bank Details</h3>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Bank Details</h3>
     <div class="grid3" style="margin-bottom:12px">
-      <div><label>Bank Name</label><input type="text" id="sBankName" placeholder="GTBank"/></div>
-      <div><label>Account Number</label><input type="text" id="sAcctNum" placeholder="0123456789"/></div>
-      <div><label>Account Name</label><input type="text" id="sAcctName" placeholder="Your Business Name"/></div>
+      <div class="fgroup"><label>Bank Name</label><input type="text" id="sBankName" placeholder="GTBank"/></div>
+      <div class="fgroup"><label>Account Number</label><input type="text" id="sAcctNum" placeholder="0123456789"/></div>
+      <div class="fgroup"><label>Account Name</label><input type="text" id="sAcctName" placeholder="Your Business Name"/></div>
     </div>
-    <label style="margin-bottom:8px">Accepted Payment Methods</label>
+    <label style="margin-bottom:10px">Accepted Payment Methods</label>
     <div class="pay-methods" id="payMethods">
       <label class="pay-cb"><input type="checkbox" value="Bank Transfer" onchange="savePayMethods()"/> Bank Transfer</label>
       <label class="pay-cb"><input type="checkbox" value="Opay" onchange="savePayMethods()"/> Opay</label>
@@ -583,121 +396,98 @@ select option{background:var(--card)}
       <label class="pay-cb"><input type="checkbox" value="Cash on Delivery" onchange="savePayMethods()"/> Cash on Delivery</label>
       <label class="pay-cb"><input type="checkbox" value="Flutterwave" onchange="savePayMethods()"/> Flutterwave</label>
     </div>
-    <button class="btn btn-green" style="margin-top:14px" onclick="saveSettings()">Save</button>
+    <button class="btn btn-green" style="margin-top:16px" onclick="saveSettings()">Save</button>
   </div>
 
   <div class="card settings-section">
-    <h3>Business Hours</h3>
-    <div style="margin-bottom:12px">
-      <label>Hours (shown to customers)</label>
-      <input type="text" id="sHours" placeholder="Mon–Fri: 8am–6pm, Sat: 9am–3pm"/>
-    </div>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Business Hours</h3>
+    <div class="fgroup"><label>Business Hours</label><input type="text" id="sHours" placeholder="Mon–Fri: 8am–6pm, Sat: 9am–3pm"/></div>
     <button class="btn btn-green" onclick="saveSettings()">Save</button>
   </div>
 
   <div class="card settings-section">
-    <h3>Social Media</h3>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Social Media & Online Presence</h3>
     <div class="grid2" style="margin-bottom:12px">
-      <div><label>Instagram</label><input type="text" id="sInsta" placeholder="@yourbusiness"/></div>
-      <div><label>Facebook</label><input type="text" id="sFacebook" placeholder="facebook.com/yourbusiness"/></div>
+      <div class="fgroup"><label>Instagram</label><input type="text" id="sInsta" placeholder="@yourbusiness"/></div>
+      <div class="fgroup"><label>Facebook</label><input type="text" id="sFacebook" placeholder="facebook.com/yourbusiness"/></div>
     </div>
     <div class="grid2" style="margin-bottom:12px">
-      <div><label>TikTok</label><input type="text" id="sTiktok" placeholder="@yourtiktok"/></div>
-      <div><label>WhatsApp Channel</label><input type="text" id="sWaChannel" placeholder="https://whatsapp.com/channel/..."/></div>
+      <div class="fgroup"><label>TikTok</label><input type="text" id="sTiktok" placeholder="@yourtiktok"/></div>
+      <div class="fgroup"><label>WhatsApp Channel Link</label><input type="text" id="sWaChannel" placeholder="https://whatsapp.com/channel/..."/></div>
     </div>
     <button class="btn btn-green" onclick="saveBotSetup()">Save</button>
   </div>
 
   <div class="card settings-section">
-    <h3>Delivery Settings</h3>
+    <h3 style="margin-bottom:14px;color:#cbd5e1">Delivery Settings</h3>
     <div class="grid2" style="margin-bottom:12px">
-      <div><label>Delivery Areas</label><input type="text" id="sDeliveryAreas" placeholder="Lagos, Ibadan, Abuja"/></div>
-      <div><label>Delivery Fee</label><input type="text" id="sDeliveryFee" placeholder="₦1,000 flat"/></div>
+      <div class="fgroup"><label>Delivery Areas</label><input type="text" id="sDeliveryAreas" placeholder="Lagos, Ibadan, Abuja"/></div>
+      <div class="fgroup"><label>Delivery Fee</label><input type="text" id="sDeliveryFee" placeholder="₦1,000 flat"/></div>
     </div>
     <div class="grid2" style="margin-bottom:12px">
-      <div><label>Delivery Time</label><input type="text" id="sDeliveryTime" placeholder="1–2 business days"/></div>
-      <div><label>Minimum Order</label><input type="text" id="sMinOrder" placeholder="₦5,000"/></div>
+      <div class="fgroup"><label>Delivery Time</label><input type="text" id="sDeliveryTime" placeholder="1–2 business days"/></div>
+      <div class="fgroup"><label>Minimum Order</label><input type="text" id="sMinOrder" placeholder="₦5,000"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Return Policy</label>
-      <textarea id="sReturnPolicy" placeholder="Returns accepted within 7 days..."></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Active Promo / Offer</label>
-      <input type="text" id="sPromo" placeholder="Use SAVE10 for 10% off above ₦15,000"/>
-    </div>
+    <div class="fgroup"><label>Return Policy</label><textarea id="sReturnPolicy" placeholder="Returns accepted within 7 days..."></textarea></div>
+    <div class="fgroup"><label>Active Promo / Offer</label><input type="text" id="sPromo" placeholder="Use SAVE10 for 10% off above ₦15,000"/></div>
     <button class="btn btn-green" onclick="saveBotSetup()">Save</button>
   </div>
 </div>
 
-</div><!-- /.container -->
+</div><!-- .container -->
 
-<!-- ══════════════════ LISTING MODAL ══════════════════ -->
-<div id="listingModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('listingModal')">
+<!-- ADD LISTING MODAL -->
+<div class="modal-overlay" id="listingModal">
   <div class="modal">
-    <h3 id="listingModalTitle">Add New Listing</h3>
-    <input type="hidden" id="lId"/>
-    <div class="grid2" style="margin-bottom:12px">
-      <div><label>Name *</label><input type="text" id="lName" placeholder="Ankara Dress"/></div>
-      <div><label>Category</label><input type="text" id="lCategory" placeholder="Fashion"/></div>
+    <div class="modal-header">
+      <h3 id="modalTitle">Add New Listing</h3>
+      <button class="modal-close" onclick="closeListingModal()">×</button>
     </div>
-    <div style="margin-bottom:12px"><label>Description</label><textarea id="lDesc" placeholder="Beautiful handmade ankara dress..."></textarea></div>
-    <div class="grid2" style="margin-bottom:12px">
-      <div><label>Price</label><input type="number" id="lPrice" placeholder="15000"/></div>
-      <div><label>Price Label</label><input type="text" id="lPriceLabel" placeholder="Starting from ₦15,000"/></div>
-    </div>
-    <div style="margin-bottom:12px"><label>Keywords</label><input type="text" id="lKeywords" placeholder="ankara, dress, fashion, women"/></div>
-    <div style="margin-bottom:12px">
-      <label>Listing Type</label>
-      <select id="lType"><option value="product">Product</option><option value="service">Service</option><option value="property">Property</option></select>
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
-        <input type="checkbox" id="lAvail" checked style="width:auto;accent-color:var(--green)"/> Available (visible to customers)
-      </label>
+    <div class="modal-body">
+      <div id="msgModal" class="msg"></div>
+      <input type="hidden" id="editListingId"/>
+      <div class="grid2">
+        <div class="fgroup"><label>Name *</label><input type="text" id="lName" placeholder="Ankara Dress"/></div>
+        <div class="fgroup"><label>Category</label><input type="text" id="lCategory" placeholder="Fashion"/></div>
+      </div>
+      <div class="fgroup"><label>Description</label><textarea id="lDesc" placeholder="Beautiful handmade ankara dress..."></textarea></div>
+      <div class="grid2">
+        <div class="fgroup"><label>Price (number only)</label><input type="number" id="lPrice" placeholder="15000"/></div>
+        <div class="fgroup"><label>Price Label</label><input type="text" id="lPriceLabel" placeholder="Starting from ₦15,000"/></div>
+      </div>
+      <div class="fgroup"><label>Keywords (comma-separated)</label><input type="text" id="lKeywords" placeholder="ankara, dress, fashion, women"/></div>
+      <div class="fgroup"><label>Listing Type</label>
+        <select id="lType"><option value="product">Product</option><option value="service">Service</option><option value="digital">Digital</option></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <input type="checkbox" id="lAvailable" checked style="width:auto;accent-color:var(--green)"/>
+        <label for="lAvailable" style="margin:0;text-transform:none;letter-spacing:0;font-size:.88rem;color:#94a3b8;font-weight:400">Available (visible to customers)</label>
+      </div>
+
+      <!-- MEDIA UPLOAD SECTION -->
+      <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:4px">
+        <label style="margin-bottom:10px;font-size:.8rem;color:#64748b">UPLOAD MEDIA (Images, Videos, PDFs)</label>
+        <div class="upload-area" id="listingUploadArea">
+          <input type="file" id="listingFiles" accept="image/*,video/*,.pdf" multiple onchange="queueListingFiles(this.files)"/>
+          <div class="upload-icon">📁</div>
+          <div class="upload-text"><strong>Click or drag files here</strong></div>
+          <div class="upload-hint">Images • Videos • PDFs — up to 50MB each · Multiple files allowed</div>
+        </div>
+        <div class="upload-progress" id="listingProgress"><div class="bar" id="listingProgressBar"></div></div>
+        <div class="media-previews" id="listingPreviews"></div>
+        <p style="font-size:.72rem;color:#475569;margin-top:8px">Media uploads happen after you save the listing.</p>
+      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-gray" onclick="closeModal('listingModal')">Cancel</button>
+      <button class="btn btn-gray" onclick="closeListingModal()">Cancel</button>
       <button class="btn btn-green" onclick="saveListing()">Save Listing</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════ SETUP CHECKLIST ══════════════════ -->
-<div id="setupChecklist">
-  <div class="cl-title">📋 Setup Checklist</div>
-  <div class="cl-item" id="cl-wa">
-    <div class="cl-check">✓</div> Connect WhatsApp
-  </div>
-  <div class="cl-item" id="cl-listing">
-    <div class="cl-check"></div> Add first listing
-  </div>
-  <div class="cl-item" id="cl-reply">
-    <div class="cl-check"></div> Set up auto-reply
-  </div>
-  <div class="cl-item" id="cl-settings">
-    <div class="cl-check"></div> Complete settings
-  </div>
-  <div class="cl-item" id="cl-schedule">
-    <div class="cl-check"></div> Set post schedule
-  </div>
-  <div class="cl-progress">
-    <div class="cl-progress-bar" id="clProgressBar" style="width:20%"></div>
-  </div>
-</div>
-
-<!-- ══════════════════ PWA INSTALL BANNER ══════════════════ -->
-<div id="pwaBar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:900;background:linear-gradient(135deg,#0d1220,#111827);border-top:1px solid rgba(34,197,94,.3);padding:14px 20px;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,.3)">
-  <div style="font-size:.86rem;color:var(--text)">📲 <b style="color:var(--green)">Install ForgeBot</b> on your phone for quick access anytime</div>
-  <div style="display:flex;gap:8px;flex-shrink:0">
-    <button class="btn btn-green" onclick="installPWA()" style="padding:7px 16px;font-size:.82rem">Install App</button>
-    <button class="btn btn-gray" onclick="dismissPWA()" style="padding:7px 14px;font-size:.82rem">Not now</button>
-  </div>
-</div>
-
-<!-- Receipt Lightbox -->
-<div id="lightbox" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center">
-  <img id="lightboxImg" style="max-width:90vw;max-height:90vh;border-radius:10px"/>
+<!-- Lightbox -->
+<div id="lightbox" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;align-items:center;justify-content:center">
+  <img id="lightboxImg" style="max-width:92vw;max-height:92vh;border-radius:10px"/>
 </div>
 
 <div id="toast"></div>
@@ -705,36 +495,29 @@ select option{background:var(--card)}
 <script>
 var API   = '';
 var TOKEN = localStorage.getItem('forgebot_token');
+var qrEventSource = null;
+var broadcastAudience = 'all_customers';
+var pendingListingFiles = []; // files queued before listing is saved
+
 if (!TOKEN) window.location.href = '/';
 
-// ── Theme ─────────────────────────────────────────────────
-var savedTheme = localStorage.getItem('forgebot_theme') || 'dark';
-setTheme(savedTheme);
-
-function setTheme(t) {
-  savedTheme = t;
-  document.documentElement.setAttribute('data-theme', t);
-  localStorage.setItem('forgebot_theme', t);
-  var btn = document.getElementById('themeBtn');
-  if (btn) btn.textContent = (t === 'dark') ? '☀️ Light' : '🌙 Dark';
-}
-function toggleTheme() { setTheme(savedTheme === 'dark' ? 'light' : 'dark'); }
-
-// ── Toast ─────────────────────────────────────────────────
-function showToast(msg, ok) {
+// ── Toast ────────────────────────────────────────────────────
+function showToast(msg, type) {
   var t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast ' + (ok === false ? 'err' : '');
-  t.classList.add('show');
-  setTimeout(function() { t.classList.remove('show'); }, 3200);
+  t.className = 'show ' + (type === false || type === 'err' ? 'err' : 'ok');
+  setTimeout(function() { t.className = ''; }, 3500);
 }
 
-function headers() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN }; }
+// ── Auth headers ──────────────────────────────────────────────
+function headers(extra) {
+  return Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, extra || {});
+}
 
 function api(method, path, body) {
   var opts = { method: method, headers: headers() };
   if (body) opts.body = JSON.stringify(body);
-  return fetch(API+'/api'+path, opts).then(function(r) {
+  return fetch(API + '/api' + path, opts).then(function(r) {
     if (r.status === 401) { logout(); throw new Error('Session expired'); }
     return r.json();
   });
@@ -753,560 +536,589 @@ function logout() {
   window.location.href = '/';
 }
 
-// ── Tab switching ─────────────────────────────────────────
+// ── Tab switching ─────────────────────────────────────────────
 function switchTab(name, btn) {
   document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
   document.querySelectorAll('nav button').forEach(function(b) { b.classList.remove('active'); });
-  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name==='replies')   loadFlows();
-  if (name==='listings')  loadListings();
-  if (name==='orders')    loadOrders();
-  if (name==='analytics') initAnalytics();
-  if (name==='status')    loadStatusPosts();
-  if (name==='broadcast') loadBroadcastLogs();
-  if (name==='errands')   loadErrands();
-  if (name==='settings')  loadSettings();
+  if (name === 'replies')   loadFlows();
+  if (name === 'listings')  loadListings();
+  if (name === 'orders')    loadOrders();
+  if (name === 'analytics') initAnalytics();
+  if (name === 'status')    loadStatusPosts();
+  if (name === 'broadcast') loadBroadcastLogs();
+  if (name === 'errands')   loadErrands();
+  if (name === 'settings')  loadSettings();
 }
 
-// ═══════════════════════ AUTO-REPLIES ═══════════════════════
-
+// ════════════════════════════════════════════════════════════════
+//  AUTO-REPLIES
+// ════════════════════════════════════════════════════════════════
 function loadFlows() {
-  api('GET','/client/flows').then(function(flows) {
+  api('GET', '/client/flows').then(function(flows) {
     var list = document.getElementById('flowList');
-    if (!flows.length) { list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:30px">No rules yet. Add one above.</div>'; return; }
+    if (!flows || !flows.length) { list.innerHTML = '<div style="color:#475569;font-size:.85rem;padding:20px">No rules yet.</div>'; return; }
     list.innerHTML = flows.map(function(f) {
-      return '<div class="flow-item"><div><div class="flow-kw">🔑 '+(f.keywords||'')+'</div><div class="flow-resp">'+(f.response||'').slice(0,80)+'</div></div><button class="btn btn-red btn-sm" onclick="deleteFlow(\''+f.id+'\')">Delete</button></div>';
+      return '<div class="flow-item"><div><div class="flow-kw">' + esc(f.keywords||'') + '</div><div class="flow-resp">' + esc((f.response||'').slice(0,80)) + '</div></div><button class="btn btn-red" onclick="deleteFlow(\'' + f.id + '\')">Delete</button></div>';
     }).join('');
-    updateChecklist('cl-reply', true);
   }).catch(function() {});
 }
 
 function addFlow() {
-  var kw=document.getElementById('rKeywords').value.trim();
-  var re=document.getElementById('rResponse').value.trim();
-  var ty=document.getElementById('rType').value;
-  var me=document.getElementById('rMedia').value.trim();
-  if (!kw||!re) return showMsg('msgReplies','Keywords and response required.',false);
-  api('POST','/client/flows',{keywords:kw,response:re,response_type:ty,media_url:me||null}).then(function() {
-    document.getElementById('rKeywords').value='';
-    document.getElementById('rResponse').value='';
-    document.getElementById('rMedia').value='';
-    showMsg('msgReplies','✓ Rule added!',true);
-    loadFlows();
-  }).catch(function(e) { showMsg('msgReplies',e.message,false); });
+  var kw = document.getElementById('rKeywords').value.trim();
+  var re = document.getElementById('rResponse').value.trim();
+  var ty = document.getElementById('rType').value;
+  var me = document.getElementById('rMedia').value.trim();
+  if (!kw || !re) return showMsg('msgReplies', 'Keywords and response are required.', false);
+  api('POST', '/client/flows', { keywords: kw, response: re, response_type: ty, media_url: me || null })
+  .then(function() { document.getElementById('rKeywords').value=''; document.getElementById('rResponse').value=''; document.getElementById('rMedia').value=''; showMsg('msgReplies','✓ Rule added!',true); loadFlows(); })
+  .catch(function(e) { showMsg('msgReplies', e.message, false); });
 }
 
-function deleteFlow(id) {
-  api('DELETE','/client/flows/'+id).then(loadFlows);
-}
+function deleteFlow(id) { api('DELETE','/client/flows/'+id).then(loadFlows); }
 
-// ═══════════════════════ LISTINGS ═══════════════════════
-
+// ════════════════════════════════════════════════════════════════
+//  LISTINGS
+// ════════════════════════════════════════════════════════════════
 function loadListings() {
-  api('GET','/client/listings').then(function(items) {
-    var el = document.getElementById('listingsList');
-    if (!items.length) { el.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No listings yet. Add your first product or service above.</div>'; return; }
-    el.innerHTML = items.map(function(l) {
-      var price = l.price_label || (l.price ? '₦'+Number(l.price).toLocaleString() : '');
-      return '<div class="listing-card">'+
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
-          '<div>'+
-            '<div class="listing-name">'+l.name+'</div>'+
-            (price?'<div class="listing-price">'+price+'</div>':'')+
-            (l.category?'<div class="listing-cat">'+l.category+'</div>':'')+
-            (l.description?'<div style="font-size:.8rem;color:var(--muted);margin-top:6px">'+l.description.slice(0,80)+'</div>':'')+
-          '</div>'+
-          '<span class="listing-badge '+(l.available!==false?'avail':'unavail')+'">'+(l.available!==false?'Available':'Unavailable')+'</span>'+
-        '</div>'+
-        '<div class="listing-actions">'+
-          '<button class="btn btn-gray btn-sm" onclick="editListing('+JSON.stringify(l).replace(/"/g,'&quot;')+')">Edit</button>'+
-          '<button class="btn btn-red btn-sm" onclick="deleteListing(\''+l.id+'\')">Delete</button>'+
-          '<button class="btn btn-sm" style="background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3)" onclick="toggleListingAvail(\''+l.id+'\','+(l.available!==false?'false':'true')+')">'+
-            (l.available!==false?'Mark Unavailable':'Mark Available')+'</button>'+
-        '</div>'+
+  api('GET', '/client/listings').then(function(listings) {
+    var grid = document.getElementById('listingsGrid');
+    if (!listings || !listings.length) {
+      grid.innerHTML = '<div style="text-align:center;padding:50px;color:#475569;grid-column:1/-1"><div style="font-size:3rem;margin-bottom:12px">📦</div><div>No listings yet.<br/>Add your first product or service above.</div></div>';
+      return;
+    }
+    grid.innerHTML = listings.map(function(l) {
+      var media   = (l.listing_media || []).sort(function(a,b){return (a.sort_order||0)-(b.sort_order||0)});
+      var thumb   = media.find(function(m){return m.media_type==='image'});
+      var price   = l.price_label || (l.price ? '₦' + Number(l.price).toLocaleString('en-NG') : null);
+      var imgHtml = thumb
+        ? '<img src="' + esc(thumb.url) + '" style="width:100%;height:160px;object-fit:cover"/>'
+        : '<div style="width:100%;height:160px;background:#0a0f1e;display:flex;align-items:center;justify-content:center;font-size:2.5rem">📦</div>';
+      var mediaCount = media.length;
+      return '<div class="listing-card">' + imgHtml +
+        '<div class="listing-body">' +
+          '<div class="listing-cat">' + esc(l.category||'General') + ' · ' + mediaCount + ' media</div>' +
+          '<div class="listing-name">' + esc(l.name) + '</div>' +
+          (price ? '<div class="listing-price">' + esc(price) + '</div>' : '') +
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:10px">' +
+            '<button class="btn btn-gray btn-sm" onclick="openEditListing(' + JSON.stringify(JSON.stringify(l)) + ')">Edit</button>' +
+            '<button class="btn btn-red btn-sm" onclick="deleteListing(\'' + l.id + '\')">Delete</button>' +
+            '<span class="avail-badge ' + (l.available?'yes':'no') + '">' + (l.available?'Live':'Hidden') + '</span>' +
+          '</div>' +
+        '</div>' +
       '</div>';
     }).join('');
-    updateChecklist('cl-listing', true);
   }).catch(function() {
-    document.getElementById('listingsList').innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">Error loading listings.</div>';
+    document.getElementById('listingsGrid').innerHTML = '<div style="color:#475569;padding:30px;text-align:center">Error loading listings.</div>';
   });
 }
 
 function openListingModal() {
-  document.getElementById('lId').value='';
-  document.getElementById('lName').value='';
-  document.getElementById('lDesc').value='';
-  document.getElementById('lCategory').value='';
-  document.getElementById('lPrice').value='';
-  document.getElementById('lPriceLabel').value='';
-  document.getElementById('lKeywords').value='';
-  document.getElementById('lType').value='product';
-  document.getElementById('lAvail').checked=true;
-  document.getElementById('listingModalTitle').textContent='Add New Listing';
-  document.getElementById('listingModal').style.display='flex';
+  document.getElementById('editListingId').value = '';
+  document.getElementById('modalTitle').textContent = 'Add New Listing';
+  document.getElementById('lName').value = '';
+  document.getElementById('lCategory').value = '';
+  document.getElementById('lDesc').value = '';
+  document.getElementById('lPrice').value = '';
+  document.getElementById('lPriceLabel').value = '';
+  document.getElementById('lKeywords').value = '';
+  document.getElementById('lType').value = 'product';
+  document.getElementById('lAvailable').checked = true;
+  document.getElementById('listingPreviews').innerHTML = '';
+  pendingListingFiles = [];
+  document.getElementById('listingModal').classList.add('open');
 }
 
-function editListing(l) {
-  document.getElementById('lId').value=l.id||'';
-  document.getElementById('lName').value=l.name||'';
-  document.getElementById('lDesc').value=l.description||'';
-  document.getElementById('lCategory').value=l.category||'';
-  document.getElementById('lPrice').value=l.price||'';
-  document.getElementById('lPriceLabel').value=l.price_label||'';
-  document.getElementById('lKeywords').value=l.keywords||'';
-  document.getElementById('lType').value=l.listing_type||'product';
-  document.getElementById('lAvail').checked=l.available!==false;
-  document.getElementById('listingModalTitle').textContent='Edit Listing';
-  document.getElementById('listingModal').style.display='flex';
+function openEditListing(jsonStr) {
+  var l = JSON.parse(jsonStr);
+  document.getElementById('editListingId').value = l.id;
+  document.getElementById('modalTitle').textContent = 'Edit Listing';
+  document.getElementById('lName').value = l.name || '';
+  document.getElementById('lCategory').value = l.category || '';
+  document.getElementById('lDesc').value = l.description || '';
+  document.getElementById('lPrice').value = l.price || '';
+  document.getElementById('lPriceLabel').value = l.price_label || '';
+  document.getElementById('lKeywords').value = l.keywords || '';
+  document.getElementById('lType').value = l.listing_type || 'product';
+  document.getElementById('lAvailable').checked = l.available !== false;
+  // Show existing media
+  var media = l.listing_media || [];
+  document.getElementById('listingPreviews').innerHTML = media.map(function(m) {
+    return '<div class="media-thumb">' + (m.media_type==='image' ? '<img src="'+esc(m.url)+'" />' : m.media_type==='video' ? '<video src="'+esc(m.url)+'" muted></video>' : '<div class="type-icon">📄</div>') + '<button class="rm" onclick="deleteMedia(\''+m.id+'\',this.parentNode)">×</button></div>';
+  }).join('');
+  pendingListingFiles = [];
+  document.getElementById('listingModal').classList.add('open');
 }
 
-function closeModal(id) { document.getElementById(id).style.display='none'; }
+function closeListingModal() { document.getElementById('listingModal').classList.remove('open'); }
 
 function saveListing() {
-  var id=document.getElementById('lId').value;
-  var payload={
-    name:document.getElementById('lName').value.trim(),
-    description:document.getElementById('lDesc').value.trim()||null,
-    category:document.getElementById('lCategory').value.trim()||null,
-    price:document.getElementById('lPrice').value||null,
-    price_label:document.getElementById('lPriceLabel').value.trim()||null,
-    keywords:document.getElementById('lKeywords').value.trim()||null,
-    listing_type:document.getElementById('lType').value,
-    available:document.getElementById('lAvail').checked
+  var id   = document.getElementById('editListingId').value;
+  var name = document.getElementById('lName').value.trim();
+  if (!name) return showMsg('msgModal','Name is required.',false);
+  var data = {
+    name:        name,
+    category:    document.getElementById('lCategory').value.trim() || null,
+    description: document.getElementById('lDesc').value.trim() || null,
+    price:       document.getElementById('lPrice').value || null,
+    price_label: document.getElementById('lPriceLabel').value.trim() || null,
+    keywords:    document.getElementById('lKeywords').value.trim() || name,
+    listing_type: document.getElementById('lType').value,
+    available:   document.getElementById('lAvailable').checked
   };
-  if (!payload.name) return showToast('Name is required.', false);
-  var promise = id ? api('PUT','/client/listings/'+id,payload) : api('POST','/client/listings',payload);
-  promise.then(function() {
-    closeModal('listingModal');
+  var method = id ? 'PUT' : 'POST';
+  var path   = id ? '/client/listings/' + id : '/client/listings';
+  api(method, path, data).then(function(listing) {
+    var listingId = listing.id || id;
+    // Upload pending files after save
+    if (pendingListingFiles.length > 0) {
+      return uploadListingMedia(listingId, pendingListingFiles).then(function() {
+        showToast('✓ Listing saved with media!');
+        closeListingModal();
+        loadListings();
+      });
+    }
     showToast('✓ Listing saved!');
+    closeListingModal();
     loadListings();
-  }).catch(function(e) { showToast('Error: '+e.message, false); });
+  }).catch(function(e) { showMsg('msgModal', e.message, false); });
 }
 
 function deleteListing(id) {
-  if (!confirm('Delete this listing?')) return;
-  api('DELETE','/client/listings/'+id).then(function() { showToast('✓ Deleted'); loadListings(); });
+  if (!confirm('Delete this listing? This cannot be undone.')) return;
+  api('DELETE', '/client/listings/' + id).then(function() { showToast('Listing deleted'); loadListings(); }).catch(function(e){ showToast(e.message, false); });
 }
 
-function toggleListingAvail(id, avail) {
-  api('PATCH','/client/listings/'+id,{available:avail==='true'||avail===true}).then(function() {
-    showToast('✓ Updated'); loadListings();
-  });
+function deleteMedia(id, el) {
+  api('DELETE', '/client/media/' + id).then(function() { if(el) el.remove(); showToast('Media removed'); }).catch(function(e){ showToast(e.message, false); });
 }
 
-// ═══════════════════════ ORDERS ═══════════════════════
+// Queue files for upload (before listing is saved)
+function queueListingFiles(files) {
+  for (var i = 0; i < files.length; i++) {
+    pendingListingFiles.push(files[i]);
+    addFilePreview(files[i], document.getElementById('listingPreviews'), i);
+  }
+}
 
-var allOrders=[];
+function addFilePreview(file, container, idx) {
+  var wrap = document.createElement('div');
+  wrap.className = 'media-thumb';
+  wrap.dataset.idx = idx;
+  var rm = document.createElement('button');
+  rm.className = 'rm';
+  rm.innerHTML = '×';
+  rm.onclick = function() { pendingListingFiles.splice(idx, 1); wrap.remove(); };
+  if (file.type.startsWith('image')) {
+    var img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    wrap.appendChild(img);
+  } else if (file.type.startsWith('video')) {
+    var vid = document.createElement('video');
+    vid.src = URL.createObjectURL(file);
+    vid.muted = true;
+    wrap.appendChild(vid);
+  } else {
+    var icon = document.createElement('div');
+    icon.className = 'type-icon';
+    icon.textContent = file.name.endsWith('.pdf') ? '📄' : '📎';
+    wrap.appendChild(icon);
+  }
+  wrap.appendChild(rm);
+  container.appendChild(wrap);
+}
+
+async function uploadListingMedia(listingId, files) {
+  var prog = document.getElementById('listingProgress');
+  var bar  = document.getElementById('listingProgressBar');
+  if (prog) { prog.style.display = 'block'; }
+  for (var i = 0; i < files.length; i++) {
+    if (bar) bar.style.width = Math.round(((i) / files.length) * 100) + '%';
+    var fd = new FormData();
+    fd.append('file', files[i]);
+    fd.append('sort_order', i);
+    await fetch(API + '/api/client/listings/' + listingId + '/media', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN },
+      body: fd
+    });
+  }
+  if (bar) bar.style.width = '100%';
+  setTimeout(function() { if(prog) prog.style.display = 'none'; }, 800);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  STATUS POSTS — schedule only (bot auto-posts from listings)
+// ════════════════════════════════════════════════════════════════
+
+function loadStatusPosts() {
+  // Load auto-post schedule times
+  api('GET', '/client/post-schedule').then(function(d) {
+    if (d.product_post_time) document.getElementById('productPostTime').value = d.product_post_time;
+    if (d.meme_post_time)    document.getElementById('memePostTime').value    = d.meme_post_time;
+  }).catch(function() {});
+
+  api('GET', '/client/status-posts').then(function(posts) {
+    var list = document.getElementById('statusList');
+    if (!posts || !posts.length) { list.innerHTML = '<div style="color:#475569;font-size:.85rem;padding:20px">No scheduled posts yet.</div>'; return; }
+    list.innerHTML = posts.map(function(p) {
+      var icon = p.media_url ? (p.media_url.match(/\.(mp4|mov|webm)/i) ? '🎬' : '🖼️') : '📝';
+      return '<div class="status-post-item">' +
+        '<div class="status-post-thumb">' + (p.media_url && p.media_url.match(/\.(jpg|jpeg|png|gif|webp)/i) ? '<img src="'+esc(p.media_url)+'" style="width:100%;height:100%;object-fit:cover;border-radius:8px"/>' : icon) + '</div>' +
+        '<div class="status-post-info"><div class="status-post-time">⏰ ' + (p.post_time||'') + '</div><div class="status-post-cap">' + esc((p.caption||'No caption').slice(0,80)) + '</div></div>' +
+        '<button class="btn btn-red" onclick="deleteStatusPost(\'' + p.id + '\')">Delete</button>' +
+      '</div>';
+    }).join('');
+  }).catch(function() {});
+}
+
+function savePostSchedule() {
+  var data = {
+    product_post_time: document.getElementById('productPostTime').value || '09:00',
+    meme_post_time:    document.getElementById('memePostTime').value    || '12:00'
+  };
+  api('PUT', '/client/post-schedule', data)
+  .then(function() { showToast('✓ Auto-post schedule saved!'); })
+  .catch(function(e) { showToast('Error: ' + e.message, false); });
+}
+
+function addStatusPost() {
+  var cap  = document.getElementById('sCaption').value.trim();
+  var time = document.getElementById('sTime').value;
+  var days = document.getElementById('sDays').value;
+  if (!time) return showMsg('msgStatus', 'Post time is required.', false);
+  api('POST', '/client/status-posts', { caption: cap || null, post_time: time, scheduledDays: days })
+  .then(function() {
+    document.getElementById('sCaption').value = '';
+    document.getElementById('sTime').value    = '';
+    showMsg('msgStatus','✓ Post scheduled!',true);
+    loadStatusPosts();
+  }).catch(function(e) { showMsg('msgStatus', e.message, false); });
+}
+
+function deleteStatusPost(id) { api('DELETE','/client/status-posts/'+id).then(loadStatusPosts); }
+
+// ════════════════════════════════════════════════════════════════
+//  ORDERS
+// ════════════════════════════════════════════════════════════════
+var currentOrderFilter = 'all';
+var allOrders = [];
+
 function loadOrders() {
-  api('GET','/client/orders').then(function(orders) {
-    allOrders=orders||[];
+  api('GET', '/client/orders').then(function(orders) {
+    allOrders = orders || [];
     updatePendingBadge();
     renderOrders(allOrders);
-  }).catch(function() {
-    document.getElementById('ordersList').innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">Error loading orders.</div>';
-  });
+  }).catch(function() { document.getElementById('ordersList').innerHTML = '<div style="color:#475569;padding:30px;text-align:center">Error loading orders.</div>'; });
 }
 
 function updatePendingBadge() {
-  var cnt=allOrders.filter(function(o) { return o.status==='pending'; }).length;
-  var btn=document.getElementById('navOrders');
-  var ex=btn.querySelector('.nav-badge'); if (ex) ex.remove();
-  if (cnt>0) { var b=document.createElement('span'); b.className='nav-badge'; b.textContent=cnt; btn.appendChild(b); }
+  var pending = allOrders.filter(function(o) { return o.status === 'pending'; }).length;
+  var navBtn  = document.getElementById('navOrders');
+  var existing = navBtn.querySelector('.badge');
+  if (existing) existing.remove();
+  if (pending > 0) { var b = document.createElement('span'); b.className = 'badge'; b.textContent = pending; navBtn.appendChild(b); }
 }
 
 function filterOrders(status, btn) {
   document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  renderOrders(status==='all'?allOrders:allOrders.filter(function(o) { return o.status===status; }));
+  renderOrders(status === 'all' ? allOrders : allOrders.filter(function(o) { return o.status === status; }));
 }
 
 function renderOrders(orders) {
-  var list=document.getElementById('ordersList');
-  if (!orders.length) { list.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">No orders found.</div>'; return; }
-  list.innerHTML=orders.map(function(o) {
-    var status=o.status||'pending';
-    var ref=(o.id||'').toString().slice(-8).toUpperCase();
-    var phone=(o.customer_jid||'').replace('@s.whatsapp.net','');
-    var total=o.total?'₦'+Number(o.total).toLocaleString():'';
-    var items=o.items?(Array.isArray(o.items)?o.items.map(function(i){return i.name}).join(', '):o.items):'';
-    var receipt=o.receipt_url?'<img src="'+o.receipt_url+'" class="receipt-thumb" onclick="openLightbox(\''+o.receipt_url+'\')" />':'';
-    var created=o.created_at?new Date(o.created_at).toLocaleDateString('en-NG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    var actions='';
-    if (status==='pending') actions='<button class="btn btn-green btn-sm" onclick="updateOrder(\''+o.id+'\',\'confirmed\')">✓ Confirm</button><button class="btn btn-gray btn-sm" onclick="updateOrder(\''+o.id+'\',\'packaging\')">📦 Packaging</button><button class="btn btn-red btn-sm" onclick="updateOrder(\''+o.id+'\',\'rejected\')">✗ Reject</button>';
-    else if (status==='confirmed') actions='<button class="btn btn-blue btn-sm" onclick="updateOrder(\''+o.id+'\',\'packaging\')">📦 Move to Packaging</button>';
-    else if (status==='packaging') actions='<button class="btn btn-blue btn-sm" onclick="updateOrder(\''+o.id+'\',\'shipped\')">🚚 Mark Shipped</button>';
-    else if (status==='shipped') actions='<button class="btn btn-green btn-sm" onclick="updateOrder(\''+o.id+'\',\'delivered\')">✓ Mark Delivered</button>';
-    return '<div class="order-card"><div class="order-top"><div><div style="font-weight:700">'+(o.customer_name||phone)+' '+receipt+'</div><div class="order-ref">#'+ref+' · '+created+(total?' · '+total:'')+'</div>'+(items?'<div class="order-meta">Items: '+items+'</div>':'')+(o.delivery_address?'<div class="order-meta">📍 '+o.delivery_address+'</div>':'')+'</div><span class="order-status '+status+'">'+status.charAt(0).toUpperCase()+status.slice(1)+'</span></div>'+(actions?'<div class="order-actions">'+actions+'</div>':'')+'</div>';
+  var list = document.getElementById('ordersList');
+  if (!orders || !orders.length) { list.innerHTML = '<div style="color:#475569;padding:30px;text-align:center">No orders found.</div>'; return; }
+  list.innerHTML = orders.map(function(o) {
+    var status  = o.status || 'pending';
+    var ref     = (o.id||'').toString().slice(-8).toUpperCase();
+    var phone   = (o.customer_jid||'').replace('@s.whatsapp.net','');
+    var total   = o.total ? '₦' + Number(o.total).toLocaleString() : '';
+    var created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-NG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    var receipt = o.receipt_url ? '<img src="'+esc(o.receipt_url)+'" class="receipt-thumb" onclick="openLightbox(\''+esc(o.receipt_url)+'\')"/>' : '';
+    var actions = '';
+    if (status==='pending') actions='<button class="btn btn-sm btn-green" onclick="updateOrder(\''+o.id+'\',\'confirmed\')">✓ Confirm</button><button class="btn btn-sm btn-gray" onclick="updateOrder(\''+o.id+'\',\'packaging\')">📦 Packaging</button><button class="btn btn-sm btn-red" onclick="updateOrder(\''+o.id+'\',\'rejected\')">✗ Reject</button>';
+    else if (status==='confirmed') actions='<button class="btn btn-sm btn-blue" onclick="updateOrder(\''+o.id+'\',\'packaging\')">📦 Move to Packaging</button>';
+    else if (status==='packaging') actions='<button class="btn btn-sm btn-blue" onclick="updateOrder(\''+o.id+'\',\'shipped\')">🚚 Mark Shipped</button>';
+    else if (status==='shipped') actions='<button class="btn btn-sm btn-green" onclick="updateOrder(\''+o.id+'\',\'delivered\')">✓ Mark Delivered</button>';
+    return '<div class="order-card"><div class="order-top"><div><div style="font-weight:600">' + esc(o.customer_name||phone) + ' ' + receipt + '</div><div class="order-ref">#' + ref + ' · ' + created + (total?' · '+total:'') + '</div>' + (o.item_name ? '<div class="order-meta">Item: ' + esc(o.item_name) + '</div>' : '') + (o.delivery_address ? '<div class="order-meta">📍 '+esc(o.delivery_address)+'</div>' : '') + '</div><span class="order-status '+status+'">'+status.charAt(0).toUpperCase()+status.slice(1)+'</span></div>' + (actions?'<div class="order-actions">'+actions+'</div>':'') + '</div>';
   }).join('');
 }
 
 function updateOrder(id, status) {
-  api('PUT','/client/orders/'+id,{status:status}).then(function() {
-    showToast('✓ Order updated to '+status); loadOrders();
-  }).catch(function(e) { showToast('Error: '+e.message,false); });
+  api('PUT', '/client/orders/' + id, { status: status })
+  .then(function() { showToast('✓ Order updated to ' + status); loadOrders(); })
+  .catch(function(e) { showToast('Error: ' + e.message, false); });
 }
 
 function openLightbox(url) {
-  document.getElementById('lightboxImg').src=url;
-  document.getElementById('lightbox').style.display='flex';
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').style.display = 'flex';
 }
 
-// ═══════════════════════ ANALYTICS ═══════════════════════
-
+// ════════════════════════════════════════════════════════════════
+//  ANALYTICS
+// ════════════════════════════════════════════════════════════════
 function initAnalytics() {
-  var now=new Date();
-  document.getElementById('analyticsMonth').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var now   = new Date();
+  var month = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('analyticsMonth').value = month;
   loadAnalytics();
 }
 
 function loadAnalytics() {
-  var month=document.getElementById('analyticsMonth').value;
+  var month = document.getElementById('analyticsMonth').value;
   if (!month) return;
-  api('GET','/client/analytics?month='+month).then(function(s) {
-    var rev=s.total_revenue?'₦'+Number(s.total_revenue).toLocaleString():'₦0';
-    document.getElementById('statGrid').innerHTML=
-      statCard(s.new_customers||0,'👥','New Customers')+
-      statCard(s.leads||0,'🎯','Price Inquiries')+
-      statCard(s.orders_placed||0,'🛒','Orders Placed')+
-      statCard(s.orders_confirmed||0,'✅','Confirmed')+
-      statCard(rev,'💰','Revenue');
-    var mo=parseInt(month.split('-')[1]);
-    var yr=month.split('-')[0];
-    var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][mo-1];
-    document.getElementById('statText').innerHTML='In <strong>'+mn+' '+yr+'</strong>, your bot welcomed <strong>'+(s.new_customers||0)+' new customers</strong>, handled <strong>'+(s.leads||0)+' price inquiries</strong>, processed <strong>'+(s.orders_placed||0)+' orders</strong> ('+s.orders_confirmed+' confirmed), generating <strong>'+rev+'</strong> in revenue.';
-    document.getElementById('statSummary').style.display='block';
+  api('GET', '/client/analytics?month=' + month).then(function(s) {
+    var revenue = s.total_revenue ? '₦' + Number(s.total_revenue).toLocaleString('en-NG') : '₦0';
+    document.getElementById('statGrid').innerHTML =
+      statCard(s.new_customers||0,'👥','New Customers') +
+      statCard(s.leads||0,'🎯','Price Inquiries') +
+      statCard(s.orders_placed||0,'🛒','Orders Placed') +
+      statCard(s.orders_confirmed||0,'✅','Confirmed') +
+      statCard(revenue,'💰','Revenue');
+    var [yr,mo] = month.split('-');
+    var mNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('statText').innerHTML =
+      'In <strong>' + mNames[parseInt(mo)-1] + ' ' + yr + '</strong>, your bot welcomed <strong>' + (s.new_customers||0) + ' new customers</strong>, handled <strong>' + (s.leads||0) + ' price inquiries</strong>, and processed <strong>' + (s.orders_placed||0) + ' orders</strong> (' + (s.orders_confirmed||0) + ' confirmed), generating <strong>' + revenue + '</strong> in revenue.';
+    document.getElementById('statSummary').style.display = 'block';
   }).catch(function() {});
 }
 
 function statCard(val, icon, lbl) {
-  return '<div class="stat-card"><div style="font-size:1.5rem;margin-bottom:6px">'+icon+'</div><div class="stat-val">'+val+'</div><div class="stat-lbl">'+lbl+'</div></div>';
+  return '<div class="stat-card"><div style="font-size:1.6rem;margin-bottom:6px">'+icon+'</div><div class="stat-val">'+val+'</div><div class="stat-lbl">'+lbl+'</div></div>';
 }
 
-// ═══════════════════════ STATUS POSTS ═══════════════════════
-
-function loadStatusPosts() {
-  api('GET','/client/status-posts').then(function(posts) {
-    var list=document.getElementById('statusList');
-    if (!posts.length) { list.innerHTML='<div style="color:var(--muted);font-size:.85rem">No scheduled posts yet.</div>'; return; }
-    list.innerHTML=posts.map(function(p) {
-      return '<div class="flow-item"><div><div style="font-weight:700;font-size:.88rem">'+(p.post_time||p.scheduled_time||'')+'</div><div class="flow-resp">'+(p.caption||'').slice(0,70)+'</div></div><button class="btn btn-red btn-sm" onclick="deleteStatusPost(\''+p.id+'\')">Delete</button></div>';
-    }).join('');
-  }).catch(function() {});
-}
-
-function addStatusPost() {
-  var cap=document.getElementById('sCaption').value.trim();
-  var med=document.getElementById('sMedia').value.trim();
-  var time=document.getElementById('sTime').value;
-  if (!cap||!time) return showMsg('msgStatus','Caption and time required.',false);
-  api('POST','/client/status-posts',{caption:cap,mediaUrl:med||null,scheduledTime:time,scheduledDays:['Mon','Tue','Wed','Thu','Fri']}).then(function() {
-    document.getElementById('sCaption').value='';
-    document.getElementById('sTime').value='';
-    showMsg('msgStatus','✓ Post scheduled!',true);
-    loadStatusPosts();
-    updateChecklist('cl-schedule', true);
-  }).catch(function(e) { showMsg('msgStatus',e.message,false); });
-}
-
-function deleteStatusPost(id) {
-  api('DELETE','/client/status-posts/'+id).then(loadStatusPosts);
-}
-
-// ═══════════════════════ BROADCAST ═══════════════════════
-
-var selectedAudience = 'all';
-
-function selectAudience(el, val) {
-  document.querySelectorAll('.audience-opt').forEach(function(o) { o.classList.remove('selected'); });
-  el.classList.add('selected');
-  el.querySelector('input').checked=true;
-  selectedAudience=val;
-  document.getElementById('customPhonesWrap').style.display=(val==='custom')?'block':'none';
+// ════════════════════════════════════════════════════════════════
+//  BROADCAST
+// ════════════════════════════════════════════════════════════════
+function setAudience(val, btn) {
+  broadcastAudience = val;
+  document.querySelectorAll('.audience-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('customPhonesWrap').style.display = val === 'custom' ? 'block' : 'none';
 }
 
 function sendBroadcast() {
-  var msg=document.getElementById('bcMsg').value.trim();
+  var msg = document.getElementById('bcMsg').value.trim();
   if (!msg) return showMsg('msgBroadcast','Message is required.',false);
-  var payload={message:msg};
-  if (selectedAudience==='custom') {
-    var phones=document.getElementById('bcPhones').value.trim().split('\n').filter(function(p) { return p.trim(); });
+  var body = { message: msg, audience: broadcastAudience };
+  if (broadcastAudience === 'custom') {
+    var phones = document.getElementById('bcPhones').value.trim().split('\n').filter(function(p){return p.trim();});
     if (!phones.length) return showMsg('msgBroadcast','Add at least one phone number.',false);
-    payload.phones=phones;
-  } else {
-    payload.audience=selectedAudience;
-    payload.phones=[];
+    body.phones = phones;
   }
   showMsg('msgBroadcast','Sending...', true);
-  api('POST','/client/broadcast',payload).then(function(r) {
-    showMsg('msgBroadcast','✓ Sent to '+r.sent+'/'+(r.total||'?')+' customers.',true);
-    loadBroadcastLogs();
-  }).catch(function(e) { showMsg('msgBroadcast',e.message,false); });
+  api('POST', '/client/broadcast', body)
+  .then(function(r) { showMsg('msgBroadcast','✓ Sent to ' + r.sent + '/' + r.total + ' contacts.', true); loadBroadcastLogs(); })
+  .catch(function(e) { showMsg('msgBroadcast', e.message, false); });
 }
 
 function loadBroadcastLogs() {
-  api('GET','/client/broadcast-logs').then(function(logs) {
-    var el=document.getElementById('broadcastLogs');
-    if (!logs.length) { el.innerHTML='<div style="color:var(--muted);font-size:.83rem;padding:8px 0">No broadcasts yet.</div>'; return; }
-    el.innerHTML='<h3 style="margin:16px 0 10px;font-size:.85rem;color:var(--sub);text-transform:uppercase;letter-spacing:.5px">Broadcast History</h3>'+
+  api('GET', '/client/broadcast-logs').then(function(logs) {
+    var el = document.getElementById('broadcastLogs');
+    if (!logs || !logs.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<h3 style="margin:16px 0 10px;color:#cbd5e1;font-size:.9rem">Recent Broadcasts</h3>' +
       logs.slice(0,10).map(function(l) {
-        return '<div class="blog-item"><b>'+new Date(l.sent_at||l.created_at).toLocaleString('en-NG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</b> — '+(l.message||'').slice(0,60)+'... <span style="color:var(--green);font-weight:700">('+l.recipients+' sent)</span></div>';
+        return '<div class="flow-item"><div><div class="flow-kw">' + new Date(l.sent_at||l.created_at).toLocaleString() + '</div><div class="flow-resp">' + esc((l.message||'').slice(0,70)) + '...</div></div><span style="font-size:.75rem;color:#475569">'+( l.sent_count||l.sent||0)+' sent</span></div>';
       }).join('');
   }).catch(function() {});
 }
 
-// ═══════════════════════ BOT ERRANDS ═══════════════════════
-
+// ════════════════════════════════════════════════════════════════
+//  BOT ERRANDS
+// ════════════════════════════════════════════════════════════════
 document.querySelectorAll('.day-btn').forEach(function(btn) {
   btn.addEventListener('click', function() { this.classList.toggle('on'); });
 });
 
 function getSelectedDays() {
-  var days=[];
-  document.querySelectorAll('#eDaysGrid .day-btn.on').forEach(function(b) { days.push(b.dataset.day); });
+  var days = [];
+  document.querySelectorAll('.day-btn.on').forEach(function(btn) { days.push(btn.dataset.day); });
   return days.join(',');
 }
 
 function loadErrands() {
-  api('GET','/client/bot-tasks').then(function(tasks) {
-    var list=document.getElementById('errandsList');
-    if (!tasks||!tasks.length) { list.innerHTML='<div style="color:var(--muted);text-align:center;padding:30px">No errands yet.</div>'; return; }
-    var filterLabels={all_customers:'All Customers',inactive_7d:'Inactive 7d',inactive_14d:'Inactive 14d',pending_orders:'Pending Orders'};
-    list.innerHTML=tasks.map(function(t) {
-      return '<div class="errand-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
-        '<div style="flex:1"><div style="font-weight:700">'+t.name+'</div>'+
-        '<div class="errand-meta">⏰ '+t.schedule_time+' · 👥 '+(filterLabels[t.filter_type]||t.filter_type)+' · 📅 '+(t.schedule_days||'Every day')+'</div>'+
-        '<div style="margin-top:8px;font-size:.8rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:7px 10px">'+(t.message||'').slice(0,100)+'</div>'+
-        '</div><div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">'+
-        '<label class="toggle"><input type="checkbox"'+(t.active?' checked':'')+' onchange="toggleErrand(\''+t.id+'\',this.checked)"/><div class="toggle-track"><div class="toggle-thumb"></div></div></label>'+
-        '<button class="btn btn-red btn-sm" onclick="deleteErrand(\''+t.id+'\')">Delete</button>'+
-        '</div></div></div>';
+  api('GET', '/client/bot-tasks').then(function(tasks) {
+    var list = document.getElementById('errandsList');
+    if (!tasks || !tasks.length) { list.innerHTML = '<div style="text-align:center;padding:30px;color:#475569">No errands yet. Create one above.</div>'; return; }
+    var filterLabels = { all_customers:'All Customers', inactive_7d:'Inactive 7+ days', inactive_14d:'Inactive 14+ days', pending_orders:'Pending Orders' };
+    list.innerHTML = tasks.map(function(t) {
+      return '<div class="errand-card"><div class="errand-top"><div><div style="font-weight:600">'+esc(t.name)+'</div><div class="errand-meta">⏰ '+esc(t.schedule_time)+' · 👥 '+(filterLabels[t.filter_type]||t.filter_type)+' · 📅 '+(t.schedule_days||'Every day')+'</div><div class="errand-meta">Last run: '+(t.last_run_date||'Never')+' · Runs: '+(t.run_count||0)+'</div><div style="margin-top:6px;font-size:.8rem;color:#94a3b8;background:#0a0f1e;border:1px solid var(--border);border-radius:6px;padding:6px 10px">'+esc((t.message||'').slice(0,100))+(t.message&&t.message.length>100?'...':'')+'</div></div><div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end"><label class="toggle"><input type="checkbox"'+(t.active?' checked':'')+' onchange="toggleErrand(\''+t.id+'\',this.checked)"/><div class="toggle-track"><div class="toggle-thumb"></div></div><span>'+(t.active?'Active':'Paused')+'</span></label><button class="btn btn-red" onclick="deleteErrand(\''+t.id+'\')">Delete</button></div></div></div>';
     }).join('');
-  }).catch(function() {});
+  }).catch(function(e) { document.getElementById('errandsList').innerHTML = '<div style="color:#475569;padding:20px">Error: '+esc(e.message)+'</div>'; });
 }
 
 function createErrand() {
-  var name=document.getElementById('eName').value.trim();
-  var time=document.getElementById('eTime').value;
-  var msg=document.getElementById('eMessage').value.trim();
-  var filter=document.getElementById('eFilter').value;
-  var days=getSelectedDays();
+  var name = document.getElementById('eName').value.trim();
+  var time = document.getElementById('eTime').value;
+  var msg  = document.getElementById('eMessage').value.trim();
+  var days = getSelectedDays();
   if (!name||!time||!msg) return showMsg('msgErrands','Name, time and message are required.',false);
   if (!days) return showMsg('msgErrands','Select at least one day.',false);
-  api('POST','/client/bot-tasks',{name:name,message:msg,schedule_time:time,schedule_days:days,filter_type:filter}).then(function() {
-    document.getElementById('eName').value='';
-    document.getElementById('eTime').value='';
-    document.getElementById('eMessage').value='';
-    showMsg('msgErrands','✓ Errand created!',true);
-    loadErrands();
-  }).catch(function(e) { showMsg('msgErrands',e.message,false); });
+  api('POST','/client/bot-tasks',{name:name,message:msg,schedule_time:time,schedule_days:days,filter_type:document.getElementById('eFilter').value})
+  .then(function() { document.getElementById('eName').value=''; document.getElementById('eTime').value=''; document.getElementById('eMessage').value=''; showMsg('msgErrands','✓ Errand created!',true); loadErrands(); })
+  .catch(function(e) { showMsg('msgErrands',e.message,false); });
 }
 
 function toggleErrand(id, active) {
-  api('PATCH','/client/bot-tasks/'+id,{active:active}).then(function() { showToast(active?'✓ Activated':'Paused'); loadErrands(); }).catch(function(e) { showToast('Error: '+e.message,false); });
+  api('PATCH','/client/bot-tasks/'+id,{active:active}).then(function() { showToast(active?'✓ Errand activated':'✓ Errand paused'); loadErrands(); }).catch(function(e){showToast(e.message,false);});
 }
 
 function deleteErrand(id) {
   if (!confirm('Delete this errand?')) return;
-  api('DELETE','/client/bot-tasks/'+id).then(function() { showToast('✓ Deleted'); loadErrands(); }).catch(function(e) { showToast('Error: '+e.message,false); });
+  api('DELETE','/client/bot-tasks/'+id).then(function(){showToast('✓ Errand deleted');loadErrands();}).catch(function(e){showToast(e.message,false);});
 }
 
-// ═══════════════════════ SETTINGS ═══════════════════════
-
+// ════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════════════════════════════════════
 function loadSettings() {
-  api('GET','/client/settings').then(function(data) {
-    setVal('sNotifNum',data.notification_number);
-    setVal('sWelcome',data.welcome_message);
-    setVal('sFallback',data.fallback_message);
-    setVal('sBankName',data.bank_name);
-    setVal('sAcctNum',data.account_number);
-    setVal('sAcctName',data.account_name);
-    setVal('sHours',data.business_hours);
-    var setup=data.bot_setup||{};
-    setVal('sInsta',setup.instagram); setVal('sFacebook',setup.facebook);
-    setVal('sTiktok',setup.tiktok); setVal('sWaChannel',setup.whatsapp_channel);
-    setVal('sDeliveryAreas',setup.delivery_areas); setVal('sDeliveryFee',setup.delivery_fee);
-    setVal('sDeliveryTime',setup.delivery_time); setVal('sMinOrder',setup.minimum_order);
-    setVal('sReturnPolicy',setup.return_policy); setVal('sPromo',setup.promo);
-    var methods=(setup.payment_methods||'').split(',');
-    document.querySelectorAll('#payMethods input[type=checkbox]').forEach(function(cb) { cb.checked=methods.includes(cb.value); });
-    if (data.partner_expires_at) {
-      var days=Math.max(0,Math.ceil((new Date(data.partner_expires_at)-Date.now())/86400000));
-      document.getElementById('trialBadge').textContent='⚡ '+days+' days left';
-    }
-    updateChecklist('cl-settings', !!(data.business_name||data.welcome_message));
+  api('GET', '/client/settings').then(function(data) {
+    setVal('sNotifNum',  data.notification_number);
+    setVal('sWelcome',   data.welcome_message);
+    setVal('sFallback',  data.fallback_message);
+    setVal('sBankName',  data.bank_name);
+    setVal('sAcctNum',   data.account_number);
+    setVal('sAcctName',  data.account_name);
+    setVal('sHours',     data.business_hours);
+    var s = data.bot_setup || {};
+    setVal('sInsta',         s.instagram);
+    setVal('sFacebook',      s.facebook);
+    setVal('sTiktok',        s.tiktok);
+    setVal('sWaChannel',     s.whatsapp_channel);
+    setVal('sDeliveryAreas', s.delivery_areas);
+    setVal('sDeliveryFee',   s.delivery_fee);
+    setVal('sDeliveryTime',  s.delivery_time);
+    setVal('sMinOrder',      s.minimum_order);
+    setVal('sReturnPolicy',  s.return_policy);
+    setVal('sPromo',         s.promo);
+    var methods = (s.payment_methods||'').split(',');
+    document.querySelectorAll('#payMethods input[type="checkbox"]').forEach(function(cb) { cb.checked = methods.includes(cb.value); });
   }).catch(function() {});
-  checkWaStatus();
+
+  api('GET', '/client/session-status').then(function(st) {
+    var badge = document.getElementById('waBadge');
+    if (st.connected) { badge.textContent = '● Connected'; badge.className = 'status-badge connected'; }
+    else { badge.textContent = '● Disconnected'; badge.className = 'status-badge disc'; }
+  }).catch(function() {});
 }
 
-function setVal(id, val) { var el=document.getElementById(id); if (el&&val!=null) el.value=val; }
+function setVal(id, val) { var el = document.getElementById(id); if (el && val != null) el.value = val; }
 
 function saveSettings() {
-  var data={
-    notification_number:document.getElementById('sNotifNum').value.trim(),
-    welcome_message:document.getElementById('sWelcome').value.trim(),
-    fallback_message:document.getElementById('sFallback').value.trim(),
-    bank_name:document.getElementById('sBankName').value.trim(),
-    account_number:document.getElementById('sAcctNum').value.trim(),
-    account_name:document.getElementById('sAcctName').value.trim(),
-    business_hours:document.getElementById('sHours').value.trim()
+  var data = {
+    notification_number: document.getElementById('sNotifNum').value.trim(),
+    welcome_message:     document.getElementById('sWelcome').value.trim(),
+    fallback_message:    document.getElementById('sFallback').value.trim(),
+    bank_name:           document.getElementById('sBankName').value.trim(),
+    account_number:      document.getElementById('sAcctNum').value.trim(),
+    account_name:        document.getElementById('sAcctName').value.trim(),
+    business_hours:      document.getElementById('sHours').value.trim()
   };
-  api('PUT','/client/settings',data).then(function() {
-    showToast('✓ Settings saved!');
-    updateChecklist('cl-settings',true);
-  }).catch(function(e) { showToast('Error: '+e.message,false); });
+  api('PUT', '/client/settings', data).then(function() { showToast('✓ Settings saved!'); }).catch(function(e) { showToast('Error: '+e.message, false); });
 }
 
 function saveBotSetup() {
-  api('PUT','/client/bot-setup',{
-    instagram:document.getElementById('sInsta').value.trim(),
-    facebook:document.getElementById('sFacebook').value.trim(),
-    tiktok:document.getElementById('sTiktok').value.trim(),
-    whatsapp_channel:document.getElementById('sWaChannel').value.trim(),
-    service_areas:document.getElementById('sDeliveryAreas').value.trim(),
-    delivery_fee_local:document.getElementById('sDeliveryFee').value.trim(),
-    delivery_time_local:document.getElementById('sDeliveryTime').value.trim(),
-    minimum_order:document.getElementById('sMinOrder').value.trim(),
-    return_policy:document.getElementById('sReturnPolicy').value.trim(),
-    current_promo:document.getElementById('sPromo').value.trim()
-  }).then(function() { showToast('✓ Bot setup saved!'); }).catch(function(e) { showToast('Error: '+e.message,false); });
+  var data = {
+    instagram:        document.getElementById('sInsta').value.trim(),
+    facebook:         document.getElementById('sFacebook').value.trim(),
+    tiktok:           document.getElementById('sTiktok').value.trim(),
+    whatsapp_channel: document.getElementById('sWaChannel').value.trim(),
+    delivery_areas:   document.getElementById('sDeliveryAreas').value.trim(),
+    delivery_fee:     document.getElementById('sDeliveryFee').value.trim(),
+    delivery_time:    document.getElementById('sDeliveryTime').value.trim(),
+    minimum_order:    document.getElementById('sMinOrder').value.trim(),
+    return_policy:    document.getElementById('sReturnPolicy').value.trim(),
+    promo:            document.getElementById('sPromo').value.trim()
+  };
+  api('PUT', '/client/bot-setup', data).then(function() { showToast('✓ Bot setup saved!'); }).catch(function(e) { showToast('Error: '+e.message, false); });
 }
 
 function savePayMethods() {
-  var checked=[];
-  document.querySelectorAll('#payMethods input:checked').forEach(function(cb) { checked.push(cb.value); });
-  api('PUT','/client/bot-setup',{payment_methods:checked.join(',')}).catch(function() {});
+  var checked = [];
+  document.querySelectorAll('#payMethods input[type="checkbox"]:checked').forEach(function(cb) { checked.push(cb.value); });
+  api('PUT', '/client/bot-setup', { payment_methods: checked.join(',') }).catch(function() {});
 }
 
-// ── WhatsApp QR ────────────────────────────────────────────
-var qrSrc=null;
-
+// ── WhatsApp QR ───────────────────────────────────────────────
 function showQR() {
-  var c=document.getElementById('qrContainer');
-  c.style.display='block';
-  document.getElementById('qrImg').innerHTML='';
-  document.getElementById('qrStatus').textContent='Connecting...';
-  if (qrSrc) qrSrc.close();
-  qrSrc=new EventSource(API+'/api/client/qr-stream?token='+encodeURIComponent(TOKEN));
-  qrSrc.addEventListener('qr',function(e) {
-    var qr=JSON.parse(e.data).qr;
-    var box=document.getElementById('qrImg');
-    box.innerHTML='<canvas id="qrCanvas"></canvas>';
-    try { QRCode.toCanvas(document.getElementById('qrCanvas'),qr,{width:220,margin:2,color:{dark:'#000',light:'#fff'}},function(err) {
-      if (err) box.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(qr)+'" style="width:220px;height:220px"/>';
-    }); } catch(err) {
-      box.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(qr)+'" style="width:220px;height:220px"/>';
-    }
-    document.getElementById('qrStatus').textContent='Scan this with your WhatsApp → Linked Devices';
+  var container = document.getElementById('qrContainer');
+  var qrImg     = document.getElementById('qrImg');
+  var qrStatus  = document.getElementById('qrStatus');
+  container.style.display = 'block';
+  qrImg.innerHTML = '';
+  qrStatus.textContent = 'Connecting...';
+  if (qrEventSource) qrEventSource.close();
+  qrEventSource = new EventSource(API + '/api/client/qr-stream?token=' + TOKEN);
+  qrEventSource.addEventListener('qr', function(e) {
+    var data = JSON.parse(e.data);
+    qrStatus.textContent = 'Scan with your WhatsApp:';
+    qrImg.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(data.qr) + '" style="width:220px;height:220px;border-radius:8px"/>';
   });
-  qrSrc.addEventListener('connected',function() {
-    document.getElementById('qrImg').innerHTML='<div style="font-size:3rem;text-align:center">✅</div>';
-    document.getElementById('qrStatus').textContent='Connected successfully!';
-    setBadgeConnected();
-    updateChecklist('cl-wa',true);
-    qrSrc.close(); qrSrc=null;
-    setTimeout(function() { document.getElementById('qrContainer').style.display='none'; },3000);
+  qrEventSource.addEventListener('connected', function() {
+    qrImg.innerHTML = '<div style="font-size:3.5rem;margin:10px 0">✅</div>';
+    qrStatus.textContent = 'WhatsApp connected successfully!';
+    document.getElementById('waBadge').textContent = '● Connected';
+    document.getElementById('waBadge').className = 'status-badge connected';
+    qrEventSource.close(); qrEventSource = null;
+    setTimeout(function() { container.style.display = 'none'; }, 3000);
   });
-  qrSrc.onerror=function() { document.getElementById('qrStatus').textContent='Connection error. Try again.'; };
 }
 
-function checkWaStatus() {
-  api('GET','/client/session-status').then(function(st) {
-    if (st.connected) { setBadgeConnected(); updateChecklist('cl-wa',true); }
-    else setBadgeDisc();
-  }).catch(function() {});
+function checkConnectionStatus() {
+  api('GET', '/client/session-status').then(function(st) {
+    var badge = document.getElementById('waBadge');
+    if (st.connected) { badge.textContent='● Connected'; badge.className='status-badge connected'; showToast('✓ WhatsApp is connected!'); }
+    else { badge.textContent='● Disconnected'; badge.className='status-badge disc'; showToast('WhatsApp is not connected.', false); }
+  });
 }
 
-function setBadgeConnected() {
-  var b=document.getElementById('waBadge');
-  b.className='wa-badge conn';
-  document.getElementById('waText').textContent='Connected';
-}
-function setBadgeDisc() {
-  var b=document.getElementById('waBadge');
-  b.className='wa-badge disc';
-  document.getElementById('waText').textContent='Disconnected';
-}
-
-// ── Push ─────────────────────────────────────────────────
+// ── Push Notifications ────────────────────────────────────────
 function subscribePush() {
-  if (!('serviceWorker' in navigator)||!('PushManager' in window)) return showToast('Not supported in this browser.',false);
-  api('GET','/push/vapid-key').then(function(d) {
+  if (!('serviceWorker' in navigator)||!('PushManager' in window)) return showToast('Push not supported in this browser.', false);
+  api('GET', '/push/vapid-key').then(function(d) {
     return navigator.serviceWorker.register('/sw.js').then(function(reg) {
-      return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToArray(d.publicKey)});
+      return reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlBase64ToUint8Array(d.publicKey) });
     }).then(function(sub) {
-      var k=sub.toJSON();
-      return api('POST','/client/push/subscribe',{endpoint:k.endpoint,keys:{p256dh:k.keys.p256dh,auth:k.keys.auth}});
+      var key = sub.toJSON();
+      return api('POST', '/client/push/subscribe', { endpoint: key.endpoint, keys: { p256dh: key.keys.p256dh, auth: key.keys.auth } });
     });
-  }).then(function() { showToast('✓ Push notifications enabled!'); }).catch(function(e) { showToast('Error: '+e.message,false); });
-}
-function testPush() { api('POST','/client/push/test').then(function() { showToast('✓ Test push sent!'); }).catch(function() {}); }
-function b64ToArray(b) {
-  var p='='.repeat((4-b.length%4)%4),s=(b+p).replace(/-/g,'+').replace(/_/g,'/');
-  var r=window.atob(s); return new Uint8Array(Array.from(r).map(function(c) { return c.charCodeAt(0); }));
+  }).then(function() { showToast('✓ Push notifications enabled!'); }).catch(function(e) { showToast('Error: '+e.message, false); });
 }
 
-// ═══════════════════════ CHECKLIST ═══════════════════════
-
-var clState={wa:false,listing:false,reply:false,settings:false,schedule:false};
-var clStorage=JSON.parse(localStorage.getItem('fb_checklist')||'{}');
-Object.assign(clState,clStorage);
-
-function updateChecklist(key, done) {
-  var k=key.replace('cl-','');
-  clState[k]=done;
-  localStorage.setItem('fb_checklist',JSON.stringify(clState));
-  renderChecklist();
+function testPush() {
+  api('POST', '/client/push/test').then(function(r) { showToast('✓ Test push sent ('+r.sent+')'); }).catch(function(e) { showToast('Error: '+e.message, false); });
 }
 
-function renderChecklist() {
-  var keys=['wa','listing','reply','settings','schedule'];
-  var done=0;
-  keys.forEach(function(k) {
-    var el=document.getElementById('cl-'+k);
-    if (!el) return;
-    if (clState[k]) { el.classList.add('done'); el.querySelector('.cl-check').textContent='✓'; done++; }
-    else { el.classList.remove('done'); el.querySelector('.cl-check').textContent=''; }
-  });
-  var pct=Math.round(done/keys.length*100);
-  document.getElementById('clProgressBar').style.width=pct+'%';
-  var cl=document.getElementById('setupChecklist');
-  if (done===keys.length) {
-    setTimeout(function() { cl.style.display='none'; },2000);
-  } else {
-    cl.style.display='block';
-  }
+function urlBase64ToUint8Array(b64) {
+  var padding = '='.repeat((4 - b64.length%4)%4);
+  var base64  = (b64+padding).replace(/-/g,'+').replace(/_/g,'/');
+  var raw     = window.atob(base64);
+  return new Uint8Array(Array.from(raw).map(function(c){return c.charCodeAt(0);}));
 }
 
-// Apply saved checklist state on load
-renderChecklist();
-// Merge initial state from API on boot
-checkWaStatus();
-
-// ═══════════════════════ PWA ═══════════════════════
-
-var _pwaPrompt=null;
-window.addEventListener('beforeinstallprompt',function(e) {
-  e.preventDefault();
-  _pwaPrompt=e;
-  if (!localStorage.getItem('fb_pwa_dismissed')) {
-    document.getElementById('pwaBar').style.display='flex';
-  }
-});
-function installPWA() {
-  if (_pwaPrompt) { _pwaPrompt.prompt(); _pwaPrompt.userChoice.then(function() { document.getElementById('pwaBar').style.display='none'; }); }
-}
-function dismissPWA() {
-  localStorage.setItem('fb_pwa_dismissed','1');
-  document.getElementById('pwaBar').style.display='none';
+// ── Utility ───────────────────────────────────────────────────
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ═══════════════════════ POLL WA STATUS ═══════════════════════
+// ── Drag & drop for listing upload area ──────────────────────
+var el = document.getElementById('listingUploadArea');
+if (el) {
+  el.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('drag');});
+  el.addEventListener('dragleave',function(){this.classList.remove('drag');});
+  el.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('drag');queueListingFiles(e.dataTransfer.files);});
+}
 
-setInterval(function() { checkWaStatus(); }, 7000);
-
-// ── Boot ────────────────────────────────────────────────────
+// ── Boot ─────────────────────────────────────────────────────
 loadFlows();
+// Check WA status on load
+api('GET', '/client/session-status').then(function(st) {
+  var badge = document.getElementById('waBadge');
+  if (st.connected) { badge.textContent='● Connected'; badge.className='status-badge connected'; }
+}).catch(function(){});
 </script>
 </body>
 </html>
