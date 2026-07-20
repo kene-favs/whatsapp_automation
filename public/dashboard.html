@@ -2,1046 +2,861 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ForgeBot Dashboard</title>
+<link rel="manifest" href="/manifest.json"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
 :root{--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--orange:#f59e0b;--card:#111827;--border:#1e2d3d;--purple:#a855f7}
-header{background:#111827;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:1.3rem;font-weight:700;color:var(--green)}.logo span{color:#fff}
-.status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 14px;border-radius:20px;font-size:.75rem;font-weight:600}
+header{background:#111827;border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+header .logo{font-size:1.3rem;font-weight:700;color:var(--green)}
+header .logo span{color:#fff}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.status-badge{background:#14532d;color:var(--green);border:1px solid var(--green);padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer}
 .status-badge.disc{background:#450a0a;color:var(--red);border-color:var(--red)}
-nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 24px;overflow-x:auto;gap:2px}
-nav button{background:none;border:none;color:#94a3b8;padding:14px 16px;cursor:pointer;font-size:.85rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s;position:relative}
+.trial-badge{background:#1a1a00;color:var(--orange);border:1px solid var(--orange);padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:600}
+nav{background:#0d1526;border-bottom:1px solid var(--border);display:flex;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:none;color:#94a3b8;padding:13px 16px;cursor:pointer;font-size:.84rem;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
 nav button.active{color:var(--green);border-bottom-color:var(--green)}
-nav button .badge{position:absolute;top:8px;right:4px;background:var(--red);color:#fff;font-size:.65rem;font-weight:700;padding:1px 5px;border-radius:8px;min-width:16px;text-align:center}
-.container{max-width:920px;margin:0 auto;padding:28px 20px}
-.section{display:none}.section.active{display:block}
-h2{font-size:1.1rem;font-weight:600;margin-bottom:18px;color:#f1f5f9}
-h3{font-size:.95rem;font-weight:600;margin-bottom:12px;color:#cbd5e1}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
-label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:5px}
-input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:9px 12px;font-size:.88rem;outline:none;transition:.2s}
+.container{max-width:920px;margin:0 auto;padding:24px 16px}
+.section{display:none}
+.section.active{display:block}
+h2{font-size:1.05rem;font-weight:600;margin-bottom:16px;color:#f1f5f9}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:4px}
+input,textarea,select{width:100%;background:#0d1526;border:1px solid var(--border);color:#e2e8f0;border-radius:6px;padding:8px 11px;font-size:.86rem;outline:none}
 input:focus,textarea:focus,select:focus{border-color:var(--blue)}
-textarea{min-height:80px;resize:vertical}
-.btn{padding:9px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.2s}
-.btn-green{background:var(--green);color:#000}.btn-green:hover{background:#16a34a}
-.btn-red{background:var(--red);color:#fff;padding:5px 12px;font-size:.78rem}
-.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#2563eb}
-.btn-gray{background:#374151;color:#e2e8f0}.btn-gray:hover{background:#4b5563}
-.btn-sm{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:.78rem;font-weight:600}
-.row{display:flex;gap:12px;margin-bottom:12px;align-items:flex-end}
+textarea{min-height:75px;resize:vertical}
+.btn{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-size:.84rem;font-weight:600;transition:.2s}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{background:#16a34a}
+.btn-red{background:var(--red);color:#fff;padding:5px 10px;font-size:.76rem}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-gray{background:#374151;color:#e2e8f0}
+.btn-sm{padding:5px 12px;font-size:.78rem}
+.row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-end}
 .row .grow{flex:1}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-.flow-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.flow-kw{font-size:.82rem;color:var(--green);font-weight:600}
-.flow-resp{font-size:.82rem;color:#94a3b8;margin-top:2px}
-.msg{padding:10px 14px;border-radius:6px;font-size:.85rem;margin-bottom:12px;display:none}
+.flow-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.flow-kw{font-size:.81rem;color:var(--green);font-weight:600}
+.flow-resp{font-size:.81rem;color:#94a3b8;margin-top:2px}
+.msg{padding:9px 13px;border-radius:6px;font-size:.83rem;margin-bottom:10px;display:none}
 .msg.show{display:block}
 .msg.ok{background:#14532d;color:var(--green);border:1px solid var(--green)}
 .msg.err{background:#450a0a;color:var(--red);border:1px solid var(--red)}
+/* Listings */
+.listings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:4px}
+.listing-card{background:#0d1526;border:1px solid var(--border);border-radius:9px;padding:14px;position:relative}
+.listing-card .lc-thumb{width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:8px}
+.lc-name{font-size:.9rem;font-weight:600;color:#f1f5f9;margin-bottom:4px}
+.lc-price{font-size:.85rem;color:var(--green);font-weight:600}
+.lc-cat{font-size:.74rem;color:#64748b;margin-top:3px}
+.lc-avail{font-size:.72rem;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:6px}
+.avail-yes{background:#14532d;color:var(--green)}
+.avail-no{background:#450a0a;color:var(--red)}
+.lc-actions{margin-top:10px;display:flex;gap:6px}
 /* Orders */
-.filter-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
-.filter-btn{background:#0d1526;border:1px solid var(--border);color:#94a3b8;padding:6px 14px;border-radius:20px;font-size:.8rem;cursor:pointer;transition:.2s}
-.filter-btn.active{background:var(--green);color:#000;border-color:var(--green)}
-.order-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
-.order-card .order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.order-ref{font-size:.78rem;color:#64748b;margin-top:2px}
-.order-status{padding:3px 10px;border-radius:12px;font-size:.75rem;font-weight:700}
-.order-status.pending{background:rgba(245,158,11,.12);color:var(--orange);border:1px solid rgba(245,158,11,.3)}
-.order-status.confirmed{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.order-status.packaging{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
-.order-status.shipped{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
-.order-status.delivered{background:rgba(34,197,94,.18);color:#86efac;border:1px solid rgba(34,197,94,.4)}
-.order-status.rejected{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.order-meta{font-size:.8rem;color:#64748b;margin:8px 0}
-.order-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.receipt-thumb{width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)}
+.order-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px}
+.order-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.order-name{font-size:.88rem;font-weight:600;color:#f1f5f9}
+.status-pill{font-size:.72rem;padding:3px 10px;border-radius:10px;font-weight:600}
+.sp-pending{background:#451a00;color:var(--orange)}
+.sp-confirmed{background:#052e16;color:var(--green)}
+.sp-cancelled{background:#450a0a;color:var(--red)}
+.sp-delivered{background:#0c1a4e;color:#60a5fa}
+.order-meta{font-size:.78rem;color:#64748b}
 /* Analytics */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
-.stat-val{font-size:1.8rem;font-weight:800;color:var(--green);margin-bottom:4px}
-.stat-lbl{font-size:.78rem;color:#64748b}
-/* QR */
-#qrContainer{text-align:center;padding:20px;background:#0d1526;border:1px solid var(--border);border-radius:10px;margin-top:14px}
-#qrImg{max-width:220px;margin:0 auto 10px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:16px;text-align:center}
+.stat-num{font-size:1.7rem;font-weight:700;color:var(--green)}
+.stat-label{font-size:.75rem;color:#64748b;margin-top:4px}
+/* Schedule */
+.day-checks{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.day-chip{display:flex;align-items:center;gap:5px;background:#0d1526;border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:.82rem;user-select:none}
+.day-chip input[type=checkbox]{width:auto;margin:0}
+.day-chip.selected{border-color:var(--green);color:var(--green)}
+.info-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:12px 14px;font-size:.81rem;color:#93c5fd;margin-bottom:14px}
 /* Bot Errands */
-.errand-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
-.errand-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.errand-meta{font-size:.78rem;color:#64748b;margin-top:6px}
-.days-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.day-btn{background:#0d1526;border:1px solid var(--border);color:#94a3b8;padding:4px 10px;border-radius:5px;font-size:.78rem;cursor:pointer;transition:.2s}
-.day-btn.on{background:var(--green);color:#000;border-color:var(--green)}
-.toggle{display:inline-flex;align-items:center;cursor:pointer;gap:8px;font-size:.82rem;color:#94a3b8}
-.toggle input{display:none}
-.toggle-track{width:36px;height:20px;background:#374151;border-radius:10px;position:relative;transition:.2s}
-.toggle input:checked + .toggle-track{background:var(--green)}
-.toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.2s}
-.toggle input:checked ~ .toggle-track .toggle-thumb{left:19px}
-/* Settings */
-.settings-section{border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:20px}
-.settings-section:last-child{border-bottom:none}
-.pay-methods{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
-.pay-cb{display:flex;align-items:center;gap:6px;font-size:.82rem;color:#94a3b8;cursor:pointer}
-.pay-cb input{width:auto}
-/* Toast */
-#toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#000;padding:10px 18px;border-radius:8px;font-weight:700;font-size:.85rem;z-index:9999;transform:translateY(80px);opacity:0;transition:.3s}
-#toast.show{transform:translateY(0);opacity:1}
-@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}.order-top{flex-direction:column}}
+.errand-item{background:#0d1526;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.errand-name{font-size:.88rem;font-weight:600;color:#f1f5f9}
+.errand-meta{font-size:.76rem;color:#64748b;margin-top:2px}
+.toggle-switch{position:relative;width:38px;height:20px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#374151;border-radius:20px;transition:.3s}
+.toggle-slider:before{position:absolute;content:'';height:14px;width:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle-switch input:checked+.toggle-slider{background:var(--green)}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(18px)}
+/* Checklist */
+#checklist{position:fixed;bottom:20px;right:20px;background:#111827;border:1px solid var(--border);border-radius:12px;padding:16px;width:240px;z-index:900;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+#checklist h4{font-size:.85rem;color:#f1f5f9;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.cl-item{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#94a3b8;padding:4px 0;border-bottom:1px solid var(--border)}
+.cl-item:last-child{border:none}
+.cl-item.done{color:var(--green)}
+.cl-dot{width:16px;height:16px;border-radius:50%;border:2px solid #374151;flex-shrink:0;transition:.3s}
+.cl-item.done .cl-dot{background:var(--green);border-color:var(--green)}
+/* PWA */
+#pwaPopup{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111827;border:1px solid var(--green);border-radius:12px;padding:18px 20px;z-index:950;width:300px;box-shadow:0 4px 24px rgba(0,0,0,.6);text-align:center}
+#pwaPopup h4{font-size:.95rem;color:#f1f5f9;margin-bottom:6px}
+#pwaPopup p{font-size:.78rem;color:#94a3b8;margin-bottom:14px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;overflow-y:auto;padding:20px}
+.modal-overlay.open{display:flex;align-items:flex-start;justify-content:center}
+.modal-box{background:#111827;border:1px solid var(--border);border-radius:12px;padding:22px;width:100%;max-width:520px;margin:auto}
+.modal-box h3{font-size:1rem;color:#f1f5f9;margin-bottom:16px;display:flex;justify-content:space-between}
+.modal-close{cursor:pointer;color:#64748b;font-size:1.2rem}
+.upload-area{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:8px}
+.upload-area:hover{border-color:var(--blue)}
+.upload-area p{font-size:.8rem;color:#64748b}
+.upload-preview{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.upload-preview img{width:60px;height:60px;object-fit:cover;border-radius:5px}
+.broadcast-log{font-size:.79rem;color:#64748b;padding:5px 0;border-bottom:1px solid var(--border)}
+.notif-box{background:#0d1a2e;border:1px solid var(--blue);border-radius:8px;padding:11px 13px;font-size:.81rem;color:#93c5fd;margin-bottom:13px}
+.notif-box b{color:#fff}
+.feat-card{background:var(--card);border-radius:10px;padding:16px;margin-bottom:12px}
+.coming-soon{border:1px dashed var(--purple);background:#1a0533;border-radius:10px;padding:20px;margin-bottom:14px;text-align:center}
+.coming-soon .cs-icon{font-size:2.2rem;margin-bottom:6px}
+.coming-soon h3{color:var(--purple);font-size:.95rem;margin-bottom:5px}
+.coming-soon p{font-size:.8rem;color:#94a3b8;max-width:420px;margin:0 auto 10px}
+.cs-badge{display:inline-block;background:var(--purple);color:#fff;font-size:.7rem;font-weight:700;padding:2px 11px;border-radius:20px}
 </style>
 </head>
 <body>
 
 <header>
   <div class="logo">Forge<span>Bot</span></div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <span id="waBadge" class="status-badge disc">&#9679; Disconnected</span>
-    <button class="btn btn-gray" onclick="logout()" style="padding:6px 14px;font-size:.8rem">Logout</button>
+  <div class="header-right">
+    <span id="trialBadge" class="trial-badge" style="display:none">&#9201; -- days left</span>
+    <span id="waBadge" class="status-badge disc" title="Click to reconnect" onclick="reconnectWA()">&#9679; Disconnected</span>
+    <button class="btn btn-gray" onclick="logout()" style="padding:5px 13px;font-size:.78rem">Logout</button>
   </div>
 </header>
 
 <nav>
-  <button class="active" onclick="switchTab('replies',this)">Auto-Replies</button>
-  <button onclick="switchTab('orders',this)" id="navOrders">Orders</button>
-  <button onclick="switchTab('analytics',this)">Analytics</button>
-  <button onclick="switchTab('status',this)">Status Posts</button>
-  <button onclick="switchTab('broadcast',this)">Broadcast</button>
-  <button onclick="switchTab('errands',this)">Bot Errands</button>
-  <button onclick="switchTab('settings',this)">Settings</button>
+  <button class="active" onclick="switchTab('replies',this)">&#129302; Auto-Replies</button>
+  <button onclick="switchTab('listings',this)">&#128230; Listings</button>
+  <button onclick="switchTab('orders',this)">&#128203; Orders</button>
+  <button onclick="switchTab('status',this)">&#128247; Status Posts</button>
+  <button onclick="switchTab('broadcast',this)">&#128226; Broadcast</button>
+  <button onclick="switchTab('analytics',this)">&#128200; Analytics</button>
+  <button onclick="switchTab('errands',this)">&#129302; Bot Errands</button>
+  <button onclick="switchTab('settings',this)">&#9881; Settings</button>
 </nav>
 
 <div class="container">
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  AUTO-REPLIES                                             -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- AUTO-REPLIES -->
 <div id="tab-replies" class="section active">
   <h2>Auto-Reply Rules</h2>
   <div id="msgReplies" class="msg"></div>
   <div class="card">
     <div class="row">
       <div class="grow">
-        <label>Keywords (comma-separated)</label>
-        <input type="text" id="rKeywords" placeholder="price, how much, cost"/>
-      </div>
-      <div>
-        <label>Type</label>
-        <select id="rType">
-          <option value="text">Text</option>
-          <option value="image">Image</option>
-        </select>
+        <label>Keywords (comma separated)</label>
+        <input id="newKw" placeholder="e.g. price, how much, cost"/>
       </div>
     </div>
-    <div style="margin-bottom:10px">
-      <label>Response</label>
-      <textarea id="rResponse" placeholder="Our prices start from ₦5,000..."></textarea>
-    </div>
-    <div style="margin-bottom:14px">
-      <label>Media URL (optional, for image type)</label>
-      <input type="text" id="rMedia" placeholder="https://..."/>
+    <div style="margin-bottom:12px">
+      <label>Reply Message</label>
+      <textarea id="newResp" placeholder="Type the reply your bot will send..."></textarea>
     </div>
     <button class="btn btn-green" onclick="addFlow()">+ Add Rule</button>
   </div>
   <div id="flowList"></div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  ORDERS                                                   -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- LISTINGS -->
+<div id="tab-listings" class="section">
+  <h2>Product &amp; Service Listings</h2>
+  <div id="msgListings" class="msg"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <p style="font-size:.82rem;color:#64748b">Your bot searches these when customers ask about products or services.</p>
+    <button class="btn btn-green" onclick="openListingModal()">+ Add Listing</button>
+  </div>
+  <div id="listingsGrid" class="listings-grid"></div>
+</div>
+
+<!-- ORDERS -->
 <div id="tab-orders" class="section">
   <h2>Orders</h2>
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="filterOrders('all',this)">All</button>
-    <button class="filter-btn" onclick="filterOrders('pending',this)">Pending</button>
-    <button class="filter-btn" onclick="filterOrders('confirmed',this)">Confirmed</button>
-    <button class="filter-btn" onclick="filterOrders('packaging',this)">Packaging</button>
-    <button class="filter-btn" onclick="filterOrders('shipped',this)">Shipped</button>
-    <button class="filter-btn" onclick="filterOrders('delivered',this)">Delivered</button>
-    <button class="filter-btn" onclick="filterOrders('rejected',this)">Rejected</button>
-  </div>
-  <div id="ordersList"><div style="text-align:center;padding:40px;color:#64748b">Loading orders...</div></div>
+  <div id="msgOrders" class="msg"></div>
+  <div id="ordersList"></div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  ANALYTICS                                               -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div id="tab-analytics" class="section">
-  <h2>Analytics</h2>
-  <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:20px">
-    <label style="margin:0;white-space:nowrap">Month:</label>
-    <input type="month" id="analyticsMonth" style="width:180px" onchange="loadAnalytics()"/>
-    <button class="btn btn-blue" onclick="loadAnalytics()" style="padding:8px 18px">Load</button>
-  </div>
-  <div id="statGrid" class="stat-grid"></div>
-  <div id="statSummary" class="card" style="display:none">
-    <h3>Summary</h3>
-    <p id="statText" style="font-size:.88rem;color:#94a3b8;line-height:1.7"></p>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  STATUS POSTS                                            -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- STATUS POSTS (Scheduler only) -->
 <div id="tab-status" class="section">
-  <h2>Scheduled Status Posts</h2>
+  <h2>Auto-Posting Schedule</h2>
   <div id="msgStatus" class="msg"></div>
-  <div class="card">
-    <div style="margin-bottom:10px">
-      <label>Caption</label>
-      <textarea id="sCaption" placeholder="Check out our latest offer..."></textarea>
-    </div>
-    <div class="grid2" style="margin-bottom:10px">
-      <div>
-        <label>Media URL (optional)</label>
-        <input type="text" id="sMedia" placeholder="https://..."/>
-      </div>
-      <div>
-        <label>Post Time (HH:MM)</label>
-        <input type="time" id="sTime"/>
-      </div>
-    </div>
-    <button class="btn btn-green" onclick="addStatusPost()">+ Schedule Post</button>
+  <div class="info-box">
+    &#129302; <b style="color:#fff">How it works:</b> ForgeBot automatically posts your listings to WhatsApp Status on your chosen days. It picks 70-80% of your catalogue, writes AI captions, and mixes in memes. Just set the time and days below — the bot does the rest.
   </div>
-  <div id="statusList"></div>
+  <div class="card">
+    <h3 style="font-size:.9rem;color:#f1f5f9;margin-bottom:12px">Posting Days</h3>
+    <div class="day-checks" id="dayChecks">
+      <label class="day-chip" id="chip-Mon"><input type="checkbox" value="Mon"/> Mon</label>
+      <label class="day-chip" id="chip-Tue"><input type="checkbox" value="Tue"/> Tue</label>
+      <label class="day-chip" id="chip-Wed"><input type="checkbox" value="Wed"/> Wed</label>
+      <label class="day-chip" id="chip-Thu"><input type="checkbox" value="Thu"/> Thu</label>
+      <label class="day-chip" id="chip-Fri"><input type="checkbox" value="Fri"/> Fri</label>
+      <label class="day-chip" id="chip-Sat"><input type="checkbox" value="Sat"/> Sat</label>
+      <label class="day-chip" id="chip-Sun"><input type="checkbox" value="Sun"/> Sun</label>
+    </div>
+    <div class="row" style="margin-top:14px;align-items:center">
+      <div class="grow">
+        <label>Post Time (24hr e.g. 09:00)</label>
+        <input id="schedTime" placeholder="09:00" style="max-width:160px"/>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap">
+        <label class="toggle-switch" style="margin:0">
+          <input type="checkbox" id="includeMemes" checked/>
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:.82rem;color:#94a3b8">Include Memes</span>
+      </label>
+    </div>
+    <button class="btn btn-green" style="margin-top:14px" onclick="saveSchedule()">Save Schedule</button>
+  </div>
+  <div class="card" style="border-color:#1a3a1a">
+    <h3 style="font-size:.88rem;color:var(--green);margin-bottom:8px">&#128247; What the bot posts</h3>
+    <p style="font-size:.8rem;color:#94a3b8;line-height:1.6">
+      &#8226; 70-80% of your listings each day with AI-generated captions<br/>
+      &#8226; Nigerian business memes + internet memes mixed in (5 days/week)<br/>
+      &#8226; 2-4 minute gaps between posts so it looks natural<br/>
+      &#8226; Only runs when your WhatsApp is connected
+    </p>
+  </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  BROADCAST                                               -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- BROADCAST -->
 <div id="tab-broadcast" class="section">
-  <h2>Broadcast Message</h2>
+  <h2>Send Broadcast</h2>
   <div id="msgBroadcast" class="msg"></div>
   <div class="card">
     <div style="margin-bottom:10px">
       <label>Message</label>
-      <textarea id="bcMsg" placeholder="Hello! We have a special offer for you today..."></textarea>
+      <textarea id="bcMsg" placeholder="Type your broadcast message..."></textarea>
     </div>
-    <div style="margin-bottom:14px">
-      <label>Phone Numbers (one per line, with country code)</label>
-      <textarea id="bcPhones" placeholder="2348012345678&#10;2349087654321" style="min-height:100px"></textarea>
+    <div style="margin-bottom:12px">
+      <label>Phone numbers — one per line (leave empty to send to ALL recent customers)</label>
+      <textarea id="bcPhones" placeholder="2348012345678&#10;2347012345678" style="min-height:60px"></textarea>
     </div>
     <button class="btn btn-green" onclick="sendBroadcast()">Send Broadcast</button>
   </div>
-  <div id="broadcastLogs"></div>
+  <h2 style="margin-top:6px">Recent Broadcasts</h2>
+  <div id="broadcastLog"></div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  BOT ERRANDS (Scheduled Auto-Outreach)                   -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ANALYTICS -->
+<div id="tab-analytics" class="section">
+  <h2>Analytics</h2>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <input type="month" id="analyticsMonth" style="max-width:180px"/>
+    <button class="btn btn-blue btn-sm" onclick="loadAnalytics()">Load</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-num" id="st-customers">--</div><div class="stat-label">New Customers</div></div>
+    <div class="stat-card"><div class="stat-num" id="st-leads">--</div><div class="stat-label">Enquiries</div></div>
+    <div class="stat-card"><div class="stat-num" id="st-orders">--</div><div class="stat-label">Orders Placed</div></div>
+    <div class="stat-card"><div class="stat-num" id="st-confirmed">--</div><div class="stat-label">Confirmed</div></div>
+    <div class="stat-card"><div class="stat-num" id="st-revenue" style="font-size:1.2rem">--</div><div class="stat-label">Revenue (&#8358;)</div></div>
+  </div>
+</div>
+
+<!-- BOT ERRANDS -->
 <div id="tab-errands" class="section">
-  <h2>Bot Errands <span style="font-size:.78rem;background:rgba(168,85,247,.15);color:var(--purple);padding:3px 10px;border-radius:12px;margin-left:8px;font-weight:600">NEW</span></h2>
-  <div class="card" style="border-color:rgba(168,85,247,.3)">
-    <p style="font-size:.84rem;color:#94a3b8;margin-bottom:16px">Schedule your bot to proactively send messages to a group of customers at a set time — automatically, every day or selected days. No manual work needed.</p>
-    <div id="msgErrands" class="msg"></div>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Errand Name</label>
-        <input type="text" id="eName" placeholder="e.g. Weekly promo reminder"/>
-      </div>
-      <div>
-        <label>Send Time</label>
-        <input type="time" id="eTime"/>
-      </div>
+  <h2>Bot Errands</h2>
+  <div id="msgErrands" class="msg"></div>
+  <div class="info-box">&#129302; Schedule automated messages the bot sends to your customers at set times.</div>
+  <div class="card">
+    <h3 style="font-size:.9rem;color:#f1f5f9;margin-bottom:12px">Add New Errand</h3>
+    <div class="row">
+      <div class="grow"><label>Errand Name</label><input id="erName" placeholder="e.g. Morning Reminder"/></div>
+      <div class="grow"><label>Send Time (24hr)</label><input id="erTime" placeholder="08:00"/></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Days (e.g. Mon,Tue,Wed,Thu,Fri)</label>
+      <input id="erDays" placeholder="Mon,Tue,Wed,Thu,Fri"/>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Message</label>
+      <textarea id="erMsg" placeholder="Good morning! Check out today's fresh stock..."></textarea>
     </div>
     <div style="margin-bottom:12px">
-      <label>Message</label>
-      <textarea id="eMessage" placeholder="Hi {name}! Just checking in — we have new arrivals you'll love. Reply YES to see them 😊"></textarea>
+      <label>Send to</label>
+      <select id="erFilter">
+        <option value="all_customers">All recent customers</option>
+        <option value="recent_7d">Customers active in last 7 days</option>
+        <option value="recent_30d">Customers active in last 30 days</option>
+      </select>
     </div>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Send to</label>
-        <select id="eFilter">
-          <option value="all_customers">All Customers (everyone who's messaged)</option>
-          <option value="inactive_7d">Inactive 7+ days (win-back)</option>
-          <option value="inactive_14d">Inactive 14+ days (long win-back)</option>
-          <option value="pending_orders">Customers with pending orders</option>
-        </select>
-      </div>
-      <div>
-        <label>Repeat on days</label>
-        <div class="days-grid" id="eDaysGrid">
-          <button type="button" class="day-btn on" data-day="Mon">Mon</button>
-          <button type="button" class="day-btn on" data-day="Tue">Tue</button>
-          <button type="button" class="day-btn on" data-day="Wed">Wed</button>
-          <button type="button" class="day-btn on" data-day="Thu">Thu</button>
-          <button type="button" class="day-btn on" data-day="Fri">Fri</button>
-          <button type="button" class="day-btn" data-day="Sat">Sat</button>
-          <button type="button" class="day-btn" data-day="Sun">Sun</button>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-green" onclick="createErrand()">+ Create Errand</button>
+    <button class="btn btn-green" onclick="addErrand()">+ Add Errand</button>
   </div>
-
-  <h3 style="margin-bottom:12px;color:#cbd5e1">Your Scheduled Errands</h3>
-  <div id="errandsList"><div style="text-align:center;padding:30px;color:#64748b">No errands yet. Create one above.</div></div>
+  <div id="errandsList"></div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!--  SETTINGS                                                -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SETTINGS -->
 <div id="tab-settings" class="section">
   <h2>Settings</h2>
   <div id="msgSettings" class="msg"></div>
 
-  <!-- WhatsApp Connection -->
-  <div class="card settings-section">
-    <h3>WhatsApp Connection</h3>
-    <p style="font-size:.82rem;color:#64748b;margin-bottom:14px">Scan the QR code below with your WhatsApp to connect your bot.</p>
-    <div id="qrContainer" style="display:none">
-      <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">Scan with your phone:</p>
-      <div id="qrImg"></div>
-      <p style="font-size:.75rem;color:#64748b;margin-top:8px" id="qrStatus">Waiting for QR code...</p>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-green" onclick="showQR()">Connect WhatsApp</button>
-      <button class="btn btn-gray" onclick="checkConnectionStatus()">Check Status</button>
-    </div>
-  </div>
-
-  <!-- Notification -->
-  <div class="card settings-section">
-    <h3>Notifications</h3>
-    <div style="margin-bottom:12px">
-      <label>Your Personal WhatsApp Number (for order alerts)</label>
-      <input type="text" id="sNotifNum" placeholder="2348012345678"/>
-    </div>
-    <button class="btn btn-green" onclick="saveSettings()">Save</button>
-    <div style="margin-top:14px">
-      <label style="margin-bottom:8px">Push Notifications (browser)</label>
-      <button class="btn btn-blue" onclick="subscribePush()" style="margin-right:8px">Enable Push Notifications</button>
-      <button class="btn btn-gray" onclick="testPush()">Test Push</button>
-    </div>
-  </div>
-
-  <!-- Bot Messages -->
-  <div class="card settings-section">
-    <h3>Bot Messages</h3>
-    <div style="margin-bottom:12px">
-      <label>Welcome Message</label>
-      <textarea id="sWelcome" placeholder="Hi! Welcome to our store. How can I help you today?"></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Fallback Message (when bot doesn't understand)</label>
-      <textarea id="sFallback" placeholder="Sorry, I didn't quite get that. You can ask about our products, prices, or type MENU to see options."></textarea>
-    </div>
+  <div class="card">
+    <h3 style="font-size:.93rem;margin-bottom:10px;color:var(--green)">Notification Number</h3>
+    <div class="notif-box">Your <b>personal WhatsApp number</b> where the bot sends payment alerts, handoff requests, etc. Enter without the + sign.</div>
+    <label>WhatsApp Number (e.g. 2348012345678)</label>
+    <input id="notifNumber" placeholder="2348012345678" style="margin-bottom:10px"/>
     <button class="btn btn-green" onclick="saveSettings()">Save</button>
   </div>
 
-  <!-- Payment / Bank Details -->
-  <div class="card settings-section">
-    <h3>Bank Details (for payment receipts)</h3>
-    <div class="grid3" style="margin-bottom:12px">
-      <div>
-        <label>Bank Name</label>
-        <input type="text" id="sBankName" placeholder="GTBank"/>
-      </div>
-      <div>
-        <label>Account Number</label>
-        <input type="text" id="sAcctNum" placeholder="0123456789"/>
-      </div>
-      <div>
-        <label>Account Name</label>
-        <input type="text" id="sAcctName" placeholder="Your Business Name"/>
-      </div>
+  <div class="card">
+    <h3 style="font-size:.93rem;margin-bottom:10px;color:#f1f5f9">Welcome &amp; Fallback Messages</h3>
+    <div style="margin-bottom:10px">
+      <label>Welcome Message (sent when a new customer first contacts you)</label>
+      <textarea id="welcomeMsg" placeholder="Welcome! How can I help you today?"></textarea>
     </div>
-    <label style="margin-bottom:8px">Accepted Payment Methods</label>
-    <div class="pay-methods" id="payMethods">
-      <label class="pay-cb"><input type="checkbox" value="Bank Transfer" onchange="savePayMethods()"/> Bank Transfer</label>
-      <label class="pay-cb"><input type="checkbox" value="Opay" onchange="savePayMethods()"/> Opay</label>
-      <label class="pay-cb"><input type="checkbox" value="PalmPay" onchange="savePayMethods()"/> PalmPay</label>
-      <label class="pay-cb"><input type="checkbox" value="Cash on Delivery" onchange="savePayMethods()"/> Cash on Delivery</label>
-      <label class="pay-cb"><input type="checkbox" value="Flutterwave" onchange="savePayMethods()"/> Flutterwave</label>
+    <div style="margin-bottom:12px">
+      <label>Fallback Message (when no auto-reply rule matches)</label>
+      <textarea id="fallbackMsg" placeholder="Thank you for reaching out! Someone will get back to you shortly."></textarea>
     </div>
-    <button class="btn btn-green" style="margin-top:14px" onclick="saveSettings()">Save</button>
+    <button class="btn btn-green" onclick="saveSettings()">Save Messages</button>
   </div>
 
-  <!-- Business Hours -->
-  <div class="card settings-section">
-    <h3>Business Hours</h3>
-    <div style="margin-bottom:12px">
-      <label>Business Hours (shown to customers)</label>
-      <input type="text" id="sHours" placeholder="Mon–Fri: 8am–6pm, Sat: 9am–3pm"/>
+  <div class="card">
+    <h3 style="font-size:.93rem;margin-bottom:10px;color:#f1f5f9">Payment Details</h3>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:12px">Bot shares these when customers ask how to pay.</p>
+    <div class="row">
+      <div class="grow"><label>Bank Name</label><input id="bankName" placeholder="e.g. Access Bank"/></div>
+      <div class="grow"><label>Account Number</label><input id="accountNumber" placeholder="0123456789"/></div>
     </div>
+    <div style="margin-bottom:12px">
+      <label>Account Name</label><input id="accountName" placeholder="e.g. John Doe"/>
+    </div>
+    <button class="btn btn-green" onclick="saveSettings()">Save Payment Details</button>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:.93rem;margin-bottom:10px;color:#f1f5f9">Business Hours</h3>
+    <input id="businessHours" placeholder="Mon-Sat: 8am-8pm, Sun: Closed" style="margin-bottom:12px"/>
     <button class="btn btn-green" onclick="saveSettings()">Save</button>
   </div>
 
-  <!-- Social Media & Online Presence -->
-  <div class="card settings-section">
-    <h3>Social Media & Online Presence</h3>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Instagram</label>
-        <input type="text" id="sInsta" placeholder="@yourbusiness"/>
-      </div>
-      <div>
-        <label>Facebook</label>
-        <input type="text" id="sFacebook" placeholder="facebook.com/yourbusiness"/>
-      </div>
-    </div>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>TikTok</label>
-        <input type="text" id="sTiktok" placeholder="@yourtiktok"/>
-      </div>
-      <div>
-        <label>WhatsApp Channel Link</label>
-        <input type="text" id="sWaChannel" placeholder="https://whatsapp.com/channel/..."/>
-      </div>
-    </div>
-    <button class="btn btn-green" onclick="saveBotSetup()">Save</button>
-  </div>
-
-  <!-- Delivery Settings -->
-  <div class="card settings-section">
-    <h3>Delivery Settings</h3>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Delivery Areas</label>
-        <input type="text" id="sDeliveryAreas" placeholder="Lagos, Ibadan, Abuja"/>
-      </div>
-      <div>
-        <label>Delivery Fee</label>
-        <input type="text" id="sDeliveryFee" placeholder="₦1,000 flat or free above ₦20,000"/>
-      </div>
-    </div>
-    <div class="grid2" style="margin-bottom:12px">
-      <div>
-        <label>Delivery Time</label>
-        <input type="text" id="sDeliveryTime" placeholder="1–2 business days"/>
-      </div>
-      <div>
-        <label>Minimum Order</label>
-        <input type="text" id="sMinOrder" placeholder="₦5,000"/>
-      </div>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Return Policy</label>
-      <textarea id="sReturnPolicy" placeholder="Returns accepted within 7 days in original condition..."></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Active Promotions / Promo Codes</label>
-      <input type="text" id="sPromo" placeholder="Use SAVE10 for 10% off orders above ₦15,000"/>
-    </div>
-    <button class="btn btn-green" onclick="saveBotSetup()">Save</button>
+  <div class="card">
+    <h3 style="font-size:.93rem;margin-bottom:10px;color:#f1f5f9">WhatsApp Connection</h3>
+    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:12px">If your bot disconnects, click below to reconnect via QR code.</p>
+    <button class="btn btn-blue" onclick="reconnectWA()">Reconnect WhatsApp</button>
   </div>
 </div>
 
-</div><!-- .container -->
+</div><!-- /container -->
 
-<div id="toast"></div>
+<!-- LISTING MODAL -->
+<div id="listingModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>
+      <span id="modalTitle">Add Listing</span>
+      <span class="modal-close" onclick="closeListingModal()">&#10005;</span>
+    </h3>
+    <input type="hidden" id="editListingId"/>
+    <div class="row">
+      <div class="grow"><label>Name *</label><input id="lName" placeholder="e.g. Men's Navy Suit"/></div>
+      <div class="grow">
+        <label>Type</label>
+        <select id="lType">
+          <option value="product">Product</option>
+          <option value="service">Service</option>
+          <option value="real_estate">Real Estate</option>
+          <option value="food">Food &amp; Drinks</option>
+          <option value="fashion">Fashion</option>
+          <option value="photography">Photography</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Description</label>
+      <textarea id="lDesc" placeholder="Describe your product or service..." style="min-height:60px"></textarea>
+    </div>
+    <div class="row">
+      <div class="grow"><label>Price</label><input id="lPrice" placeholder="25000"/></div>
+      <div class="grow"><label>Price Label</label><input id="lPriceLabel" placeholder="&#8358;25,000 per session"/></div>
+    </div>
+    <div class="row">
+      <div class="grow"><label>Category</label><input id="lCategory" placeholder="e.g. Clothing, Food"/></div>
+      <div class="grow"><label>Location</label><input id="lLocation" placeholder="e.g. Ikeja, Lagos"/></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Keywords (helps bot match customer queries)</label>
+      <input id="lKeywords" placeholder="suit, formal, men, corporate"/>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Available?</label>
+      <select id="lAvailable">
+        <option value="true">Yes — Available</option>
+        <option value="false">No — Out of Stock</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px">
+      <label>Images (max 3)</label>
+      <div class="upload-area" onclick="document.getElementById('imgUpload').click()">
+        <p>&#128247; Click to upload images (JPG, PNG)</p>
+        <input type="file" id="imgUpload" accept="image/*" multiple style="display:none" onchange="handleImgSelect(this)"/>
+      </div>
+      <div id="imgPreviews" class="upload-preview"></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label>PDF / Catalogue (optional)</label>
+      <div class="upload-area" onclick="document.getElementById('pdfUpload').click()">
+        <p>&#128196; Click to upload PDF</p>
+        <input type="file" id="pdfUpload" accept=".pdf" style="display:none" onchange="handlePdfSelect(this)"/>
+      </div>
+      <div id="pdfName" style="font-size:.78rem;color:var(--green);margin-top:4px"></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-green" onclick="saveListing()">Save Listing</button>
+      <button class="btn btn-gray" onclick="closeListingModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
-<!-- ── Receipt lightbox ──────────────────────────────────────── -->
-<div id="lightbox" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
-  <img id="lightboxImg" style="max-width:90vw;max-height:90vh;border-radius:8px"/>
+<!-- PWA Popup -->
+<div id="pwaPopup">
+  <h4>&#128640; Install ForgeBot</h4>
+  <p>Add to your home screen for quick access — no app store needed!</p>
+  <div style="display:flex;gap:8px;justify-content:center">
+    <button class="btn btn-green btn-sm" onclick="installPWA()">Install</button>
+    <button class="btn btn-gray btn-sm" onclick="dismissPWA()">Later</button>
+  </div>
+</div>
+
+<!-- Onboarding Checklist -->
+<div id="checklist" style="display:none">
+  <h4>Getting Started <span style="cursor:pointer;color:#64748b;font-size:.85rem" onclick="document.getElementById('checklist').style.display='none'">&#10005;</span></h4>
+  <div class="cl-item" id="cl-connected"><div class="cl-dot"></div> Connect WhatsApp</div>
+  <div class="cl-item" id="cl-listing"><div class="cl-dot"></div> Add first listing</div>
+  <div class="cl-item" id="cl-notif"><div class="cl-dot"></div> Set notification number</div>
+  <div class="cl-item" id="cl-welcome"><div class="cl-dot"></div> Set welcome message</div>
+  <div class="cl-item" id="cl-schedule"><div class="cl-dot"></div> Set posting schedule</div>
 </div>
 
 <script>
-// ── Constants ─────────────────────────────────────────────────
 var API   = '';
 var TOKEN = localStorage.getItem('forgebot_token');
-var qrEventSource = null;
-
-// ── Auth guard ────────────────────────────────────────────────
 if (!TOKEN) {
-  window.location.href = '/';
+  var _t = new URLSearchParams(window.location.search).get('token');
+  if (_t) { TOKEN = _t; localStorage.setItem('forgebot_token', _t); }
+  else window.location.href = '/';
+}
+var H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN };
+
+var _pendingImgs = [];
+var _pendingPdf  = null;
+var _deferInstall = null;
+
+// ── Tab ───────────────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('nav button').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'analytics') loadAnalytics();
+  if (id === 'orders')    loadOrders();
+  if (id === 'listings')  loadListings();
+  if (id === 'errands')   loadErrands();
 }
 
-// ── Toast ────────────────────────────────────────────────────
-function showToast(msg, ok) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.background = (ok === false) ? 'var(--red)' : 'var(--green)';
-  t.style.color = (ok === false) ? '#fff' : '#000';
-  t.classList.add('show');
-  setTimeout(function() { t.classList.remove('show'); }, 3000);
-}
-
-// ── Auth headers ──────────────────────────────────────────────
-function headers(extra) {
-  return Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, extra || {});
-}
-
-// ── API helper ────────────────────────────────────────────────
-function api(method, path, body) {
-  var opts = { method: method, headers: headers() };
-  if (body) opts.body = JSON.stringify(body);
-  return fetch(API + '/api' + path, opts).then(function(r) {
-    if (r.status === 401) { logout(); throw new Error('Session expired'); }
-    return r.json();
-  });
-}
-
-// ── Show/hide message ─────────────────────────────────────────
-function showMsg(id, txt, ok) {
+function showMsg(id, text, type) {
   var el = document.getElementById(id);
-  el.textContent = txt;
-  el.className = 'msg show ' + (ok ? 'ok' : 'err');
-  setTimeout(function() { el.classList.remove('show'); }, 4000);
+  el.textContent = text; el.className = 'msg show '+type;
+  setTimeout(function(){ el.classList.remove('show'); }, 4000);
+}
+function logout() { localStorage.removeItem('forgebot_token'); window.location.href = '/'; }
+function reconnectWA() { window.open('/onboard?token='+TOKEN, '_blank'); }
+
+async function api(method, path, body) {
+  var opts = { method: method, headers: H };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  var r = await fetch(API+'/api'+path, opts);
+  var data = await r.json().catch(function(){ return {}; });
+  return { ok: r.ok, status: r.status, data: data };
 }
 
-// ── Logout ────────────────────────────────────────────────────
-function logout() {
-  localStorage.removeItem('forgebot_token');
-  window.location.href = '/';
-}
-
-// ── Tab switching ─────────────────────────────────────────────
-function switchTab(name, btn) {
-  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
-  document.querySelectorAll('nav button').forEach(function(b) { b.classList.remove('active'); });
-  document.getElementById('tab-' + name).classList.add('active');
-  if (btn) btn.classList.add('active');
-
-  if (name === 'replies')   loadFlows();
-  if (name === 'orders')    loadOrders();
-  if (name === 'analytics') initAnalytics();
-  if (name === 'status')    loadStatusPosts();
-  if (name === 'broadcast') loadBroadcastLogs();
-  if (name === 'errands')   loadErrands();
-  if (name === 'settings')  loadSettings();
-}
-
-// ════════════════════════════════════════════════════════════════
-//  AUTO-REPLIES
-// ════════════════════════════════════════════════════════════════
-
-function loadFlows() {
-  api('GET', '/client/flows').then(function(flows) {
-    var list = document.getElementById('flowList');
-    if (!flows.length) { list.innerHTML = '<div style="color:#64748b;font-size:.85rem">No rules yet.</div>'; return; }
-    list.innerHTML = flows.map(function(f) {
-      return '<div class="flow-item">' +
-        '<div>' +
-          '<div class="flow-kw">' + (f.keywords || '') + '</div>' +
-          '<div class="flow-resp">' + (f.response || '').slice(0, 80) + '</div>' +
-        '</div>' +
-        '<button class="btn btn-red" onclick="deleteFlow(\'' + f.id + '\')">Delete</button>' +
-      '</div>';
-    }).join('');
-  }).catch(function() {});
-}
-
-function addFlow() {
-  var kw = document.getElementById('rKeywords').value.trim();
-  var re = document.getElementById('rResponse').value.trim();
-  var ty = document.getElementById('rType').value;
-  var me = document.getElementById('rMedia').value.trim();
-  if (!kw || !re) return showMsg('msgReplies', 'Keywords and response are required.', false);
-  api('POST', '/client/flows', { keywords: kw, response: re, response_type: ty, media_url: me || null, flow_name: kw.split(',')[0].trim() })
-  .then(function() {
-    document.getElementById('rKeywords').value = '';
-    document.getElementById('rResponse').value = '';
-    document.getElementById('rMedia').value    = '';
-    showMsg('msgReplies', '✓ Rule added!', true);
-    loadFlows();
-  }).catch(function(e) { showMsg('msgReplies', e.message, false); });
-}
-
-function deleteFlow(id) {
-  api('DELETE', '/client/flows/' + id).then(loadFlows);
-}
-
-// ════════════════════════════════════════════════════════════════
-//  ORDERS
-// ════════════════════════════════════════════════════════════════
-
-var currentOrderFilter = 'all';
-var allOrders = [];
-
-function loadOrders() {
-  api('GET', '/client/orders').then(function(orders) {
-    allOrders = orders || [];
-    updatePendingBadge();
-    renderOrders(allOrders);
-  }).catch(function() {
-    document.getElementById('ordersList').innerHTML = '<div style="color:#64748b;padding:30px;text-align:center">Error loading orders.</div>';
-  });
-}
-
-function updatePendingBadge() {
-  var pending = allOrders.filter(function(o) { return o.status === 'pending' || o.payment_status === 'unpaid'; }).length;
-  var navBtn  = document.getElementById('navOrders');
-  var existing = navBtn.querySelector('.badge');
-  if (existing) existing.remove();
-  if (pending > 0) {
-    var b = document.createElement('span');
-    b.className = 'badge';
-    b.textContent = pending;
-    navBtn.appendChild(b);
-  }
-}
-
-function filterOrders(status, btn) {
-  currentOrderFilter = status;
-  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
-  var filtered = status === 'all' ? allOrders : allOrders.filter(function(o) { return o.status === status; });
-  renderOrders(filtered);
-}
-
-function renderOrders(orders) {
-  var list = document.getElementById('ordersList');
-  if (!orders || !orders.length) {
-    list.innerHTML = '<div style="color:#64748b;padding:30px;text-align:center">No orders found.</div>';
-    return;
-  }
-  list.innerHTML = orders.map(function(o) {
-    var status  = o.status || 'pending';
-    var ref     = (o.id || '').toString().slice(-8).toUpperCase();
-    var phone   = (o.customer_jid || '').replace('@s.whatsapp.net', '');
-    var total   = o.total ? '₦' + Number(o.total).toLocaleString() : '';
-    var items   = o.items ? (Array.isArray(o.items) ? o.items.map(function(i) { return i.name; }).join(', ') : o.items) : '';
-    var receipt = o.receipt_url ? '<img src="' + o.receipt_url + '" class="receipt-thumb" onclick="openLightbox(\'' + o.receipt_url + '\')" title="Click to view receipt"/>' : '';
-    var created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-NG', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
-
-    var actions = '';
-    if (status === 'pending') {
-      actions = '<button class="btn btn-sm btn-green" onclick="updateOrder(\'' + o.id + '\',\'confirmed\')">✓ Confirm</button>' +
-                '<button class="btn btn-sm btn-gray" onclick="updateOrder(\'' + o.id + '\',\'packaging\')">📦 Packaging</button>' +
-                '<button class="btn btn-sm btn-red" onclick="updateOrder(\'' + o.id + '\',\'rejected\')">✗ Reject</button>';
-    } else if (status === 'confirmed') {
-      actions = '<button class="btn btn-sm btn-blue" onclick="updateOrder(\'' + o.id + '\',\'packaging\')">📦 Move to Packaging</button>';
-    } else if (status === 'packaging') {
-      actions = '<button class="btn btn-sm btn-blue" onclick="updateOrder(\'' + o.id + '\',\'shipped\')">🚚 Mark Shipped</button>';
-    } else if (status === 'shipped') {
-      actions = '<button class="btn btn-sm btn-green" onclick="updateOrder(\'' + o.id + '\',\'delivered\')">✓ Mark Delivered</button>';
+// ── WA badge — uses /client/session-status ────────────────────
+async function pollWaStatus() {
+  try {
+    var r     = await api('GET', '/client/session-status');
+    var badge = document.getElementById('waBadge');
+    if (r.ok && r.data.connected) {
+      badge.textContent = '● Connected';
+      badge.className   = 'status-badge';
+      updateChecklist('cl-connected', true);
+    } else {
+      badge.textContent = '● Disconnected';
+      badge.className   = 'status-badge disc';
     }
+  } catch(e) {}
+  setTimeout(pollWaStatus, 12000);
+}
 
-    return '<div class="order-card">' +
-      '<div class="order-top">' +
-        '<div>' +
-          '<div style="font-weight:600">' + (o.customer_name || phone) + ' ' + receipt + '</div>' +
-          '<div class="order-ref">#' + ref + ' · ' + created + (total ? ' · ' + total : '') + '</div>' +
-          (items ? '<div class="order-meta">Items: ' + items + '</div>' : '') +
-          (o.delivery_address ? '<div class="order-meta">📍 ' + o.delivery_address + '</div>' : '') +
-        '</div>' +
-        '<span class="order-status ' + status + '">' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>' +
-      '</div>' +
-      (actions ? '<div class="order-actions">' + actions + '</div>' : '') +
+// ── Settings ──────────────────────────────────────────────────
+async function loadSettings() {
+  var r = await api('GET', '/client/settings');
+  if (!r.ok) return;
+  var d = r.data;
+  setValue('notifNumber',   d.notification_number);
+  setValue('welcomeMsg',    d.welcome_message);
+  setValue('fallbackMsg',   d.fallback_message);
+  setValue('bankName',      d.bank_name);
+  setValue('accountNumber', d.account_number);
+  setValue('accountName',   d.account_name);
+  setValue('businessHours', d.business_hours);
+
+  if (d.partner_expires_at) {
+    var exp  = new Date(d.partner_expires_at);
+    var days = Math.ceil((exp - Date.now()) / 86400000);
+    var tb   = document.getElementById('trialBadge');
+    tb.style.display = '';
+    tb.textContent   = days > 0 ? '⏱ '+days+' days left' : 'Trial expired';
+    if (days <= 3) { tb.style.color='var(--red)'; tb.style.borderColor='var(--red)'; }
+  }
+
+  if (d.notification_number) updateChecklist('cl-notif',   true);
+  if (d.welcome_message)     updateChecklist('cl-welcome',  true);
+
+  if (d.bot_setup) {
+    var bs = d.bot_setup;
+    if (bs.post_schedule_time) document.getElementById('schedTime').value = bs.post_schedule_time;
+    if (typeof bs.post_include_memes !== 'undefined') document.getElementById('includeMemes').checked = bs.post_include_memes;
+    if (Array.isArray(bs.post_schedule_days) && bs.post_schedule_days.length) {
+      bs.post_schedule_days.forEach(function(day) {
+        var chip = document.getElementById('chip-'+day);
+        if (chip) { chip.querySelector('input').checked = true; chip.classList.add('selected'); }
+      });
+      updateChecklist('cl-schedule', true);
+    }
+  }
+}
+
+function setValue(id, val) { if (val) document.getElementById(id).value = val; }
+
+async function saveSettings() {
+  var r = await api('PUT', '/client/settings', {
+    notification_number: document.getElementById('notifNumber').value.trim().replace(/\D/g,''),
+    welcome_message:     document.getElementById('welcomeMsg').value.trim(),
+    fallback_message:    document.getElementById('fallbackMsg').value.trim(),
+    bank_name:           document.getElementById('bankName').value.trim(),
+    account_number:      document.getElementById('accountNumber').value.trim(),
+    account_name:        document.getElementById('accountName').value.trim(),
+    business_hours:      document.getElementById('businessHours').value.trim()
+  });
+  if (r.ok) {
+    showMsg('msgSettings','Saved!','ok');
+    updateChecklist('cl-notif',  !!document.getElementById('notifNumber').value);
+    updateChecklist('cl-welcome', !!document.getElementById('welcomeMsg').value);
+  } else showMsg('msgSettings', r.data.error||'Save failed.', 'err');
+}
+
+document.getElementById('dayChecks').addEventListener('change', function(e) {
+  if (e.target.type === 'checkbox') {
+    var chip = e.target.closest('.day-chip');
+    chip.classList.toggle('selected', e.target.checked);
+  }
+});
+
+async function saveSchedule() {
+  var days  = Array.from(document.querySelectorAll('#dayChecks input:checked')).map(function(i){ return i.value; });
+  var time  = document.getElementById('schedTime').value.trim();
+  var memes = document.getElementById('includeMemes').checked;
+  if (!time) { showMsg('msgStatus','Please enter a post time.','err'); return; }
+  var r = await api('PUT', '/client/post-schedule', { days: days, time: time, include_memes: memes });
+  if (r.ok) { showMsg('msgStatus','Schedule saved!','ok'); updateChecklist('cl-schedule', days.length > 0); }
+  else showMsg('msgStatus', r.data.error||'Save failed.', 'err');
+}
+
+// ── Auto-Replies ──────────────────────────────────────────────
+async function loadFlows() {
+  var r = await fetch(API+'/api/client/flows', { headers: H });
+  var flows = await r.json().catch(function(){ return []; });
+  var el = document.getElementById('flowList');
+  if (!flows.length) { el.innerHTML = '<p style="color:#64748b;font-size:.84rem">No rules yet.</p>'; return; }
+  el.innerHTML = flows.map(function(f) {
+    return '<div class="flow-item"><div style="flex:1"><div class="flow-kw">'+esc(f.keywords)+'</div><div class="flow-resp">'+esc(f.response)+'</div></div><button class="btn btn-red" onclick="deleteFlow(\''+f.id+'\')">Delete</button></div>';
+  }).join('');
+}
+async function addFlow() {
+  var kw = document.getElementById('newKw').value.trim();
+  var rp = document.getElementById('newResp').value.trim();
+  if (!kw||!rp) { showMsg('msgReplies','Fill in keywords and reply.','err'); return; }
+  var r = await fetch(API+'/api/client/flows', { method:'POST', headers:H, body:JSON.stringify({keywords:kw,response:rp}) });
+  if (r.ok) { document.getElementById('newKw').value=''; document.getElementById('newResp').value=''; showMsg('msgReplies','Rule added!','ok'); loadFlows(); }
+  else showMsg('msgReplies','Failed.','err');
+}
+async function deleteFlow(id) {
+  if (!confirm('Delete this rule?')) return;
+  var r = await fetch(API+'/api/client/flows/'+id, { method:'DELETE', headers:H });
+  if (r.ok) { showMsg('msgReplies','Deleted.','ok'); loadFlows(); }
+}
+
+// ── Listings ──────────────────────────────────────────────────
+async function loadListings() {
+  var r = await api('GET', '/client/listings');
+  var items = Array.isArray(r.data) ? r.data : [];
+  var el = document.getElementById('listingsGrid');
+  if (!items.length) { el.innerHTML = '<div style="color:#64748b;font-size:.84rem;padding:20px 0;grid-column:1/-1">No listings yet.</div>'; return; }
+  el.innerHTML = items.map(function(l) {
+    var media   = Array.isArray(l.listing_media) ? l.listing_media : [];
+    var imgItem = media.find(function(m){ return m.media_type==='image'; });
+    var thumb   = imgItem ? '<img class="lc-thumb" src="'+esc(imgItem.url)+'" onerror="this.style.display=\'none\'">' : '';
+    return '<div class="listing-card">'+thumb+
+      '<div class="lc-name">'+esc(l.name)+'</div>'+
+      '<div class="lc-price">'+(l.price_label||(l.price?'&#8358;'+l.price:''))+'</div>'+
+      '<div class="lc-cat">'+(l.listing_type||'')+(l.category?' &middot; '+esc(l.category):'')+'</div>'+
+      '<span class="lc-avail '+(l.available?'avail-yes':'avail-no')+'">'+(l.available?'Available':'Unavailable')+'</span>'+
+      '<div class="lc-actions">'+
+        '<button class="btn btn-blue btn-sm" onclick=\'editListing('+JSON.stringify(l)+')\'>Edit</button>'+
+        '<button class="btn btn-red btn-sm" onclick="deleteListing(\''+l.id+'\')">Del</button>'+
+      '</div></div>';
+  }).join('');
+  updateChecklist('cl-listing', items.length > 0);
+}
+
+function openListingModal() {
+  _pendingImgs = []; _pendingPdf = null;
+  document.getElementById('editListingId').value = '';
+  document.getElementById('modalTitle').textContent = 'Add Listing';
+  ['lName','lDesc','lPrice','lPriceLabel','lCategory','lLocation','lKeywords'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('lType').value = 'product';
+  document.getElementById('lAvailable').value = 'true';
+  document.getElementById('imgPreviews').innerHTML = '';
+  document.getElementById('pdfName').textContent = '';
+  document.getElementById('listingModal').classList.add('open');
+}
+
+function editListing(l) {
+  openListingModal();
+  document.getElementById('modalTitle').textContent = 'Edit Listing';
+  document.getElementById('editListingId').value    = l.id;
+  document.getElementById('lName').value       = l.name        || '';
+  document.getElementById('lDesc').value       = l.description || '';
+  document.getElementById('lPrice').value      = l.price       || '';
+  document.getElementById('lPriceLabel').value = l.price_label || '';
+  document.getElementById('lCategory').value   = l.category    || '';
+  document.getElementById('lLocation').value   = l.location    || '';
+  document.getElementById('lKeywords').value   = l.keywords    || '';
+  document.getElementById('lType').value       = l.listing_type|| 'product';
+  document.getElementById('lAvailable').value  = l.available   ? 'true' : 'false';
+  var media = Array.isArray(l.listing_media) ? l.listing_media : [];
+  document.getElementById('imgPreviews').innerHTML = media
+    .filter(function(m){ return m.media_type==='image'; })
+    .map(function(m){ return '<img src="'+esc(m.url)+'" style="width:60px;height:60px;object-fit:cover;border-radius:5px">'; })
+    .join('');
+}
+function closeListingModal() { document.getElementById('listingModal').classList.remove('open'); }
+
+function handleImgSelect(input) {
+  _pendingImgs = Array.from(input.files).slice(0,3);
+  var prev = document.getElementById('imgPreviews'); prev.innerHTML = '';
+  _pendingImgs.forEach(function(f){ var img=document.createElement('img'); img.style.cssText='width:60px;height:60px;object-fit:cover;border-radius:5px'; img.src=URL.createObjectURL(f); prev.appendChild(img); });
+}
+function handlePdfSelect(input) {
+  _pendingPdf = input.files[0]||null;
+  document.getElementById('pdfName').textContent = _pendingPdf ? '📄 '+_pendingPdf.name : '';
+}
+
+async function saveListing() {
+  var name = document.getElementById('lName').value.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  var body = {
+    name:         name,
+    description:  document.getElementById('lDesc').value.trim(),
+    price:        document.getElementById('lPrice').value.trim(),
+    price_label:  document.getElementById('lPriceLabel').value.trim(),
+    category:     document.getElementById('lCategory').value.trim(),
+    location:     document.getElementById('lLocation').value.trim(),
+    keywords:     document.getElementById('lKeywords').value.trim(),
+    listing_type: document.getElementById('lType').value,
+    available:    document.getElementById('lAvailable').value === 'true'
+  };
+  var editId = document.getElementById('editListingId').value;
+  var r = editId ? await api('PUT','/client/listings/'+editId, body) : await api('POST','/client/listings', body);
+  if (!r.ok) { showMsg('msgListings', r.data.error||'Failed to save.', 'err'); return; }
+  var lid = r.data.id || editId;
+  for (var i=0; i<_pendingImgs.length; i++) {
+    var fd = new FormData(); fd.append('file',_pendingImgs[i]); fd.append('media_type','image');
+    await fetch(API+'/api/client/listings/'+lid+'/media', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd });
+  }
+  if (_pendingPdf) {
+    var pfd = new FormData(); pfd.append('file',_pendingPdf); pfd.append('media_type','pdf');
+    await fetch(API+'/api/client/listings/'+lid+'/media', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:pfd });
+  }
+  closeListingModal(); showMsg('msgListings','Listing saved!','ok'); loadListings();
+}
+async function deleteListing(id) {
+  if (!confirm('Delete this listing?')) return;
+  var r = await api('DELETE','/client/listings/'+id);
+  if (r.ok) { showMsg('msgListings','Deleted.','ok'); loadListings(); }
+  else showMsg('msgListings','Failed.','err');
+}
+
+// ── Orders ────────────────────────────────────────────────────
+async function loadOrders() {
+  var r = await api('GET','/client/orders');
+  var orders = Array.isArray(r.data) ? r.data : [];
+  var el = document.getElementById('ordersList');
+  if (!orders.length) { el.innerHTML='<p style="color:#64748b;font-size:.84rem;padding:20px 0">No orders yet.</p>'; return; }
+  var cls = {pending:'sp-pending',confirmed:'sp-confirmed',cancelled:'sp-cancelled',delivered:'sp-delivered'};
+  el.innerHTML = orders.map(function(o) {
+    var sc = cls[o.status]||'sp-pending';
+    return '<div class="order-item">'+
+      '<div class="order-header">'+
+        '<div class="order-name">'+(o.customer_name||o.customer_jid||'Unknown')+'</div>'+
+        '<div>'+
+          '<span class="status-pill '+sc+'">'+o.status+'</span> '+
+          '<select onchange="updateOrderStatus(\''+o.id+'\',this.value)" style="width:auto;padding:3px 6px;font-size:.75rem;border-radius:4px">'+
+            ['pending','confirmed','packaging','shipped','delivered','cancelled'].map(function(s){ return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>'; }).join('')+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<div class="order-meta">'+(o.total?'&#8358;'+Number(o.total).toLocaleString()+' &middot; ':'')+
+        (o.payment_status||'unpaid')+
+        '<span style="float:right">'+new Date(o.created_at).toLocaleDateString()+'</span></div>'+
     '</div>';
   }).join('');
 }
-
-function updateOrder(id, status) {
-  api('PUT', '/client/orders/' + id, { status: status, payment_status: status === 'confirmed' ? 'confirmed' : undefined })
-  .then(function() {
-    showToast('✓ Order updated to ' + status);
-    loadOrders();
-  }).catch(function(e) { showToast('Error: ' + e.message, false); });
+async function updateOrderStatus(id, status) {
+  var r = await api('PUT','/client/orders/'+id,{status:status});
+  if (r.ok) showMsg('msgOrders','Updated.','ok');
+  else showMsg('msgOrders','Failed.','err');
 }
 
-function openLightbox(url) {
-  var lb = document.getElementById('lightbox');
-  document.getElementById('lightboxImg').src = url;
-  lb.style.display = 'flex';
-}
-
-// ════════════════════════════════════════════════════════════════
-//  ANALYTICS
-// ════════════════════════════════════════════════════════════════
-
-function initAnalytics() {
-  var now   = new Date();
-  var month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  document.getElementById('analyticsMonth').value = month;
-  loadAnalytics();
-}
-
-function loadAnalytics() {
+// ── Analytics ─────────────────────────────────────────────────
+async function loadAnalytics() {
   var month = document.getElementById('analyticsMonth').value;
-  if (!month) return;
-  api('GET', '/client/analytics?month=' + month).then(function(s) {
-    var revenue = s.total_revenue ? '₦' + Number(s.total_revenue).toLocaleString() : '₦0';
-    document.getElementById('statGrid').innerHTML =
-      statCard(s.new_customers  || 0, '👥 New Customers') +
-      statCard(s.leads          || 0, '🎯 Price Inquiries') +
-      statCard(s.orders_placed  || 0, '🛒 Orders Placed') +
-      statCard(s.orders_confirmed || 0, '✅ Confirmed') +
-      statCard(revenue,             '💰 Revenue');
-
-    var [yr, mo] = month.split('-');
-    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var mName = monthNames[parseInt(mo) - 1] + ' ' + yr;
-    document.getElementById('statText').innerHTML =
-      'In <strong>' + mName + '</strong>, your bot welcomed <strong>' + (s.new_customers || 0) + ' new customers</strong> and ' +
-      'handled <strong>' + (s.leads || 0) + ' price inquiries</strong>. ' +
-      '<strong>' + (s.orders_placed || 0) + ' orders</strong> were placed and ' +
-      '<strong>' + (s.orders_confirmed || 0) + '</strong> were confirmed, generating <strong>' + revenue + '</strong> in revenue.';
-    document.getElementById('statSummary').style.display = 'block';
-  }).catch(function() {});
+  if (!month) { var n=new Date(); month=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); document.getElementById('analyticsMonth').value=month; }
+  var r = await api('GET','/client/analytics?month='+month);
+  if (!r.ok) return;
+  var d = r.data;
+  document.getElementById('st-customers').textContent = d.new_customers    || 0;
+  document.getElementById('st-leads').textContent     = d.leads            || 0;
+  document.getElementById('st-orders').textContent    = d.orders_placed    || 0;
+  document.getElementById('st-confirmed').textContent = d.orders_confirmed || 0;
+  document.getElementById('st-revenue').textContent   = d.total_revenue ? '&#8358;'+Number(d.total_revenue).toLocaleString() : '&#8358;0';
 }
 
-function statCard(val, lbl) {
-  return '<div class="stat-card"><div class="stat-val">' + val + '</div><div class="stat-lbl">' + lbl + '</div></div>';
+// ── Broadcast ─────────────────────────────────────────────────
+async function loadBroadcastLogs() {
+  var r = await api('GET','/client/broadcast-logs');
+  var logs = Array.isArray(r.data) ? r.data : [];
+  var el = document.getElementById('broadcastLog');
+  if (!logs.length) { el.innerHTML='<p style="color:#64748b;font-size:.84rem">No broadcasts yet.</p>'; return; }
+  el.innerHTML = logs.map(function(l){
+    return '<div class="broadcast-log">'+new Date(l.sent_at||l.created_at).toLocaleString()+' &mdash; '+(l.recipients||0)+' sent &mdash; "'+esc((l.message||'').slice(0,60))+'..."</div>';
+  }).join('');
 }
-
-// ════════════════════════════════════════════════════════════════
-//  STATUS POSTS
-// ════════════════════════════════════════════════════════════════
-
-function loadStatusPosts() {
-  api('GET', '/client/status-posts').then(function(posts) {
-    var list = document.getElementById('statusList');
-    if (!posts.length) { list.innerHTML = '<div style="color:#64748b;font-size:.85rem">No scheduled posts yet.</div>'; return; }
-    list.innerHTML = posts.map(function(p) {
-      return '<div class="flow-item">' +
-        '<div>' +
-          '<div style="font-weight:600;font-size:.88rem">' + (p.post_time || '') + ' — ' + (p.caption || '').slice(0,60) + '</div>' +
-          (p.media_url ? '<div style="font-size:.78rem;color:#64748b">' + p.media_url.slice(0,50) + '</div>' : '') +
-        '</div>' +
-        '<button class="btn btn-red" onclick="deleteStatusPost(\'' + p.id + '\')">Delete</button>' +
-      '</div>';
-    }).join('');
-  }).catch(function() {});
-}
-
-function addStatusPost() {
-  var cap  = document.getElementById('sCaption').value.trim();
-  var med  = document.getElementById('sMedia').value.trim();
-  var time = document.getElementById('sTime').value;
-  if (!cap || !time) return showMsg('msgStatus', 'Caption and time required.', false);
-  api('POST', '/client/status-posts', { caption: cap, media_url: med || null, post_time: time })
-  .then(function() {
-    document.getElementById('sCaption').value = '';
-    document.getElementById('sTime').value    = '';
-    showMsg('msgStatus', '✓ Post scheduled!', true);
-    loadStatusPosts();
-  }).catch(function(e) { showMsg('msgStatus', e.message, false); });
-}
-
-function deleteStatusPost(id) {
-  api('DELETE', '/client/status-posts/' + id).then(loadStatusPosts);
-}
-
-// ════════════════════════════════════════════════════════════════
-//  BROADCAST
-// ════════════════════════════════════════════════════════════════
-
-function sendBroadcast() {
-  var msg    = document.getElementById('bcMsg').value.trim();
-  var phones = document.getElementById('bcPhones').value.trim().split('\n').filter(function(p) { return p.trim(); });
-  if (!msg || !phones.length) return showMsg('msgBroadcast', 'Message and at least one number required.', false);
-  showMsg('msgBroadcast', 'Sending...', true);
-  api('POST', '/client/broadcast', { message: msg, phones: phones })
-  .then(function(r) {
-    showMsg('msgBroadcast', '✓ Sent to ' + r.sent + '/' + r.total + ' numbers.', true);
-    loadBroadcastLogs();
-  }).catch(function(e) { showMsg('msgBroadcast', e.message, false); });
-}
-
-function loadBroadcastLogs() {
-  api('GET', '/client/broadcast-logs').then(function(logs) {
-    var el = document.getElementById('broadcastLogs');
-    if (!logs.length) { el.innerHTML = ''; return; }
-    el.innerHTML = '<h3 style="margin-bottom:10px;color:#cbd5e1">Recent Broadcasts</h3>' +
-      logs.slice(0, 10).map(function(l) {
-        return '<div class="broadcast-log">' + new Date(l.sent_at).toLocaleString() + ' — ' + (l.message || '').slice(0, 60) + '...</div>';
-      }).join('');
-  }).catch(function() {});
-}
-
-// ════════════════════════════════════════════════════════════════
-//  BOT ERRANDS
-// ════════════════════════════════════════════════════════════════
-
-// Toggle day buttons
-document.querySelectorAll('.day-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    this.classList.toggle('on');
-  });
-});
-
-function getSelectedDays() {
-  var days = [];
-  document.querySelectorAll('.day-btn.on').forEach(function(btn) {
-    days.push(btn.dataset.day);
-  });
-  return days.join(',');
-}
-
-function loadErrands() {
-  api('GET', '/client/bot-tasks').then(function(tasks) {
-    var list = document.getElementById('errandsList');
-    if (!tasks || !tasks.length) {
-      list.innerHTML = '<div style="text-align:center;padding:30px;color:#64748b">No errands yet. Create one above.</div>';
-      return;
-    }
-    list.innerHTML = tasks.map(function(t) {
-      var filterLabels = {
-        all_customers: 'All Customers',
-        inactive_7d:   'Inactive 7+ days',
-        inactive_14d:  'Inactive 14+ days',
-        pending_orders: 'Pending Orders'
-      };
-      var lastRun = t.last_run_date ? 'Last run: ' + t.last_run_date : 'Never run yet';
-      return '<div class="errand-card">' +
-        '<div class="errand-top">' +
-          '<div>' +
-            '<div style="font-weight:600">' + t.name + '</div>' +
-            '<div class="errand-meta">' +
-              '⏰ ' + t.schedule_time + ' · ' +
-              '👥 ' + (filterLabels[t.filter_type] || t.filter_type) + ' · ' +
-              '📅 ' + (t.schedule_days || 'Every day') +
-            '</div>' +
-            '<div class="errand-meta">' + lastRun + ' · Runs: ' + (t.run_count || 0) + '</div>' +
-            '<div style="margin-top:6px;font-size:.8rem;color:#94a3b8;background:#0d1526;border:1px solid var(--border);border-radius:5px;padding:6px 8px">' + (t.message || '').slice(0,100) + (t.message && t.message.length > 100 ? '...' : '') + '</div>' +
-          '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">' +
-            '<label class="toggle">' +
-              '<input type="checkbox"' + (t.active ? ' checked' : '') + ' onchange="toggleErrand(\'' + t.id + '\',this.checked)"/>' +
-              '<div class="toggle-track"><div class="toggle-thumb"></div></div>' +
-              '<span>' + (t.active ? 'Active' : 'Paused') + '</span>' +
-            '</label>' +
-            '<button class="btn btn-red" onclick="deleteErrand(\'' + t.id + '\')">Delete</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  }).catch(function(e) {
-    document.getElementById('errandsList').innerHTML = '<div style="color:#64748b;padding:20px;text-align:center">Error loading errands: ' + e.message + '</div>';
-  });
-}
-
-function createErrand() {
-  var name    = document.getElementById('eName').value.trim();
-  var time    = document.getElementById('eTime').value;
-  var msg     = document.getElementById('eMessage').value.trim();
-  var filter  = document.getElementById('eFilter').value;
-  var days    = getSelectedDays();
-
-  if (!name || !time || !msg) {
-    showMsg('msgErrands', 'Name, time and message are required.', false);
-    return;
+async function sendBroadcast() {
+  var message = document.getElementById('bcMsg').value.trim();
+  var phones  = document.getElementById('bcPhones').value.trim();
+  if (!message) { showMsg('msgBroadcast','Please type a message.','err'); return; }
+  if (!confirm('Send this broadcast?')) return;
+  var r;
+  if (phones) {
+    var list = phones.split('\n').map(function(p){ return p.trim(); }).filter(Boolean);
+    r = await api('POST','/client/broadcast',{message:message,phones:list});
+  } else {
+    r = await api('POST','/client/broadcasts',{message:message});
   }
-  if (!days) {
-    showMsg('msgErrands', 'Please select at least one day.', false);
-    return;
-  }
-
-  api('POST', '/client/bot-tasks', {
-    name:          name,
-    message:       msg,
-    schedule_time: time,
-    schedule_days: days,
-    filter_type:   filter
-  }).then(function() {
-    document.getElementById('eName').value    = '';
-    document.getElementById('eTime').value    = '';
-    document.getElementById('eMessage').value = '';
-    showMsg('msgErrands', '✓ Errand created! Your bot will run it automatically.', true);
-    loadErrands();
-  }).catch(function(e) { showMsg('msgErrands', e.message, false); });
+  if (r.ok) {
+    document.getElementById('bcMsg').value=''; document.getElementById('bcPhones').value='';
+    showMsg('msgBroadcast','Sent! ('+(r.data.sent||'all')+' recipients)','ok'); loadBroadcastLogs();
+  } else showMsg('msgBroadcast', r.data.error||'Failed.','err');
 }
 
-function toggleErrand(id, active) {
-  api('PATCH', '/client/bot-tasks/' + id, { active: active })
-  .then(function() {
-    showToast(active ? '✓ Errand activated' : '✓ Errand paused');
-    loadErrands();
-  }).catch(function(e) { showToast('Error: ' + e.message, false); });
+// ── Bot Errands ───────────────────────────────────────────────
+async function loadErrands() {
+  var r = await api('GET','/client/bot-tasks');
+  var tasks = Array.isArray(r.data) ? r.data : [];
+  var el = document.getElementById('errandsList');
+  if (!tasks.length) { el.innerHTML='<p style="color:#64748b;font-size:.84rem;padding:10px 0">No errands yet.</p>'; return; }
+  el.innerHTML = tasks.map(function(t){
+    return '<div class="errand-item">'+
+      '<div style="flex:1">'+
+        '<div class="errand-name">'+esc(t.name)+'</div>'+
+        '<div class="errand-meta">'+esc(t.schedule_time)+' &middot; '+esc(t.schedule_days)+' &middot; '+esc(t.filter_type||'')+'</div>'+
+        '<div class="errand-meta" style="margin-top:3px;color:#94a3b8">'+esc((t.message||'').slice(0,60))+'...</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<label class="toggle-switch"><input type="checkbox" '+(t.active?'checked':'')+' onchange="toggleErrand(\''+t.id+'\',this.checked)"><span class="toggle-slider"></span></label>'+
+        '<button class="btn btn-red btn-sm" onclick="deleteErrand(\''+t.id+'\')">Del</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
-
-function deleteErrand(id) {
+async function addErrand() {
+  var name=document.getElementById('erName').value.trim(), msg=document.getElementById('erMsg').value.trim(),
+      time=document.getElementById('erTime').value.trim(), days=document.getElementById('erDays').value.trim();
+  if (!name||!msg||!time||!days) { showMsg('msgErrands','Fill in all fields.','err'); return; }
+  var r = await api('POST','/client/bot-tasks',{name:name,message:msg,schedule_time:time,schedule_days:days,filter_type:document.getElementById('erFilter').value});
+  if (r.ok) {
+    ['erName','erMsg','erTime','erDays'].forEach(function(id){ document.getElementById(id).value=''; });
+    showMsg('msgErrands','Errand added!','ok'); loadErrands();
+  } else showMsg('msgErrands',r.data.error||'Failed.','err');
+}
+async function toggleErrand(id, active) { await api('PATCH','/client/bot-tasks/'+id,{active:active}); }
+async function deleteErrand(id) {
   if (!confirm('Delete this errand?')) return;
-  api('DELETE', '/client/bot-tasks/' + id).then(function() {
-    showToast('✓ Errand deleted');
-    loadErrands();
-  }).catch(function(e) { showToast('Error: ' + e.message, false); });
+  var r = await api('DELETE','/client/bot-tasks/'+id);
+  if (r.ok) { showMsg('msgErrands','Deleted.','ok'); loadErrands(); }
 }
 
-// ════════════════════════════════════════════════════════════════
-//  SETTINGS
-// ════════════════════════════════════════════════════════════════
-
-function loadSettings() {
-  api('GET', '/client/settings').then(function(data) {
-    setVal('sNotifNum',  data.notification_number);
-    setVal('sWelcome',   data.welcome_message);
-    setVal('sFallback',  data.fallback_message);
-    setVal('sBankName',  data.bank_name);
-    setVal('sAcctNum',   data.account_number);
-    setVal('sAcctName',  data.account_name);
-    setVal('sHours',     data.business_hours);
-
-    var setup = data.bot_setup || {};
-    setVal('sInsta',         setup.instagram);
-    setVal('sFacebook',      setup.facebook);
-    setVal('sTiktok',        setup.tiktok);
-    setVal('sWaChannel',     setup.whatsapp_channel);
-    setVal('sDeliveryAreas', setup.delivery_areas);
-    setVal('sDeliveryFee',   setup.delivery_fee);
-    setVal('sDeliveryTime',  setup.delivery_time);
-    setVal('sMinOrder',      setup.minimum_order);
-    setVal('sReturnPolicy',  setup.return_policy);
-    setVal('sPromo',         setup.promo);
-
-    // Payment methods checkboxes
-    var methods = (setup.payment_methods || '').split(',');
-    document.querySelectorAll('#payMethods input[type="checkbox"]').forEach(function(cb) {
-      cb.checked = methods.includes(cb.value);
-    });
-
-    // WhatsApp connection badge
-    api('GET', '/client/session-status').then(function(st) {
-      var badge = document.getElementById('waBadge');
-      if (st.connected) {
-        badge.textContent = '● Connected';
-        badge.classList.remove('disc');
-      } else {
-        badge.textContent = '● Disconnected';
-        badge.classList.add('disc');
-      }
-    }).catch(function() {});
-  }).catch(function() {});
+// ── Checklist ─────────────────────────────────────────────────
+function updateChecklist(id, done) {
+  var el = document.getElementById(id); if (!el) return;
+  done ? el.classList.add('done') : el.classList.remove('done');
+  var all  = document.querySelectorAll('.cl-item').length;
+  var done2 = document.querySelectorAll('.cl-item.done').length;
+  var cl   = document.getElementById('checklist');
+  if (done2 === all) setTimeout(function(){ cl.style.display='none'; localStorage.setItem('checklist_done','1'); }, 2000);
+  else cl.style.display = '';
 }
 
-function setVal(id, val) {
-  var el = document.getElementById(id);
-  if (el && val != null) el.value = val;
+// ── PWA ───────────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault(); _deferInstall = e;
+  if (!localStorage.getItem('pwa_dismissed')) setTimeout(function(){ document.getElementById('pwaPopup').style.display='block'; }, 4000);
+});
+function installPWA() { if (_deferInstall) { _deferInstall.prompt(); _deferInstall.userChoice.then(function(){ document.getElementById('pwaPopup').style.display='none'; }); } else document.getElementById('pwaPopup').style.display='none'; }
+function dismissPWA() { localStorage.setItem('pwa_dismissed','1'); document.getElementById('pwaPopup').style.display='none'; }
+
+// ── Push ──────────────────────────────────────────────────────
+var VAPID = 'BBN1ci_BmHj26FTeNf_lnzqVGAhM2_X1RBlDz0lYlVOh3ULn5aKO9iNnhHBdyuDBGQXCvkjAN03yNrwhd6S0JNs';
+async function registerPush() {
+  if (!('serviceWorker' in navigator)||!('PushManager' in window)||localStorage.getItem('push_registered')) return;
+  try {
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+    var sw  = await navigator.serviceWorker.ready;
+    var sub = await sw.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64toUint8(VAPID) });
+    var j   = sub.toJSON();
+    await api('POST','/client/push/subscribe',{endpoint:j.endpoint,keys:j.keys});
+    localStorage.setItem('push_registered','1');
+  } catch(e) { console.log('[Push]',e.message); }
+}
+function b64toUint8(b64) {
+  var pad=('='.repeat((4-b64.length%4)%4)), raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  var a=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i); return a;
 }
 
-function saveSettings() {
-  var data = {
-    notification_number: document.getElementById('sNotifNum').value.trim(),
-    welcome_message:     document.getElementById('sWelcome').value.trim(),
-    fallback_message:    document.getElementById('sFallback').value.trim(),
-    bank_name:           document.getElementById('sBankName').value.trim(),
-    account_number:      document.getElementById('sAcctNum').value.trim(),
-    account_name:        document.getElementById('sAcctName').value.trim(),
-    business_hours:      document.getElementById('sHours').value.trim()
-  };
-  api('PUT', '/client/settings', data)
-  .then(function() { showToast('✓ Settings saved!'); })
-  .catch(function(e) { showToast('Error: ' + e.message, false); });
+// ── Util ──────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Boot ──────────────────────────────────────────────────────
+async function loadAll() {
+  await loadSettings();
+  await loadFlows();
+  await loadBroadcastLogs();
+  pollWaStatus();
+  var n=new Date(); document.getElementById('analyticsMonth').value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');
+  if (!localStorage.getItem('checklist_done')) document.getElementById('checklist').style.display='';
+  setTimeout(registerPush, 6000);
 }
-
-function saveBotSetup() {
-  var data = {
-    instagram:        document.getElementById('sInsta').value.trim(),
-    facebook:         document.getElementById('sFacebook').value.trim(),
-    tiktok:           document.getElementById('sTiktok').value.trim(),
-    whatsapp_channel: document.getElementById('sWaChannel').value.trim(),
-    delivery_areas:   document.getElementById('sDeliveryAreas').value.trim(),
-    delivery_fee:     document.getElementById('sDeliveryFee').value.trim(),
-    delivery_time:    document.getElementById('sDeliveryTime').value.trim(),
-    minimum_order:    document.getElementById('sMinOrder').value.trim(),
-    return_policy:    document.getElementById('sReturnPolicy').value.trim(),
-    promo:            document.getElementById('sPromo').value.trim()
-  };
-  api('PUT', '/client/bot-setup', data)
-  .then(function() { showToast('✓ Bot setup saved!'); })
-  .catch(function(e) { showToast('Error: ' + e.message, false); });
-}
-
-function savePayMethods() {
-  var checked = [];
-  document.querySelectorAll('#payMethods input[type="checkbox"]:checked').forEach(function(cb) {
-    checked.push(cb.value);
-  });
-  api('PUT', '/client/bot-setup', { payment_methods: checked.join(',') }).catch(function() {});
-}
-
-// ── WhatsApp QR ───────────────────────────────────────────────
-function showQR() {
-  var container = document.getElementById('qrContainer');
-  var qrImg     = document.getElementById('qrImg');
-  var qrStatus  = document.getElementById('qrStatus');
-  container.style.display = 'block';
-  qrImg.innerHTML = '';
-  qrStatus.textContent = 'Connecting...';
-
-  if (qrEventSource) qrEventSource.close();
-
-  qrEventSource = new EventSource(API + '/api/client/qr-stream?token=' + TOKEN);
-
-  qrEventSource.addEventListener('qr', function(e) {
-    var data  = JSON.parse(e.data);
-    var qr    = data.qr;
-    qrStatus.textContent = 'Scan this QR code with your WhatsApp:';
-
-    // Try QRCode library first, fallback to image API
-    if (typeof QRCode !== 'undefined') {
-      qrImg.innerHTML = '';
-      new QRCode(qrImg, { text: qr, width: 220, height: 220 });
-    } else {
-      qrImg.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(qr) + '" style="width:220px;height:220px"/>';
-    }
-  });
-
-  qrEventSource.addEventListener('connected', function() {
-    qrImg.innerHTML = '<div style="font-size:3rem">✅</div>';
-    qrStatus.textContent = 'WhatsApp connected successfully!';
-    document.getElementById('waBadge').textContent = '● Connected';
-    document.getElementById('waBadge').classList.remove('disc');
-    qrEventSource.close();
-    qrEventSource = null;
-    setTimeout(function() { container.style.display = 'none'; }, 3000);
-  });
-
-  qrEventSource.addEventListener('error', function(e) {
-    if (qrEventSource.readyState === EventSource.CLOSED) return;
-    qrStatus.textContent = 'Connection error. Please try again.';
-  });
-}
-
-function checkConnectionStatus() {
-  api('GET', '/client/session-status').then(function(st) {
-    var badge = document.getElementById('waBadge');
-    if (st.connected) {
-      badge.textContent = '● Connected';
-      badge.classList.remove('disc');
-      showToast('✓ WhatsApp is connected!');
-    } else {
-      badge.textContent = '● Disconnected';
-      badge.classList.add('disc');
-      showToast('WhatsApp is not connected. Scan a QR code to connect.', false);
-    }
-  });
-}
-
-// ── Push Notifications ────────────────────────────────────────
-function subscribePush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    return showToast('Push notifications not supported in this browser.', false);
-  }
-  api('GET', '/push/vapid-key').then(function(d) {
-    return navigator.serviceWorker.register('/sw.js').then(function(reg) {
-      return reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(d.publicKey)
-      });
-    }).then(function(sub) {
-      var key = sub.toJSON();
-      return api('POST', '/client/push/subscribe', {
-        endpoint: key.endpoint,
-        keys:     { p256dh: key.keys.p256dh, auth: key.keys.auth }
-      });
-    });
-  }).then(function() {
-    showToast('✓ Push notifications enabled!');
-  }).catch(function(e) {
-    showToast('Error enabling push: ' + e.message, false);
-  });
-}
-
-function testPush() {
-  api('POST', '/client/push/test').then(function(r) {
-    showToast('✓ Test push sent (' + r.sent + ')');
-  }).catch(function(e) { showToast('Error: ' + e.message, false); });
-}
-
-function urlBase64ToUint8Array(base64String) {
-  var padding = '='.repeat((4 - base64String.length % 4) % 4);
-  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  var rawData = window.atob(base64);
-  return new Uint8Array(Array.from(rawData).map(function(c) { return c.charCodeAt(0); }));
-}
-
-// ── Boot ─────────────────────────────────────────────────────
-loadFlows();
+loadAll();
 </script>
 </body>
 </html>
