@@ -343,16 +343,23 @@ router.get('/client/settings', async function(req, res) {
 });
 
 // ── PUT /client/settings ─────────────────────────────────────
+// NOTE: Using direct Supabase call (NOT db.updateClient) so that
+// new columns (bank_name, notification_number, etc.) are always saved
+// regardless of what the legacy updateClient whitelist contains.
 router.put('/client/settings', async function(req, res) {
   try {
+    var sb = getSupabase();
+    var b  = req.body;
+    var update = {};
     var allowed = [
       'notification_number','welcome_message','fallback_message',
       'bank_name','account_number','account_name','business_hours','business_name'
     ];
-    var update = {};
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var updated = await db.updateClient(req.clientId, update);
-    res.json(updated);
+    allowed.forEach(function(k) { if (b[k] !== undefined) update[k] = b[k]; });
+    if (!Object.keys(update).length) return res.json({ ok: true });
+    var { data, error } = await sb.from('clients').update(update).eq('id', req.clientId).select().single();
+    if (error) throw new Error(error.message);
+    res.json(data || { ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
