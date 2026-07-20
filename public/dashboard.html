@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
@@ -8,28 +8,46 @@
 <meta name="theme-color" content="#25D366"/>
 <link rel="icon" href="/favicon.ico"/>
 <style>
-  :root{
+  /* ══ THEME VARIABLES ══════════════════════════════════════ */
+  :root[data-theme="light"] {
     --green:#25D366;--dark-green:#128C7E;--light-green:#DCF8C6;
     --bg:#f0f2f5;--white:#fff;--text:#1a1a1a;--muted:#888;
-    --border:#e0e0e0;--danger:#e53935;--warn:#f57c00;--info:#1565C0;
-    --card-shadow:0 2px 8px rgba(0,0,0,.08);
+    --border:#e0e0e0;--card-bg:#fff;--topbar:#128C7E;
+    --input-bg:#fff;--tab-bg:#fff;--sub-tab-bg:#f0f2f5;
+    --badge-wa-text:#fff;
+    --danger:#e53935;--warn:#f57c00;
+    --shadow:0 2px 8px rgba(0,0,0,.08);
   }
+  :root[data-theme="dark"] {
+    --green:#25D366;--dark-green:#1a9e6f;--light-green:#1a3a2a;
+    --bg:#0d1117;--white:#161b22;--text:#e6edf3;--muted:#8b949e;
+    --border:#30363d;--card-bg:#161b22;--topbar:#0d1117;
+    --input-bg:#0d1117;--tab-bg:#161b22;--sub-tab-bg:#0d1117;
+    --badge-wa-text:#e6edf3;
+    --danger:#f85149;--warn:#d29922;
+    --shadow:0 2px 8px rgba(0,0,0,.4);
+  }
+
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .25s,color .25s}
 
   /* ── Top bar ── */
-  .topbar{background:var(--dark-green);color:#fff;padding:0 20px;display:flex;align-items:center;height:56px;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
-  .topbar .logo{font-weight:700;font-size:1.15rem;letter-spacing:.5px;margin-right:auto}
-  .wa-badge{display:flex;align-items:center;gap:6px;font-size:.78rem;padding:4px 12px;border-radius:20px;cursor:pointer;transition:background .2s}
+  .topbar{background:var(--topbar);color:#fff;padding:0 20px;display:flex;align-items:center;height:56px;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  .topbar .logo{font-weight:700;font-size:1.15rem;letter-spacing:.5px;margin-right:auto;color:#fff}
+  .wa-badge{display:flex;align-items:center;gap:6px;font-size:.78rem;padding:4px 12px;border-radius:20px;cursor:pointer;transition:background .2s;color:var(--badge-wa-text)}
   .wa-badge.connected{background:rgba(255,255,255,.2)}
   .wa-badge.disconnected{background:rgba(229,57,53,.35)}
-  .wa-badge .dot{width:8px;height:8px;border-radius:50%;background:#ccc}
+  .wa-badge .dot{width:8px;height:8px;border-radius:50%}
   .wa-badge.connected .dot{background:#4caf50}
   .wa-badge.disconnected .dot{background:#ef5350}
   .trial-badge{background:var(--warn);color:#fff;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:12px}
 
+  /* Theme toggle button */
+  .theme-btn{background:rgba(255,255,255,.15);border:none;border-radius:20px;padding:5px 12px;cursor:pointer;font-size:.85rem;color:#fff;display:flex;align-items:center;gap:5px;transition:background .2s}
+  .theme-btn:hover{background:rgba(255,255,255,.25)}
+
   /* ── Tabs ── */
-  .tabs{display:flex;overflow-x:auto;background:var(--white);border-bottom:1px solid var(--border);padding:0 12px;gap:4px}
+  .tabs{display:flex;overflow-x:auto;background:var(--tab-bg);border-bottom:1px solid var(--border);padding:0 12px;gap:4px;transition:background .25s}
   .tabs::-webkit-scrollbar{height:0}
   .tab{padding:14px 16px;font-size:.85rem;font-weight:500;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s}
   .tab.active{color:var(--dark-green);border-bottom-color:var(--dark-green)}
@@ -40,10 +58,10 @@
   .content.active{display:block}
 
   /* ── Cards ── */
-  .card{background:var(--white);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:var(--card-shadow)}
+  .card{background:var(--card-bg);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow);border:1px solid var(--border);transition:background .25s,border-color .25s}
   .card h3{font-size:.95rem;font-weight:600;margin-bottom:14px;color:var(--dark-green)}
   .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:16px}
-  .stat-card{background:var(--white);border-radius:12px;padding:18px;box-shadow:var(--card-shadow);text-align:center}
+  .stat-card{background:var(--card-bg);border-radius:12px;padding:18px;box-shadow:var(--shadow);text-align:center;border:1px solid var(--border);transition:background .25s}
   .stat-card .val{font-size:1.9rem;font-weight:700;color:var(--dark-green)}
   .stat-card .lbl{font-size:.78rem;color:var(--muted);margin-top:4px}
 
@@ -51,7 +69,7 @@
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
   @media(max-width:600px){.form-row{grid-template-columns:1fr}}
   label{font-size:.82rem;color:var(--muted);display:block;margin-bottom:4px}
-  input,textarea,select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;background:var(--white);transition:border .2s}
+  input,textarea,select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;background:var(--input-bg);color:var(--text);transition:border .2s,background .25s,color .25s}
   input:focus,textarea:focus,select:focus{outline:none;border-color:var(--green)}
   textarea{resize:vertical;min-height:80px}
   .btn{padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;transition:opacity .2s}
@@ -68,19 +86,23 @@
 
   /* ── Tables ── */
   table{width:100%;border-collapse:collapse;font-size:.85rem}
-  th{text-align:left;padding:10px 12px;background:var(--bg);color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}
-  td{padding:10px 12px;border-bottom:1px solid var(--border)}
+  th{text-align:left;padding:10px 12px;background:var(--bg);color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;transition:background .25s}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
   tr:last-child td{border-bottom:none}
   .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600}
   .badge-green{background:#e8f5e9;color:#2e7d32}
   .badge-yellow{background:#fff8e1;color:#f57c00}
   .badge-red{background:#ffebee;color:#c62828}
   .badge-blue{background:#e3f2fd;color:#1565C0}
+  [data-theme="dark"] .badge-green{background:#1a3a2a;color:#4caf50}
+  [data-theme="dark"] .badge-yellow{background:#2a2010;color:#d29922}
+  [data-theme="dark"] .badge-red{background:#2a1015;color:#f85149}
+  [data-theme="dark"] .badge-blue{background:#102030;color:#58a6ff}
 
   /* ── Listing cards ── */
   .listing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-  .listing-card{background:var(--white);border-radius:12px;box-shadow:var(--card-shadow);overflow:hidden}
-  .listing-card .thumb{width:100%;height:150px;object-fit:cover;background:#eee;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.8rem}
+  .listing-card{background:var(--card-bg);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--border);transition:background .25s}
+  .listing-card .thumb{width:100%;height:150px;object-fit:cover;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.8rem}
   .listing-card .thumb img{width:100%;height:100%;object-fit:cover}
   .listing-card .body{padding:14px}
   .listing-card .body h4{font-size:.92rem;font-weight:600;margin-bottom:4px}
@@ -89,13 +111,13 @@
   .listing-card .actions{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}
 
   /* ── Modal ── */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
-  .modal{background:var(--white);border-radius:16px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;position:relative}
+  .modal{background:var(--card-bg);border-radius:16px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;position:relative;border:1px solid var(--border);transition:background .25s}
   .modal h2{font-size:1.05rem;font-weight:700;margin-bottom:18px;color:var(--dark-green)}
   .modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted)}
 
-  /* ── Media upload preview ── */
+  /* ── Media preview ── */
   .media-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .media-preview .thumb-box{width:70px;height:70px;border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--border)}
   .media-preview .thumb-box img{width:100%;height:100%;object-fit:cover}
@@ -103,44 +125,44 @@
 
   /* ── Toast ── */
   #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 22px;border-radius:24px;font-size:.85rem;z-index:999;display:none;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  [data-theme="dark"] #toast{background:#e6edf3;color:#0d1117}
 
   /* ── PWA install ── */
-  #pwa-banner{display:none;position:fixed;bottom:16px;right:16px;background:var(--white);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:16px 20px;z-index:300;max-width:280px}
+  #pwa-banner{display:none;position:fixed;bottom:16px;right:16px;background:var(--card-bg);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);padding:16px 20px;z-index:300;max-width:280px;border:1px solid var(--border)}
   #pwa-banner p{font-size:.85rem;margin-bottom:10px;font-weight:500}
   #pwa-banner .pwa-btns{display:flex;gap:8px}
 
   /* ── Onboarding checklist ── */
   #checklist-btn{position:fixed;bottom:72px;right:16px;background:var(--dark-green);color:#fff;border:none;border-radius:50%;width:48px;height:48px;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:290}
-  #checklist-panel{display:none;position:fixed;bottom:128px;right:16px;background:var(--white);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:16px 18px;z-index:290;min-width:220px}
+  #checklist-panel{display:none;position:fixed;bottom:128px;right:16px;background:var(--card-bg);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);padding:16px 18px;z-index:290;min-width:220px;border:1px solid var(--border)}
   #checklist-panel h4{font-size:.88rem;font-weight:700;margin-bottom:10px;color:var(--dark-green)}
-  .check-item{display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 0;border-bottom:1px solid var(--border)}
+  .check-item{display:flex;align-items:center;gap:8px;font-size:.82rem;padding:5px 0;border-bottom:1px solid var(--border);color:var(--text)}
   .check-item:last-child{border-bottom:none}
   .check-item .ico{font-size:1rem}
 
   /* ── Days checkbox row ── */
   .days-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-  .day-btn{padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:.8rem;font-weight:500;transition:background .2s,color .2s}
+  .day-btn{padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:.8rem;font-weight:500;transition:background .2s,color .2s}
   .day-btn.sel{background:var(--green);color:#fff;border-color:var(--green)}
 
-  /* ── Analytics month picker ── */
+  /* ── Month nav ── */
   .month-nav{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-  .month-nav button{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.85rem}
-  .month-nav span{font-weight:600;font-size:.95rem;min-width:120px;text-align:center}
+  .month-nav button{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.85rem;color:var(--text)}
+  .month-nav span{font-weight:600;font-size:.95rem;min-width:120px;text-align:center;color:var(--text)}
 
-  /* ── Inline tabs (e.g. listings) ── */
+  /* ── Sub-tabs ── */
   .sub-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-  .sub-tab{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--muted);transition:background .2s,color .2s}
+  .sub-tab{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--sub-tab-bg);color:var(--muted);transition:background .2s,color .2s}
   .sub-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
 
-  /* ── Reply chips editor ── */
-  #keyword-input-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--border);border-radius:8px;padding:6px;min-height:42px}
-  #keyword-input-wrap input{flex:1;border:none;outline:none;font-size:.88rem;min-width:100px}
+  /* ── Keyword chip input ── */
+  #keyword-input-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid var(--border);border-radius:8px;padding:6px;min-height:42px;background:var(--input-bg)}
+  #keyword-input-wrap input{flex:1;border:none;outline:none;font-size:.88rem;min-width:100px;background:transparent;color:var(--text)}
   #keyword-chips{display:flex;flex-wrap:wrap;gap:4px}
 
   .empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
   .empty-state .ico{font-size:2.5rem;margin-bottom:10px}
   .empty-state p{font-size:.88rem}
-
   .loading-spinner{display:flex;justify-content:center;padding:32px;color:var(--muted);font-size:.88rem}
   .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
 </style>
@@ -151,6 +173,9 @@
 <div class="topbar">
   <div class="logo">⚡ ForgeBot</div>
   <span id="trial-badge" class="trial-badge" style="display:none"></span>
+  <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+    <span id="theme-icon">🌙</span> <span id="theme-label">Dark</span>
+  </button>
   <div class="wa-badge disconnected" id="wa-badge" onclick="openQR()">
     <span class="dot"></span>
     <span id="wa-text">Disconnected</span>
@@ -169,9 +194,7 @@
   <button class="tab" onclick="switchTab('settings',this)">Settings</button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     AUTO-REPLIES TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- AUTO-REPLIES -->
 <div id="tab-auto-replies" class="content active">
   <div class="card">
     <div class="section-header">
@@ -182,9 +205,7 @@
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     LISTINGS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- LISTINGS -->
 <div id="tab-listings" class="content">
   <div class="section-header">
     <div class="sub-tabs">
@@ -198,9 +219,7 @@
   <div id="listings-grid" class="listing-grid"></div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     ORDERS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- ORDERS -->
 <div id="tab-orders" class="content">
   <div class="card">
     <div class="section-header">
@@ -215,13 +234,11 @@
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     STATUS POSTS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- STATUS POSTS -->
 <div id="tab-status-posts" class="content">
   <div class="card">
     <h3>Auto-Post Schedule</h3>
-    <p style="font-size:.83rem;color:var(--muted);margin-bottom:16px">ForgeBot will auto-post your listings as WhatsApp Statuses on the days & time you choose. Toggle memes to keep it fun.</p>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:16px">ForgeBot will auto-post your listings as WhatsApp Statuses on the days & time you choose.</p>
     <div style="margin-bottom:14px">
       <label>Post on these days</label>
       <div class="days-row" id="post-days">
@@ -245,26 +262,21 @@
     </div>
     <button class="btn btn-dark" onclick="savePostSchedule()">Save Schedule</button>
   </div>
-  <div class="card" style="margin-top:0">
+  <div class="card">
     <h3>Recent Auto-Posts</h3>
     <div id="status-posts-list"><div class="loading-spinner">Loading…</div></div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     BROADCAST TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- BROADCAST -->
 <div id="tab-broadcast" class="content">
   <div class="card">
     <h3>Send Broadcast</h3>
-    <div style="margin-bottom:12px">
-      <label>Message</label>
-      <textarea id="broadcast-msg" placeholder="Type your broadcast message…" rows="4"></textarea>
-    </div>
+    <div style="margin-bottom:12px"><label>Message</label><textarea id="broadcast-msg" placeholder="Type your broadcast message…" rows="4"></textarea></div>
     <div style="margin-bottom:16px">
-      <label>Target phones (optional — leave blank to send to all customers)</label>
+      <label>Target phones <span style="color:var(--muted);font-size:.78rem">(optional — leave blank to send to all customers)</span></label>
       <textarea id="broadcast-phones" placeholder="08012345678&#10;09087654321" rows="4"></textarea>
-      <p style="font-size:.75rem;color:var(--muted);margin-top:4px">One number per line. Include country code if international (e.g. +2348012345678)</p>
+      <p style="font-size:.75rem;color:var(--muted);margin-top:4px">One number per line.</p>
     </div>
     <button class="btn btn-dark" onclick="sendBroadcast()">Send Broadcast</button>
   </div>
@@ -274,9 +286,7 @@
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     ANALYTICS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- ANALYTICS -->
 <div id="tab-analytics" class="content">
   <div class="month-nav">
     <button onclick="changeMonth(-1)">‹</button>
@@ -288,9 +298,7 @@
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     BOT ERRANDS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- BOT ERRANDS -->
 <div id="tab-bot-errands" class="content">
   <div class="card">
     <div class="section-header">
@@ -302,9 +310,7 @@
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     SETTINGS TAB
-═════════════════════════════════════════════════════════════ -->
+<!-- SETTINGS -->
 <div id="tab-settings" class="content">
   <div class="card">
     <h3>Business Info</h3>
@@ -312,14 +318,8 @@
       <div><label>Business Name</label><input id="s-biz-name" placeholder="e.g. Favour Store"/></div>
       <div><label>Business Hours</label><input id="s-biz-hours" placeholder="Mon-Fri 8am-6pm"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Welcome Message</label>
-      <textarea id="s-welcome" placeholder="Hi! Welcome to {{business_name}}. How can I help you today?"></textarea>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Fallback / Default Reply</label>
-      <textarea id="s-fallback" placeholder="Sorry, I didn't understand that. Type MENU to see options."></textarea>
-    </div>
+    <div style="margin-bottom:12px"><label>Welcome Message</label><textarea id="s-welcome" placeholder="Hi! Welcome to {{business_name}}…"></textarea></div>
+    <div style="margin-bottom:12px"><label>Fallback / Default Reply</label><textarea id="s-fallback" placeholder="Sorry, I didn't understand that."></textarea></div>
     <div><label>Notification WhatsApp Number</label><input id="s-notif" placeholder="08012345678 (your personal number for order alerts)"/></div>
   </div>
   <div class="card">
@@ -355,16 +355,25 @@
   </div>
   <div class="card">
     <h3>Current Promo</h3>
-    <textarea id="s-promo" placeholder="10% off all orders this week! Use code SAVE10" rows="2"></textarea>
+    <textarea id="s-promo" placeholder="10% off all orders this week!" rows="2"></textarea>
   </div>
+
+  <!-- Appearance preference -->
+  <div class="card">
+    <h3>Appearance</h3>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:14px">Choose how the dashboard looks. Your preference is saved automatically.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button onclick="setTheme('light')" id="btn-light" class="btn btn-outline" style="display:flex;align-items:center;gap:6px">☀️ Light Mode</button>
+      <button onclick="setTheme('dark')" id="btn-dark" class="btn btn-dark" style="display:flex;align-items:center;gap:6px">🌙 Dark Mode</button>
+    </div>
+  </div>
+
   <div style="padding:4px 0 20px">
     <button class="btn btn-dark" style="width:100%" onclick="saveSettings()">Save All Settings</button>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     MODALS
-═════════════════════════════════════════════════════════════ -->
+<!-- ══ MODALS ═══════════════════════════════════════════════ -->
 
 <!-- Flow modal -->
 <div class="modal-overlay" id="flow-modal">
@@ -373,28 +382,11 @@
     <h2>Auto-Reply Flow</h2>
     <div style="margin-bottom:12px">
       <label>Keywords (press Enter after each)</label>
-      <div id="keyword-input-wrap">
-        <div id="keyword-chips"></div>
-        <input id="keyword-input" placeholder="e.g. price" onkeydown="handleKeywordInput(event)"/>
-      </div>
+      <div id="keyword-input-wrap"><div id="keyword-chips"></div><input id="keyword-input" placeholder="e.g. price" onkeydown="handleKeywordInput(event)"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Response Type</label>
-      <select id="flow-type" onchange="toggleFlowMedia()">
-        <option value="text">Text</option>
-        <option value="image">Image</option>
-        <option value="video">Video</option>
-        <option value="document">Document</option>
-      </select>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Response Message</label>
-      <textarea id="flow-response" placeholder="Type your reply here…" rows="4"></textarea>
-    </div>
-    <div id="flow-media-wrap" style="display:none;margin-bottom:12px">
-      <label>Media URL</label>
-      <input id="flow-media-url" placeholder="https://example.com/image.jpg"/>
-    </div>
+    <div style="margin-bottom:12px"><label>Response Type</label><select id="flow-type" onchange="toggleFlowMedia()"><option value="text">Text</option><option value="image">Image</option><option value="video">Video</option><option value="document">Document</option></select></div>
+    <div style="margin-bottom:12px"><label>Response Message</label><textarea id="flow-response" placeholder="Type your reply here…" rows="4"></textarea></div>
+    <div id="flow-media-wrap" style="display:none;margin-bottom:12px"><label>Media URL</label><input id="flow-media-url" placeholder="https://example.com/image.jpg"/></div>
     <button class="btn btn-dark" style="width:100%" onclick="saveFlow()">Save Flow</button>
   </div>
 </div>
@@ -406,45 +398,25 @@
     <h2 id="listing-modal-title">Add Listing</h2>
     <input type="hidden" id="edit-listing-id"/>
     <div class="form-row">
-      <div>
-        <label>Name *</label>
-        <input id="l-name" placeholder="Product / Service name"/>
-      </div>
-      <div>
-        <label>Type</label>
-        <select id="l-type">
-          <option value="product">Product</option>
-          <option value="service">Service</option>
-          <option value="property">Property</option>
-          <option value="appointment">Appointment / Booking</option>
-        </select>
-      </div>
+      <div><label>Name *</label><input id="l-name" placeholder="Product / Service name"/></div>
+      <div><label>Type</label><select id="l-type"><option value="product">Product</option><option value="service">Service</option><option value="property">Property</option><option value="appointment">Appointment / Booking</option></select></div>
     </div>
     <div class="form-row">
       <div><label>Price</label><input id="l-price" placeholder="₦5000"/></div>
       <div><label>Price Label</label><input id="l-price-label" placeholder="per kg / per session"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Description</label>
-      <textarea id="l-desc" placeholder="Describe the product or service…" rows="3"></textarea>
-    </div>
+    <div style="margin-bottom:12px"><label>Description</label><textarea id="l-desc" placeholder="Describe the product or service…" rows="3"></textarea></div>
     <div class="form-row">
-      <div><label>Category</label><input id="l-cat" placeholder="e.g. Fashion, Food, Real Estate"/></div>
+      <div><label>Category</label><input id="l-cat" placeholder="e.g. Fashion, Food"/></div>
       <div><label>Location</label><input id="l-loc" placeholder="e.g. Lagos Island"/></div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Keywords (for bot search)</label>
-      <input id="l-keywords" placeholder="e.g. gown, dress, ankara"/>
-    </div>
+    <div style="margin-bottom:12px"><label>Keywords (for bot search)</label><input id="l-keywords" placeholder="e.g. gown, dress, ankara"/></div>
     <div style="margin-bottom:12px">
       <label>Images (max 3)</label>
       <input type="file" id="l-images" accept="image/*" multiple onchange="previewImages(event)"/>
       <div class="media-preview" id="image-preview"></div>
     </div>
-    <div style="margin-bottom:16px">
-      <label>Catalogue PDF (optional)</label>
-      <input type="file" id="l-pdf" accept="application/pdf"/>
-    </div>
+    <div style="margin-bottom:16px"><label>Catalogue PDF (optional)</label><input type="file" id="l-pdf" accept="application/pdf"/></div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <input type="checkbox" id="l-available" checked style="width:auto;accent-color:var(--green)"/>
       <label for="l-available" style="margin:0;font-size:.88rem;cursor:pointer">Available for sale/booking</label>
@@ -461,29 +433,13 @@
     <div style="margin-bottom:12px"><label>Task Name</label><input id="t-name" placeholder="e.g. Weekly Promo Reminder"/></div>
     <div style="margin-bottom:12px"><label>Message</label><textarea id="t-msg" rows="4" placeholder="Type the message to send…"></textarea></div>
     <div class="form-row">
-      <div>
-        <label>Send at (time)</label>
-        <input type="time" id="t-time"/>
-      </div>
-      <div>
-        <label>Who to send to</label>
-        <select id="t-filter">
-          <option value="all_customers">All Customers</option>
-          <option value="new_only">New Customers (past 7 days)</option>
-          <option value="inactive">Inactive (no chat in 14 days)</option>
-        </select>
-      </div>
+      <div><label>Send at (time)</label><input type="time" id="t-time"/></div>
+      <div><label>Who to send to</label><select id="t-filter"><option value="all_customers">All Customers</option><option value="new_only">New (past 7 days)</option><option value="inactive">Inactive (14+ days)</option></select></div>
     </div>
     <div style="margin-bottom:16px">
       <label>Run on days</label>
       <div class="days-row" id="task-days">
-        <button class="day-btn" data-day="Mon">Mon</button>
-        <button class="day-btn" data-day="Tue">Tue</button>
-        <button class="day-btn" data-day="Wed">Wed</button>
-        <button class="day-btn" data-day="Thu">Thu</button>
-        <button class="day-btn" data-day="Fri">Fri</button>
-        <button class="day-btn" data-day="Sat">Sat</button>
-        <button class="day-btn" data-day="Sun">Sun</button>
+        <button class="day-btn" data-day="Mon">Mon</button><button class="day-btn" data-day="Tue">Tue</button><button class="day-btn" data-day="Wed">Wed</button><button class="day-btn" data-day="Thu">Thu</button><button class="day-btn" data-day="Fri">Fri</button><button class="day-btn" data-day="Sat">Sat</button><button class="day-btn" data-day="Sun">Sun</button>
       </div>
     </div>
     <button class="btn btn-dark" style="width:100%" onclick="saveTask()">Save Task</button>
@@ -496,15 +452,13 @@
     <button class="modal-close" onclick="closeModal('qr-modal');stopQR()">×</button>
     <h2>Connect WhatsApp</h2>
     <p style="font-size:.83rem;color:var(--muted);margin-bottom:16px">Open WhatsApp → Settings → Linked Devices → Link a Device</p>
-    <div id="qr-container" style="display:flex;justify-content:center;align-items:center;min-height:230px">
-      <div class="loading-spinner">Generating QR…</div>
-    </div>
+    <div id="qr-container" style="display:flex;justify-content:center;align-items:center;min-height:230px"><div class="loading-spinner">Generating QR…</div></div>
     <p id="qr-status-text" style="font-size:.8rem;color:var(--muted);margin-top:12px"></p>
   </div>
 </div>
 
 <!-- Onboarding checklist -->
-<button id="checklist-btn" onclick="toggleChecklist()" title="Onboarding checklist">✅</button>
+<button id="checklist-btn" onclick="toggleChecklist()" title="Setup checklist">✅</button>
 <div id="checklist-panel">
   <h4>Setup Checklist</h4>
   <div class="check-item"><span class="ico" id="ck-wa">⬜</span><span>Connect WhatsApp</span></div>
@@ -516,7 +470,7 @@
 
 <!-- PWA install banner -->
 <div id="pwa-banner">
-  <p>📲 Install ForgeBot on your device for the best experience!</p>
+  <p>📲 Install ForgeBot for the best experience!</p>
   <div class="pwa-btns">
     <button class="btn btn-dark btn-sm" onclick="installPWA()">Install</button>
     <button class="btn btn-outline btn-sm" onclick="document.getElementById('pwa-banner').style.display='none'">Later</button>
@@ -527,9 +481,25 @@
 <div id="toast"></div>
 
 <script>
-/* ══════════════════════════════════════════════════
-   GLOBALS & UTILS
-══════════════════════════════════════════════════ */
+/* ══ THEME ════════════════════════════════════════════════ */
+var savedTheme = localStorage.getItem('forgebot_theme') || 'light';
+applyTheme(savedTheme);
+
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  var icon = document.getElementById('theme-icon');
+  var label = document.getElementById('theme-label');
+  if (icon) icon.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (label) label.textContent = t === 'dark' ? 'Light' : 'Dark';
+  localStorage.setItem('forgebot_theme', t);
+}
+function setTheme(t) { applyTheme(t); }
+function toggleTheme() {
+  var cur = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+
+/* ══ GLOBALS & UTILS ═══════════════════════════════════════ */
 var TOKEN = localStorage.getItem('forgebot_token') || '';
 var currentListingFilter = 'all';
 var analyticsMonth = (function(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); })();
@@ -559,10 +529,8 @@ function statusBadge(s){
   return '<span class="badge '+(map[s]||'badge-yellow')+'">'+s+'</span>';
 }
 
-/* ══════════════════════════════════════════════════
-   TAB SWITCHING
-══════════════════════════════════════════════════ */
-var tabLoaders = { 'listings': loadListings, 'orders': loadOrders, 'status-posts': loadStatusPosts, 'broadcast': loadBroadcastLog, 'analytics': loadAnalytics, 'bot-errands': loadTasks, 'settings': loadSettings };
+/* ══ TAB SWITCHING ══════════════════════════════════════════ */
+var tabLoaders = { 'listings':loadListings,'orders':loadOrders,'status-posts':loadStatusPosts,'broadcast':loadBroadcastLog,'analytics':loadAnalytics,'bot-errands':loadTasks,'settings':loadSettings };
 function switchTab(name, el) {
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
   document.querySelectorAll('.content').forEach(function(c){ c.classList.remove('active'); });
@@ -573,9 +541,7 @@ function switchTab(name, el) {
   if(name==='auto-replies') loadFlows();
 }
 
-/* ══════════════════════════════════════════════════
-   WA BADGE & QR
-══════════════════════════════════════════════════ */
+/* ══ WA BADGE ════════════════════════════════════════════════ */
 function pollWaStatus(){
   api('GET','/client/session-status').then(function(d){
     var badge=document.getElementById('wa-badge'), txt=document.getElementById('wa-text');
@@ -594,22 +560,18 @@ function openQR(){
   qrEventSource = new EventSource('/api/client/qr-stream?token='+encodeURIComponent(TOKEN));
   qrEventSource.addEventListener('qr', function(e){
     var data = JSON.parse(e.data);
-    // Use QRCode lib if available, otherwise show raw
     if(window.QRCode){
       var c = document.getElementById('qr-container');
       c.innerHTML='<canvas id="qr-canvas"></canvas>';
       QRCode.toCanvas(document.getElementById('qr-canvas'), data.qr, {width:230,margin:1}, function(){});
     } else {
-      // Fallback: use a QR API
       document.getElementById('qr-container').innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=230x230&data='+encodeURIComponent(data.qr)+'" style="border-radius:8px"/>';
     }
     document.getElementById('qr-status-text').textContent='Scan this with WhatsApp';
   });
   qrEventSource.addEventListener('connected', function(){
     document.getElementById('qr-container').innerHTML='<div style="font-size:3rem">✅</div><p style="margin-top:8px;font-weight:600;color:#2e7d32">Connected!</p>';
-    document.getElementById('qr-status-text').textContent='';
-    pollWaStatus();
-    setTimeout(function(){ closeModal('qr-modal'); stopQR(); }, 1800);
+    pollWaStatus(); setTimeout(function(){ closeModal('qr-modal'); stopQR(); }, 1800);
   });
   qrEventSource.addEventListener('reconnecting', function(e){
     var d=JSON.parse(e.data||'{}');
@@ -621,24 +583,16 @@ function openQR(){
 }
 function stopQR(){ if(qrEventSource){ qrEventSource.close(); qrEventSource=null; } }
 
-/* ══════════════════════════════════════════════════
-   TRIAL BADGE
-══════════════════════════════════════════════════ */
+/* ══ TRIAL BADGE ═════════════════════════════════════════════ */
 function loadTrialBadge(){
   api('GET','/client/partner-status').then(function(d){
     if(!d.is_partner) return;
     var badge=document.getElementById('trial-badge');
-    if(d.days_left !== null){
-      badge.style.display='inline-block';
-      badge.textContent = d.days_left > 0 ? d.days_left+' days left' : 'Trial expired';
-      if(d.days_left <= 0) badge.style.background='var(--danger)';
-    }
+    if(d.days_left!==null){ badge.style.display='inline-block'; badge.textContent=d.days_left>0?d.days_left+' days left':'Trial expired'; if(d.days_left<=0) badge.style.background='var(--danger)'; }
   }).catch(function(){});
 }
 
-/* ══════════════════════════════════════════════════
-   AUTO-REPLIES
-══════════════════════════════════════════════════ */
+/* ══ AUTO-REPLIES ════════════════════════════════════════════ */
 function loadFlows(){
   api('GET','/client/flows').then(function(flows){
     var c=document.getElementById('flows-list');
@@ -656,33 +610,31 @@ function toggleFlowMedia(){ var t=document.getElementById('flow-type').value; do
 function saveFlow(){
   var keywords=keywordList; var response=document.getElementById('flow-response').value.trim(); var response_type=document.getElementById('flow-type').value; var media_url=document.getElementById('flow-media-url').value.trim();
   if(!keywords.length||!response){ toast('Keywords and response are required.'); return; }
-  api('POST','/client/flows',{ keywords, response, response_type, media_url: media_url||undefined }).then(function(){ closeModal('flow-modal'); loadFlows(); toast('Flow saved!'); }).catch(function(){ toast('Error saving flow.'); });
+  api('POST','/client/flows',{ keywords:keywords, response:response, response_type:response_type, media_url:media_url||undefined }).then(function(){ closeModal('flow-modal'); loadFlows(); toast('Flow saved!'); }).catch(function(){ toast('Error saving flow.'); });
 }
 function deleteFlow(id){ if(!confirm('Delete this flow?')) return; api('DELETE','/client/flows/'+id).then(function(){ loadFlows(); toast('Deleted.'); }); }
 
-/* ══════════════════════════════════════════════════
-   LISTINGS
-══════════════════════════════════════════════════ */
+/* ══ LISTINGS ════════════════════════════════════════════════ */
 var allListings=[];
 function loadListings(){
-  api('GET','/client/listings').then(function(data){ allListings=data; renderListings(); updateChecklist('listing', data.length>0); }).catch(function(){ document.getElementById('listings-grid').innerHTML='<p style="color:var(--danger);padding:20px">Error loading listings.</p>'; });
+  api('GET','/client/listings').then(function(data){ allListings=data; renderListings(); updateChecklist('listing',data.length>0); }).catch(function(){ document.getElementById('listings-grid').innerHTML='<p style="color:var(--danger);padding:20px">Error loading listings.</p>'; });
 }
-function setListingType(t, el){ currentListingFilter=t; document.querySelectorAll('.sub-tab').forEach(function(b){ b.classList.remove('active'); }); if(el)el.classList.add('active'); renderListings(); }
+function setListingType(t,el){ currentListingFilter=t; document.querySelectorAll('.sub-tab').forEach(function(b){ b.classList.remove('active'); }); if(el)el.classList.add('active'); renderListings(); }
 function renderListings(){
-  var filtered = currentListingFilter==='all' ? allListings : allListings.filter(function(l){ return l.listing_type===currentListingFilter; });
+  var filtered=currentListingFilter==='all'?allListings:allListings.filter(function(l){ return l.listing_type===currentListingFilter; });
   var g=document.getElementById('listings-grid');
   if(!filtered.length){ g.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="ico">🛍️</div><p>No listings yet. Add your first one!</p></div>'; return; }
   g.innerHTML=filtered.map(function(l){
     var media=(l.listing_media||[]).filter(function(m){ return m.media_type==='image'; });
-    var thumb = media.length ? '<img src="'+media[0].url+'" alt="'+l.name+'" loading="lazy"/>' : '<div class="thumb" style="display:flex;align-items:center;justify-content:center;height:150px;background:#f5f5f5;color:#bbb;font-size:.8rem">No image</div>';
-    return '<div class="listing-card"><div class="thumb">'+thumb+'</div><div class="body"><h4>'+l.name+'</h4>'+(l.price?'<div class="price">'+l.price+(l.price_label?' / '+l.price_label:'')+'</div>':'')+'<div class="cat">'+(l.category||'')+(l.location?' · '+l.location:'')+'</div></div><div class="actions"><button class="btn btn-outline btn-sm" onclick="editListing('+l.id+')">Edit</button><button class="btn btn-red btn-sm" onclick="deleteListing('+l.id+')">Delete</button><span class="badge '+(l.available?'badge-green':'badge-red')+'" style="margin-left:auto">'+(l.available?'Active':'Hidden')+'</span></div></div>';
+    var thumb=media.length?'<img src="'+media[0].url+'" alt="'+l.name+'" loading="lazy"/>':"<div style='display:flex;align-items:center;justify-content:center;height:150px;color:var(--muted);font-size:.8rem'>No image</div>";
+    return '<div class="listing-card"><div class="thumb">'+thumb+'</div><div class="body"><h4>'+l.name+'</h4>'+(l.price?'<div class="price">'+l.price+(l.price_label?' / '+l.price_label:'')+'</div>':'')+' <div class="cat">'+(l.category||'')+(l.location?' · '+l.location:'')+'</div></div><div class="actions"><button class="btn btn-outline btn-sm" onclick="editListing('+l.id+')">Edit</button><button class="btn btn-red btn-sm" onclick="deleteListing('+l.id+')">Delete</button><span class="badge '+(l.available?'badge-green':'badge-red')+'" style="margin-left:auto">'+(l.available?'Active':'Hidden')+'</span></div></div>';
   }).join('');
 }
 function openListingModal(){
   document.getElementById('edit-listing-id').value=''; document.getElementById('listing-modal-title').textContent='Add Listing';
   ['l-name','l-price','l-price-label','l-desc','l-cat','l-loc','l-keywords'].forEach(function(id){ document.getElementById(id).value=''; });
-  document.getElementById('l-type').value='product'; document.getElementById('l-available').checked=true;
-  document.getElementById('image-preview').innerHTML=''; openModal('listing-modal');
+  document.getElementById('l-type').value='product'; document.getElementById('l-available').checked=true; document.getElementById('image-preview').innerHTML='';
+  openModal('listing-modal');
 }
 function editListing(id){
   var l=allListings.find(function(x){ return x.id===id; }); if(!l) return;
@@ -703,13 +655,10 @@ async function saveListing(){
   var body={ name:document.getElementById('l-name').value.trim(), description:document.getElementById('l-desc').value.trim(), price:document.getElementById('l-price').value.trim(), price_label:document.getElementById('l-price-label').value.trim(), category:document.getElementById('l-cat').value.trim(), location:document.getElementById('l-loc').value.trim(), keywords:document.getElementById('l-keywords').value.trim(), listing_type:document.getElementById('l-type').value, available:document.getElementById('l-available').checked };
   if(!body.name){ toast('Name is required.'); return; }
   try {
-    var listing = editId ? await api('PUT','/client/listings/'+editId,body) : await api('POST','/client/listings',body);
+    var listing=editId?await api('PUT','/client/listings/'+editId,body):await api('POST','/client/listings',body);
     var lid=listing.id||editId;
     var files=Array.from(document.getElementById('l-images').files).slice(0,3);
-    for(var i=0;i<files.length;i++){
-      var fd=new FormData(); fd.append('file',files[i]); fd.append('media_type','image'); fd.append('sort_order',String(i));
-      await apiForm('POST','/client/listings/'+lid+'/media',fd);
-    }
+    for(var i=0;i<files.length;i++){ var fd=new FormData(); fd.append('file',files[i]); fd.append('media_type','image'); fd.append('sort_order',String(i)); await apiForm('POST','/client/listings/'+lid+'/media',fd); }
     var pdf=document.getElementById('l-pdf').files[0];
     if(pdf){ var pfd=new FormData(); pfd.append('file',pdf); pfd.append('media_type','pdf'); await apiForm('POST','/client/listings/'+lid+'/media',pfd); }
     closeModal('listing-modal'); loadListings(); toast(editId?'Listing updated!':'Listing added!');
@@ -717,44 +666,35 @@ async function saveListing(){
 }
 function deleteListing(id){ if(!confirm('Delete this listing?')) return; api('DELETE','/client/listings/'+id).then(function(){ loadListings(); toast('Deleted.'); }); }
 
-/* ══════════════════════════════════════════════════
-   ORDERS
-══════════════════════════════════════════════════ */
+/* ══ ORDERS ══════════════════════════════════════════════════ */
 function loadOrders(){
   api('GET','/client/orders').then(function(data){ allOrders=data; renderOrders(data); }).catch(function(){ document.getElementById('orders-table').innerHTML='<p style="color:var(--danger);padding:16px;font-size:.85rem">Error loading orders.</p>'; });
 }
-function filterOrders(){
-  var f=document.getElementById('order-status-filter').value;
-  renderOrders(f ? allOrders.filter(function(o){ return o.status===f; }) : allOrders);
-}
+function filterOrders(){ var f=document.getElementById('order-status-filter').value; renderOrders(f?allOrders.filter(function(o){ return o.status===f; }):allOrders); }
 function renderOrders(orders){
   var c=document.getElementById('orders-table');
   if(!orders.length){ c.innerHTML='<div class="empty-state"><div class="ico">📦</div><p>No orders yet.</p></div>'; return; }
   c.innerHTML='<table><thead><tr><th>#</th><th>Customer</th><th>Item</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+orders.map(function(o){
-    return '<tr><td>#'+String(o.id).slice(-4)+'</td><td>'+(o.customer_name||o.customer_phone||'')+'</td><td style="max-width:180px">'+(o.item_name||'')+'</td><td>'+(o.total?'₦'+Number(o.total).toLocaleString():'')+'</td><td>'+statusBadge(o.status)+'</td><td>'+fmtDate(o.created_at)+'</td><td><select onchange="updateOrderStatus('+o.id+',this.value)" style="padding:4px 8px;font-size:.78rem"><option value="">Update…</option><option>confirmed</option><option>packaging</option><option>shipped</option><option>delivered</option><option>cancelled</option></select></td></tr>';
+    return '<tr><td>#'+String(o.id).slice(-4)+'</td><td>'+(o.customer_name||o.customer_phone||'')+'</td><td style="max-width:180px">'+(o.item_name||'')+'</td><td>'+(o.total?'₦'+Number(o.total).toLocaleString():'')+'</td><td>'+statusBadge(o.status)+'</td><td>'+fmtDate(o.created_at)+'</td><td><select onchange="updateOrderStatus('+o.id+',this.value)" style="padding:4px 8px;font-size:.78rem;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px"><option value="">Update…</option><option>confirmed</option><option>packaging</option><option>shipped</option><option>delivered</option><option>cancelled</option></select></td></tr>';
   }).join('')+'</tbody></table>';
 }
 function updateOrderStatus(id,status){ if(!status) return; api('PUT','/client/orders/'+id,{status:status}).then(function(){ loadOrders(); toast('Order updated!'); }).catch(function(){ toast('Update failed.'); }); }
 
-/* ══════════════════════════════════════════════════
-   STATUS POSTS / SCHEDULE
-══════════════════════════════════════════════════ */
+/* ══ STATUS POSTS ════════════════════════════════════════════ */
 function loadStatusPosts(){
   api('GET','/client/post-schedule').then(function(d){
     var days=d.days||[];
-    document.querySelectorAll('#post-days .day-btn').forEach(function(b){ b.classList.toggle('sel', days.includes(b.dataset.day)); });
+    document.querySelectorAll('#post-days .day-btn').forEach(function(b){ b.classList.toggle('sel',days.includes(b.dataset.day)); });
     document.getElementById('post-time').value=d.time||'';
     document.getElementById('post-memes').checked=d.include_memes!==false;
   }).catch(function(){});
   api('GET','/client/status-posts').then(function(posts){
     var c=document.getElementById('status-posts-list');
     if(!posts||!posts.length){ c.innerHTML='<p style="color:var(--muted);font-size:.85rem">No status posts yet.</p>'; return; }
-    c.innerHTML='<table><thead><tr><th>Caption</th><th>Days</th><th>Time</th></tr></thead><tbody>'+posts.map(function(p){
-      return '<tr><td style="max-width:200px">'+(p.caption||'Auto-generated')+'</td><td>'+(p.scheduled_days||[]).join(', ')+'</td><td>'+(p.scheduled_time||'')+'</td></tr>';
-    }).join('')+'</tbody></table>';
+    c.innerHTML='<table><thead><tr><th>Caption</th><th>Days</th><th>Time</th></tr></thead><tbody>'+posts.map(function(p){ return '<tr><td style="max-width:200px">'+(p.caption||'Auto-generated')+'</td><td>'+(p.scheduled_days||[]).join(', ')+'</td><td>'+(p.scheduled_time||'')+'</td></tr>'; }).join('')+'</tbody></table>';
   }).catch(function(){});
 }
-document.querySelectorAll('#post-days .day-btn').forEach(function(b){ b.addEventListener('click', function(){ b.classList.toggle('sel'); }); });
+document.querySelectorAll('#post-days .day-btn').forEach(function(b){ b.addEventListener('click',function(){ b.classList.toggle('sel'); }); });
 function savePostSchedule(){
   var days=Array.from(document.querySelectorAll('#post-days .day-btn.sel')).map(function(b){ return b.dataset.day; });
   var time=document.getElementById('post-time').value; var memes=document.getElementById('post-memes').checked;
@@ -762,28 +702,22 @@ function savePostSchedule(){
   api('PUT','/client/post-schedule',{days:days,time:time,include_memes:memes}).then(function(){ toast('Schedule saved! ✅'); updateChecklist('schedule',true); }).catch(function(){ toast('Error saving schedule.'); });
 }
 
-/* ══════════════════════════════════════════════════
-   BROADCAST
-══════════════════════════════════════════════════ */
+/* ══ BROADCAST ════════════════════════════════════════════════ */
 function loadBroadcastLog(){
   api('GET','/client/broadcast-logs').then(function(logs){
     var c=document.getElementById('broadcast-log');
     if(!logs.length){ c.innerHTML='<p style="color:var(--muted);font-size:.85rem">No broadcasts yet.</p>'; return; }
-    c.innerHTML='<table><thead><tr><th>Message</th><th>Recipients</th><th>Date</th></tr></thead><tbody>'+logs.map(function(l){
-      return '<tr><td style="max-width:300px;word-break:break-word">'+l.message+'</td><td>'+l.recipients+'</td><td>'+fmtDate(l.sent_at)+'</td></tr>';
-    }).join('')+'</tbody></table>';
+    c.innerHTML='<table><thead><tr><th>Message</th><th>Recipients</th><th>Date</th></tr></thead><tbody>'+logs.map(function(l){ return '<tr><td style="max-width:300px;word-break:break-word">'+l.message+'</td><td>'+l.recipients+'</td><td>'+fmtDate(l.sent_at)+'</td></tr>'; }).join('')+'</tbody></table>';
   }).catch(function(){});
 }
 function sendBroadcast(){
   var msg=document.getElementById('broadcast-msg').value.trim(); var phones=document.getElementById('broadcast-phones').value.trim();
   if(!msg){ toast('Please type a message.'); return; }
   var body={message:msg}; if(phones) body.phones=phones;
-  api('POST','/client/broadcast',body).then(function(r){ toast('Sent to '+r.sent+' contacts! ✅'); loadBroadcastLog(); document.getElementById('broadcast-msg').value=''; document.getElementById('broadcast-phones').value=''; }).catch(function(){ toast('Error sending broadcast. Is WhatsApp connected?'); });
+  api('POST','/client/broadcast',body).then(function(r){ toast('Sent to '+r.sent+' contacts! ✅'); loadBroadcastLog(); document.getElementById('broadcast-msg').value=''; document.getElementById('broadcast-phones').value=''; }).catch(function(){ toast('Error sending. Is WhatsApp connected?'); });
 }
 
-/* ══════════════════════════════════════════════════
-   ANALYTICS
-══════════════════════════════════════════════════ */
+/* ══ ANALYTICS ════════════════════════════════════════════════ */
 function fmtMonth(m){ var p=m.split('-'); var names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(p[1])-1]+' '+p[0]; }
 function changeMonth(dir){ var p=analyticsMonth.split('-'); var d=new Date(parseInt(p[0]),parseInt(p[1])-1+dir,1); analyticsMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); loadAnalytics(); }
 function loadAnalytics(){
@@ -795,9 +729,7 @@ function loadAnalytics(){
   }).catch(function(){ document.getElementById('analytics-cards').innerHTML='<p style="color:var(--danger);padding:20px">Error loading analytics.</p>'; });
 }
 
-/* ══════════════════════════════════════════════════
-   BOT ERRANDS / TASKS
-══════════════════════════════════════════════════ */
+/* ══ BOT ERRANDS ══════════════════════════════════════════════ */
 function loadTasks(){
   api('GET','/client/bot-tasks').then(function(tasks){
     var c=document.getElementById('tasks-list');
@@ -813,20 +745,17 @@ function openTaskModal(){
   document.querySelectorAll('#task-days .day-btn').forEach(function(b){ b.classList.remove('sel'); });
   openModal('task-modal');
 }
-document.querySelectorAll('#task-days .day-btn').forEach(function(b){ b.addEventListener('click', function(){ b.classList.toggle('sel'); }); });
+document.querySelectorAll('#task-days .day-btn').forEach(function(b){ b.addEventListener('click',function(){ b.classList.toggle('sel'); }); });
 function saveTask(){
   var name=document.getElementById('t-name').value.trim(); var msg=document.getElementById('t-msg').value.trim(); var time=document.getElementById('t-time').value;
-  var days=Array.from(document.querySelectorAll('#task-days .day-btn.sel')).map(function(b){ return b.dataset.day; });
-  var filter=document.getElementById('t-filter').value;
+  var days=Array.from(document.querySelectorAll('#task-days .day-btn.sel')).map(function(b){ return b.dataset.day; }); var filter=document.getElementById('t-filter').value;
   if(!name||!msg||!time||!days.length){ toast('Fill in all fields.'); return; }
   api('POST','/client/bot-tasks',{name:name,message:msg,schedule_time:time,schedule_days:days,filter_type:filter}).then(function(){ closeModal('task-modal'); loadTasks(); toast('Task saved! ✅'); }).catch(function(){ toast('Error saving task.'); });
 }
 function toggleTask(id,active){ api('PATCH','/client/bot-tasks/'+id,{active:active}).then(function(){ toast(active?'Task enabled.':'Task paused.'); }); }
 function deleteTask(id){ if(!confirm('Delete this task?')) return; api('DELETE','/client/bot-tasks/'+id).then(function(){ loadTasks(); toast('Deleted.'); }); }
 
-/* ══════════════════════════════════════════════════
-   SETTINGS
-══════════════════════════════════════════════════ */
+/* ══ SETTINGS ═════════════════════════════════════════════════ */
 function loadSettings(){
   api('GET','/client/settings').then(function(d){
     document.getElementById('s-biz-name').value=d.business_name||''; document.getElementById('s-biz-hours').value=d.business_hours||'';
@@ -839,12 +768,8 @@ function loadSettings(){
     document.getElementById('s-areas').value=b.delivery_areas||''; document.getElementById('s-fee').value=b.delivery_fee||'';
     document.getElementById('s-dtime').value=b.delivery_time||''; document.getElementById('s-minorder').value=b.minimum_order||'';
     document.getElementById('s-return').value=b.return_policy||''; document.getElementById('s-promo').value=b.promo||'';
-    updateChecklist('settings', !!(d.notification_number||d.welcome_message));
-    if(d.is_partner && d.partner_expires_at){
-      var badge=document.getElementById('trial-badge'); var days=Math.ceil((new Date(d.partner_expires_at)-new Date())/86400000);
-      badge.style.display='inline-block'; badge.textContent=days>0?days+' days left':'Trial expired';
-      if(days<=0) badge.style.background='var(--danger)';
-    }
+    updateChecklist('settings',!!(d.notification_number||d.welcome_message));
+    if(d.is_partner&&d.partner_expires_at){ var badge=document.getElementById('trial-badge'); var days=Math.ceil((new Date(d.partner_expires_at)-new Date())/86400000); badge.style.display='inline-block'; badge.textContent=days>0?days+' days left':'Trial expired'; if(days<=0) badge.style.background='var(--danger)'; }
   }).catch(function(){ toast('Error loading settings.'); });
 }
 function saveSettings(){
@@ -853,45 +778,27 @@ function saveSettings(){
   Promise.all([api('PUT','/client/settings',mainBody), api('PUT','/client/bot-setup',setupBody)]).then(function(){ toast('Settings saved! ✅'); updateChecklist('settings',true); }).catch(function(){ toast('Error saving settings.'); });
 }
 
-/* ══════════════════════════════════════════════════
-   ONBOARDING CHECKLIST
-══════════════════════════════════════════════════ */
+/* ══ CHECKLIST ════════════════════════════════════════════════ */
 var checklistOpen=false;
 function toggleChecklist(){ checklistOpen=!checklistOpen; document.getElementById('checklist-panel').style.display=checklistOpen?'block':'none'; }
-function updateChecklist(key,done){
-  var map={wa:'ck-wa',listing:'ck-listing',flow:'ck-flow',settings:'ck-settings',schedule:'ck-schedule'};
-  var el=document.getElementById(map[key]); if(el) el.textContent=done?'✅':'⬜';
-}
+function updateChecklist(key,done){ var map={wa:'ck-wa',listing:'ck-listing',flow:'ck-flow',settings:'ck-settings',schedule:'ck-schedule'}; var el=document.getElementById(map[key]); if(el) el.textContent=done?'✅':'⬜'; }
 
-/* ══════════════════════════════════════════════════
-   PWA
-══════════════════════════════════════════════════ */
-window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferInstall=e; setTimeout(function(){ document.getElementById('pwa-banner').style.display='block'; },4000); });
+/* ══ PWA ══════════════════════════════════════════════════════ */
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); deferInstall=e; setTimeout(function(){ document.getElementById('pwa-banner').style.display='block'; },4000); });
 function installPWA(){ if(!deferInstall) return; deferInstall.prompt(); deferInstall.userChoice.then(function(){ document.getElementById('pwa-banner').style.display='none'; deferInstall=null; }); }
 
-/* ══════════════════════════════════════════════════
-   PUSH NOTIFICATIONS
-══════════════════════════════════════════════════ */
+/* ══ PUSH ══════════════════════════════════════════════════════ */
 var VAPID_PUB='BBN1ci_BmHj26FTeNf_lnzqVGAhM2_X1RBlDz0lYlVOh3ULn5aKO9iNnhHBdyuDBGQXCvkjAN03yNrwhd6S0JNs';
 function urlB64(b64){ var p=b64.replace(/-/g,'+').replace(/_/g,'/'); var raw=atob(p); var arr=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i); return arr; }
-function setupPush(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)) return;
-  navigator.serviceWorker.ready.then(function(sw){ return sw.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64(VAPID_PUB) }); }).then(function(sub){ api('POST','/client/push/subscribe', JSON.parse(JSON.stringify(sub))).catch(function(){}); }).catch(function(){});
-}
+function setupPush(){ if(!('serviceWorker' in navigator)||!('PushManager' in window)) return; navigator.serviceWorker.ready.then(function(sw){ return sw.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64(VAPID_PUB) }); }).then(function(sub){ api('POST','/client/push/subscribe',JSON.parse(JSON.stringify(sub))).catch(function(){}); }).catch(function(){}); }
 
-/* ══════════════════════════════════════════════════
-   INIT
-══════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', function(){
+/* ══ INIT ══════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded',function(){
   if(!TOKEN){ window.location.href='/login.html'; return; }
-  pollWaStatus();
-  loadTrialBadge();
-  loadFlows();
-  setupPush();
+  pollWaStatus(); loadTrialBadge(); loadFlows(); setupPush();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});
 });
 </script>
-<!-- Optional: qrcode.js for nicer QR rendering -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="console.log('QR lib not loaded, using fallback')"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="console.log('QR lib fallback')"></script>
 </body>
 </html>

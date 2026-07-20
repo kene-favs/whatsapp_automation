@@ -10,6 +10,8 @@ const router   = express.Router();
 const jwt      = require('jsonwebtoken');
 const multer   = require('multer');
 const { createClient } = require('@supabase/supabase-js');
+const bcrypt   = require('bcryptjs');
+const axios    = require('axios');
 
 const db             = require('../db/supabase');
 const sessionManager = require('../sessions/sessionManager');
@@ -45,12 +47,170 @@ async function checkPartnerExpiry(clientId) {
   } catch (e) { console.error('[ClientAPI] Partner check error:', e.message); }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  PUBLIC ROUTES (no auth required)
+// ══════════════════════════════════════════════════════════════
+
+async function activateClient(clientId) {
+  var sb = _supabase || createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  await sb.from('clients').update({ status: 'active', trial_notified: false }).eq('id', clientId);
+}
+
+router.post('/client/signup', async function(req, res) {
+  try {
+    var { email, full_name, whatsapp_number, plan, ref } = req.body;
+    if (!email || !full_name || !whatsapp_number) return res.status(400).json({ error: 'email, full_name, and whatsapp_number are required' });
+    var sb = getSupabase();
+    var hash = await bcrypt.hash('forgebot2025', 10);
+    var insert = await sb.from('clients').insert({
+      email, full_name, whatsapp_number, password_hash: hash,
+      status: 'pending', plan: plan || 'monthly', referred_by: ref || null,
+      trial_notified: false, setup_completed: false
+    }).select('id').single();
+    if (insert.error) throw new Error(insert.error.message);
+    var clientId = insert.data.id;
+    var amount = (plan === 'yearly') ? 24000 : 2500;
+    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    var flwRes;
+    try {
+      flwRes = await axios.post('https://api.flutterwave.com/v3/payments', {
+        tx_ref: 'FB-' + clientId + '-' + Date.now(), amount, currency: 'NGN',
+        redirect_url: appUrl + '/api/client/pay/callback',
+        customer: { email, name: full_name, phonenumber: whatsapp_number },
+        meta: { client_id: clientId },
+        customizations: { title: 'ForgeBot Subscription', logo: appUrl + '/icons/icon-192.png' }
+      }, { headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY } });
+    } catch (e) {
+      await sb.from('clients').delete().eq('id', clientId);
+      return res.status(502).json({ error: 'Payment gateway unavailable. Please try again.' });
+    }
+    if (!flwRes.data || flwRes.data.status !== 'success') {
+      await sb.from('clients').delete().eq('id', clientId);
+      return res.status(502).json({ error: 'Could not create payment link. Please try again.' });
+    }
+    res.json({ payment_url: flwRes.data.data.link });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/client/login', async function(req, res) {
+  try {
+    var { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    var sb = getSupabase();
+    var result = await sb.from('clients').select('*').eq('email', email).single();
+    if (result.error || !result.data) return res.status(401).json({ error: 'Invalid credentials' });
+    var client = result.data;
+    if (client.status !== 'active') return res.status(403).json({ error: 'Account not yet active. Complete payment first.' });
+    var match = await bcrypt.compare(password, client.password_hash);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    var token = jwt.sign({ id: client.id, clientId: client.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, client: { id: client.id, full_name: client.full_name, email: client.email } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/client/qr-stream — PUBLIC (EventSource cannot send auth headers)
+router.get('/client/qr-stream', async function(req, res) {
+  var token = req.query.token;
+  var clientId;
+  try {
+    var decoded = jwt.verify(token, process.env.JWT_SECRET);
+    clientId = decoded.clientId || decoded.id;
+  } catch (e) { return res.status(401).json({ error: 'Invalid token' }); }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable Railway/nginx buffering
+  res.flushHeaders();
+
+  function sendEvent(event, data) {
+    try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
+  }
+
+  // If already connected, tell the client immediately
+  if (sessionManager.getSession(clientId)) {
+    sendEvent('connected', { status: 'connected' });
+    res.end();
+    return;
+  }
+
+  // Register listener — gets cached QR immediately if one already exists
+  sessionManager.registerQRListener(clientId, sendEvent);
+
+  // Heartbeat every 20s to keep Railway connection alive
+  var heartbeat = setInterval(function() {
+    try { res.write(': heartbeat\n\n'); } catch (e) { clearInterval(heartbeat); }
+  }, 20000);
+
+  // Cleanup on disconnect
+  req.on('close', function() {
+    clearInterval(heartbeat);
+    sessionManager.unregisterQRListener(clientId, sendEvent);
+  });
+
+  // Start session (mutex inside prevents double-start, errors handled internally)
+  sessionManager.startSession(clientId).catch(function(e) {
+    console.error('[QR-Stream] startSession error:', e.message);
+  });
+});
+
+router.get('/client/pay/callback', async function(req, res) {
+  try {
+    var { status, tx_ref, transaction_id } = req.query;
+    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    if (status !== 'successful' || !transaction_id) return res.redirect(appUrl + '/?payment=failed');
+    var verify;
+    try {
+      verify = await axios.get('https://api.flutterwave.com/v3/transactions/' + transaction_id + '/verify', {
+        headers: { Authorization: 'Bearer ' + process.env.FLW_SECRET_KEY }
+      });
+    } catch (e) { return res.redirect(appUrl + '/?payment=failed'); }
+    var txData = verify.data && verify.data.data;
+    if (!txData || txData.status !== 'successful') return res.redirect(appUrl + '/?payment=failed');
+    var clientId = txData.meta && txData.meta.client_id;
+    if (!clientId) return res.redirect(appUrl + '/?payment=failed');
+    await activateClient(clientId);
+    var token = jwt.sign({ id: clientId, clientId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    return res.redirect(appUrl + '/onboard?activated=1&token=' + token);
+  } catch (e) { return res.redirect((process.env.APP_URL || 'https://forgebot.up.railway.app') + '/?payment=error'); }
+});
+
+router.post('/client/pay/webhook', async function(req, res) {
+  try {
+    var hash = req.headers['verif-hash'];
+    if (!hash || hash !== process.env.FLW_HASH) return res.status(401).json({ error: 'Unauthorized' });
+    var { event, data } = req.body;
+    if (event === 'charge.completed' && data && data.status === 'successful') {
+      var clientId = data.meta && data.meta.client_id;
+      if (clientId) await activateClient(clientId);
+    }
+    res.json({ status: 'ok' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/push/vapid-key', function(req, res) { res.json({ publicKey: process.env.VAPID_PUBLIC_KEY }); });
+
+router.post('/push/subscribe', async function(req, res) {
+  try {
+    var { subscription, clientId: cid } = req.body;
+    if (!subscription || !cid) return res.status(400).json({ error: 'subscription and clientId required' });
+    await getSupabase().from('push_subscriptions').upsert({ client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString() }, { onConflict: 'client_id' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/push/test', function(req, res) { res.json({ ok: true }); });
+
+// ── Apply auth + partner check to all /client routes ──────────
 router.use('/client', auth, async function(req, res, next) {
   await checkPartnerExpiry(req.clientId);
   next();
 });
 
-// ── GET /api/client/me ────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  EXISTING ROUTES (all preserved)
+// ══════════════════════════════════════════════════════════════
+
 router.get('/client/me', async function(req, res) {
   try {
     var client = await db.getClientById(req.clientId);
@@ -62,7 +222,6 @@ router.get('/client/me', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Flows ─────────────────────────────────────────────────────
 router.get('/client/flows', async function(req, res) {
   try { res.json(await db.getFlows(req.clientId, false)); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -81,7 +240,6 @@ router.delete('/client/flows/:id', async function(req, res) {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Status Posts ──────────────────────────────────────────────
 router.get('/client/status-posts', async function(req, res) {
   try { res.json(await db.getStatusPosts(req.clientId)); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -102,7 +260,6 @@ router.delete('/client/status-posts/:id', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Broadcasts ────────────────────────────────────────────────
 router.get('/client/broadcasts', async function(req, res) {
   try {
     var r = await getSupabase().from('broadcasts').select('*').eq('client_id', req.clientId).order('created_at', { ascending: false }).limit(20);
@@ -124,11 +281,10 @@ router.post('/client/broadcasts', async function(req, res) {
       catch (e) { console.error('[Broadcast] Failed for ' + jids[i]); }
     }
     await db.logBroadcast(req.clientId, message, sent);
-    res.json({ sent: sent, total: jids.length });
+    res.json({ sent, total: jids.length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Settings ──────────────────────────────────────────────────
 router.put('/client/settings', async function(req, res) {
   try {
     var allowed = ['notification_number','business_name','welcome_message','fallback_message','bank_name','account_number','account_name','business_hours'];
@@ -146,127 +302,58 @@ router.put('/client/fallback', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── QR Stream (SSE) — with heartbeat to survive Railway nginx ─
-router.get('/client/qr-stream', async function(req, res) {
-  var token = req.query.token;
-  try {
-    var decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.clientId = decoded.clientId || decoded.id;
-  } catch (e) { return res.status(401).json({ error: 'Invalid token' }); }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // disable Railway/nginx buffering
-  res.flushHeaders();
-
-  var clientId = req.clientId;
-
-  function sendEvent(event, data) {
-    try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
-  }
-
-  // If already connected, tell the client immediately and close
-  if (sessionManager.getSession(clientId)) {
-    sendEvent('connected', { status: 'connected' });
-    res.end();
-    return;
-  }
-
-  // Register this SSE connection as a listener (gets cached QR immediately if available)
-  sessionManager.registerQRListener(clientId, sendEvent);
-
-  // Start session (mutex inside prevents double-start)
-  sessionManager.startSession(clientId).catch(function(e) {
-    console.error('[QR-Stream] startSession error:', e.message);
-  });
-
-  // Heartbeat every 20s — keeps Railway from closing the SSE connection
-  var heartbeat = setInterval(function() {
-    try { res.write(': heartbeat\n\n'); } catch (e) { clearInterval(heartbeat); }
-  }, 20000);
-
-  // Cleanup on disconnect
-  req.on('close', function() {
-    clearInterval(heartbeat);
-    sessionManager.unregisterQRListener(clientId, sendEvent);
-  });
-});
-
-// ── bot-setup (questionnaire from onboard.html) ───────────────
 router.put('/client/bot-setup', async function(req, res) {
   try {
-    var sb = getSupabase();
-    var {
-      occupation, occupation_data, availability_days, payment_methods, current_promo,
+    var sb = getSupabase(); var clientId = req.clientId;
+    var { occupation, occupation_data, availability_days, payment_methods, current_promo,
       instagram, facebook, tiktok, whatsapp_channel, service_areas, property_types,
-      studio_location, advance_booking, deposit_required, home_service,
-      return_policy, delivers_to, minimum_order, delivery_time_local, delivery_fee_local,
-      session_duration, session_type, who_do_you_serve, free_consult, bulk_orders
-    } = req.body;
-
+      studio_location, advance_booking, deposit_required, home_service, return_policy,
+      delivers_to, minimum_order, delivery_time_local, delivery_fee_local, session_duration,
+      session_type, who_do_you_serve, free_consult, bulk_orders } = req.body;
     if (occupation) {
-      await sb.from('clients').update({ occupation: occupation, occupation_data: occupation_data || {} }).eq('id', req.clientId);
+      await sb.from('clients').update({ occupation, occupation_data: occupation_data || {} }).eq('id', clientId);
     }
-
     var setup = {
-      client_id: req.clientId,
-      availability_days: availability_days,
-      payment_methods: payment_methods,
-      current_promo: current_promo || null,
-      instagram: instagram || null,
-      facebook: facebook || null,
-      tiktok: tiktok || null,
-      whatsapp_channel: whatsapp_channel || null,
-      service_areas: service_areas || property_types || null,
-      studio_location: studio_location || null,
-      advance_booking: advance_booking || null,
-      deposit_required: deposit_required || null,
-      home_service: home_service || null,
-      return_policy: return_policy || null,
-      delivers_to: delivers_to || null,
-      minimum_order: minimum_order || null,
-      delivery_time_local: delivery_time_local || null,
-      delivery_fee_local: delivery_fee_local || null,
-      session_duration: session_duration || session_type || null,
-      who_do_you_serve: who_do_you_serve || null,
-      bulk_orders: bulk_orders || null,
+      client_id: clientId, availability_days, payment_methods, current_promo: current_promo||null,
+      instagram: instagram||null, facebook: facebook||null, tiktok: tiktok||null,
+      whatsapp_channel: whatsapp_channel||null, service_areas: service_areas||property_types||null,
+      studio_location: studio_location||null, advance_booking: advance_booking||null,
+      deposit_required: deposit_required||null, home_service: home_service||null,
+      return_policy: return_policy||null, delivers_to: delivers_to||null,
+      minimum_order: minimum_order||null, delivery_time_local: delivery_time_local||null,
+      delivery_fee_local: delivery_fee_local||null, session_duration: session_duration||session_type||null,
+      who_do_you_serve: who_do_you_serve||null, bulk_orders: bulk_orders||null,
       updated_at: new Date().toISOString()
     };
-
-    // Don't overwrite existing values with null/empty
     Object.keys(setup).forEach(function(k) {
       if (k !== 'client_id' && (setup[k] === null || setup[k] === undefined || setup[k] === '')) delete setup[k];
     });
-
     var { error } = await sb.from('bot_setup').upsert(setup, { onConflict: 'client_id' });
     if (error) throw new Error(error.message);
+    await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Occupation ────────────────────────────────────────────────
 router.put('/client/occupation', async function(req, res) {
   try {
     var { occupation, answers } = req.body;
     if (!occupation) return res.status(400).json({ error: 'occupation required' });
     var sb = getSupabase();
-    await sb.from('clients').update({ occupation: occupation, occupation_data: answers || {} }).eq('id', req.clientId);
+    await sb.from('clients').update({ occupation, occupation_data: answers || {} }).eq('id', req.clientId);
     await sb.from('bot_setup').upsert({ client_id: req.clientId, occupation_answers: answers || {}, updated_at: new Date().toISOString() }, { onConflict: 'client_id' });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Location ──────────────────────────────────────────────────
 router.put('/client/location', async function(req, res) {
   try {
     var { location_address, location_maps_url } = req.body;
-    await getSupabase().from('clients').update({ location_address: location_address || null, location_maps_url: location_maps_url || null }).eq('id', req.clientId);
+    await getSupabase().from('clients').update({ location_address: location_address||null, location_maps_url: location_maps_url||null }).eq('id', req.clientId);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Listings ──────────────────────────────────────────────────
 router.get('/client/listings', async function(req, res) {
   try {
     var r = await getSupabase().from('service_listings').select('*, listing_media(*)').eq('client_id', req.clientId).order('created_at', { ascending: false });
@@ -313,7 +400,6 @@ router.delete('/client/listings/:id', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Listing Media ─────────────────────────────────────────────
 router.get('/client/listings/:id/media', async function(req, res) {
   try {
     var r = await getSupabase().from('listing_media').select('*').eq('listing_id', req.params.id).eq('client_id', req.clientId).order('sort_order', { ascending: true });
@@ -321,6 +407,7 @@ router.get('/client/listings/:id/media', async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Accepts file upload (multer) OR JSON url
 router.post('/client/listings/:id/media', upload.single('file'), async function(req, res) {
   try {
     var sb = getSupabase();
@@ -362,7 +449,6 @@ router.post('/client/upload', upload.single('file'), async function(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── FAQ ───────────────────────────────────────────────────────
 router.get('/client/faq', async function(req, res) {
   try { var r = await getSupabase().from('business_faq').select('*').eq('client_id', req.clientId).order('sort_order', { ascending: true }); res.json(r.data || []); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -382,9 +468,9 @@ router.patch('/client/faq/:id', async function(req, res) {
   try {
     var { question, answer, keywords, sort_order } = req.body;
     var update = {};
-    if (question !== undefined) update.question = question;
-    if (answer !== undefined) update.answer = answer;
-    if (keywords !== undefined) update.keywords = keywords;
+    if (question   !== undefined) update.question   = question;
+    if (answer     !== undefined) update.answer     = answer;
+    if (keywords   !== undefined) update.keywords   = keywords;
     if (sort_order !== undefined) update.sort_order = sort_order;
     var r = await getSupabase().from('business_faq').update(update).eq('id', req.params.id).eq('client_id', req.clientId).select().single();
     if (r.error) throw new Error(r.error.message);
@@ -397,7 +483,6 @@ router.delete('/client/faq/:id', async function(req, res) {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Partner status ────────────────────────────────────────────
 router.get('/client/partner-status', async function(req, res) {
   try {
     var r = await getSupabase().from('clients').select('is_partner,partner_expires_at,subscription_active').eq('id', req.clientId).single();
@@ -419,7 +504,7 @@ router.put('/client/qualification-toggle', async function(req, res) {
 });
 
 // ══════════════════════════════════════════════════════════════
-//  NEW ROUTES v3 (dashboard additions)
+//  NEW ROUTES v3 (dashboard)
 // ══════════════════════════════════════════════════════════════
 
 router.get('/client/settings', async function(req, res) {
@@ -430,29 +515,37 @@ router.get('/client/settings', async function(req, res) {
     var client = clientRes.data; delete client.password_hash;
     var setup = ((await sb.from('bot_setup').select('*').eq('client_id', req.clientId).single()).data) || {};
     res.json({
-      notification_number: client.notification_number||'', welcome_message: client.welcome_message||'',
-      fallback_message: client.fallback_message||'', bank_name: client.bank_name||'',
-      account_number: client.account_number||'', account_name: client.account_name||'', business_hours: client.business_hours||'',
+      business_name: client.business_name||'', notification_number: client.notification_number||'',
+      welcome_message: client.welcome_message||'', fallback_message: client.fallback_message||'',
+      bank_name: client.bank_name||'', account_number: client.account_number||'',
+      account_name: client.account_name||'', business_hours: client.business_hours||'',
       bot_setup: {
-        instagram: setup.instagram||'', facebook: setup.facebook||'', tiktok: setup.tiktok||'', whatsapp_channel: setup.whatsapp_channel||'',
-        delivery_areas: setup.service_areas||setup.delivery_areas||'', delivery_fee: setup.delivery_fee_local||'',
-        delivery_time: setup.delivery_time_local||'', minimum_order: setup.minimum_order||'', return_policy: setup.return_policy||'',
+        instagram: setup.instagram||'', facebook: setup.facebook||'', tiktok: setup.tiktok||'',
+        whatsapp_channel: setup.whatsapp_channel||'', delivery_areas: setup.service_areas||setup.delivery_areas||'',
+        delivery_fee: setup.delivery_fee_local||'', delivery_time: setup.delivery_time_local||'',
+        minimum_order: setup.minimum_order||'', return_policy: setup.return_policy||'',
         promo: setup.current_promo||'', payment_methods: Array.isArray(setup.payment_methods) ? setup.payment_methods.join(',') : (setup.payment_methods||''),
-        post_schedule_days: setup.post_schedule_days||[], post_schedule_time: setup.post_schedule_time||'', post_include_memes: setup.post_include_memes !== false
+        post_schedule_days: setup.post_schedule_days||[], post_schedule_time: setup.post_schedule_time||'',
+        post_include_memes: setup.post_include_memes !== false
       },
-      is_partner: client.is_partner||false, partner_expires_at: client.partner_expires_at||null, subscription_active: client.subscription_active||false
+      is_partner: client.is_partner||false, partner_expires_at: client.partner_expires_at||null,
+      subscription_active: client.subscription_active||false
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/client/session-status', function(req, res) {
-  try { var sock = sessionManager.getSession(req.clientId); res.json({ connected: !!(sock), status: sock ? 'connected' : 'disconnected' }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    var sock = sessionManager.getSession(req.clientId);
+    res.json({ connected: !!(sock), status: sock ? 'connected' : 'disconnected' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/client/orders', async function(req, res) {
-  try { var r = await getSupabase().from('orders').select('*').eq('client_id', req.clientId).order('created_at', { ascending: false }).limit(100); res.json(r.data || []); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    var r = await getSupabase().from('orders').select('*').eq('client_id', req.clientId).order('created_at', { ascending: false }).limit(100);
+    res.json(r.data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.put('/client/orders/:id', async function(req, res) {
@@ -470,18 +563,22 @@ router.get('/client/analytics', async function(req, res) {
   try {
     var month = req.query.month || (function(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'); })();
     var parts = month.split('-'); var sb = getSupabase();
-    var start = month+'-01'; var end = new Date(parseInt(parts[0]), parseInt(parts[1]), 1).toISOString().split('T')[0];
+    var start = month+'-01';
+    var end = new Date(parseInt(parts[0]), parseInt(parts[1]), 1).toISOString().split('T')[0];
     var custRes  = await sb.from('customers').select('id',{count:'exact',head:true}).eq('client_id',req.clientId).gte('created_at',start).lt('created_at',end);
     var ordRes   = await sb.from('orders').select('status,total').eq('client_id',req.clientId).gte('created_at',start).lt('created_at',end);
-    var orders   = ordRes.data||[]; var conf = orders.filter(function(o){return ['confirmed','packaging','shipped','delivered'].includes(o.status);});
+    var orders   = ordRes.data||[];
+    var conf     = orders.filter(function(o){ return ['confirmed','packaging','shipped','delivered'].includes(o.status); });
     var leadsRes = await sb.from('customers').select('id',{count:'exact',head:true}).eq('client_id',req.clientId).gte('last_contact',start).lt('last_contact',end);
-    res.json({ new_customers: custRes.count||0, leads: leadsRes.count||0, orders_placed: orders.length, orders_confirmed: conf.length, total_revenue: conf.reduce(function(s,o){return s+(parseFloat(o.total)||0);},0) });
+    res.json({ new_customers: custRes.count||0, leads: leadsRes.count||0, orders_placed: orders.length, orders_confirmed: conf.length, total_revenue: conf.reduce(function(s,o){ return s+(parseFloat(o.total)||0); }, 0) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/client/broadcast-logs', async function(req, res) {
-  try { var r = await getSupabase().from('broadcasts').select('*').eq('client_id', req.clientId).order('sent_at', { ascending: false }).limit(20); res.json(r.data || []); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    var r = await getSupabase().from('broadcasts').select('*').eq('client_id', req.clientId).order('sent_at', { ascending: false }).limit(20);
+    res.json(r.data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/client/broadcast', async function(req, res) {
@@ -490,11 +587,11 @@ router.post('/client/broadcast', async function(req, res) {
     if (!message) return res.status(400).json({ error: 'message required' });
     var sock = sessionManager.getSession(req.clientId);
     if (!sock) return res.status(400).json({ error: 'WhatsApp not connected' });
-    var list = Array.isArray(phones) ? phones : (phones||'').split('\n').map(function(p){return p.trim();}).filter(Boolean);
+    var list = Array.isArray(phones) ? phones : (phones||'').split('\n').map(function(p){ return p.trim(); }).filter(Boolean);
     if (!list.length) return res.status(400).json({ error: 'No phone numbers provided' });
     var sent = 0;
-    for (var i=0;i<list.length;i++) {
-      try { await sock.sendMessage(list[i].replace(/\D/g,'')+'@s.whatsapp.net', {text:message}); sent++; await new Promise(function(r){setTimeout(r,1200);}); }
+    for (var i = 0; i < list.length; i++) {
+      try { await sock.sendMessage(list[i].replace(/\D/g,'')+'@s.whatsapp.net', { text: message }); sent++; await new Promise(function(r){ setTimeout(r, 1200); }); }
       catch(e) {}
     }
     await getSupabase().from('broadcasts').insert({ client_id: req.clientId, message, recipients: sent, sent_at: new Date().toISOString() });
@@ -521,7 +618,7 @@ router.patch('/client/bot-tasks/:id', async function(req, res) {
   try {
     var allowed = ['active','name','message','schedule_time','schedule_days','filter_type'];
     var update = {};
-    allowed.forEach(function(k){if(req.body[k]!==undefined)update[k]=req.body[k];});
+    allowed.forEach(function(k){ if(req.body[k]!==undefined) update[k]=req.body[k]; });
     var r = await getSupabase().from('bot_tasks').update(update).eq('id',req.params.id).eq('client_id',req.clientId).select().single();
     if (r.error) throw new Error(r.error.message);
     res.json(r.data);
