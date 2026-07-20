@@ -4,6 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ForgeBot — Set Up Your Bot</title>
+<!-- QRCode.js loaded here so it's ALWAYS ready before any QR event fires -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
@@ -18,7 +20,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#080d14;color:#fff;m
 h1{font-size:22px;font-weight:900;letter-spacing:-.5px;margin-bottom:6px}
 p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:24px}
 .sec-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#25D366;margin:28px 0 14px;padding-bottom:6px;border-bottom:1px solid rgba(37,211,102,.15)}
-.sec-sub{font-size:12px;color:rgba(255,255,255,.4);margin-top:-8px;margin-bottom:14px}
 .field{margin-bottom:16px}
 .field label{display:block;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px}
 .field label .opt{font-weight:400;color:rgba(255,255,255,.3);font-size:12px}
@@ -29,11 +30,11 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .radio-group{display:flex;flex-direction:column;gap:10px}
 .radio-card{display:flex;align-items:flex-start;gap:12px;background:#111c2c;border:1.5px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;cursor:pointer;transition:.2s}
-.radio-card:hover{border-color:rgba(37,211,102,.3);background:#0f1f30}
+.radio-card:hover{border-color:rgba(37,211,102,.3)}
 .radio-card input{margin-top:3px;accent-color:#25D366;flex-shrink:0}
 .radio-card.selected{border-color:#25D366;background:rgba(37,211,102,.07)}
-.radio-card .rc-icon{font-size:20px;flex-shrink:0}
-.radio-card strong{display:block;font-size:14px;font-weight:700;color:#fff;margin-bottom:2px}
+.rc-icon{font-size:20px;flex-shrink:0}
+.radio-card strong{display:block;font-size:14px;font-weight:700;margin-bottom:2px}
 .radio-card small{font-size:12px;color:rgba(255,255,255,.45);line-height:1.4}
 .check-group{display:flex;flex-wrap:wrap;gap:8px}
 .check-group label{display:flex;align-items:center;gap:6px;background:#111c2c;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;transition:.2s}
@@ -43,8 +44,15 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .btn{width:100%;background:#25D366;color:#000;padding:14px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;border:none;margin-top:8px;transition:.2s;font-family:inherit}
 .btn:hover{background:#1fbb58}
 .btn:disabled{background:rgba(37,211,102,.3);cursor:not-allowed}
-.qr-box{width:220px;height:220px;margin:0 auto 24px;border-radius:14px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.03);position:relative;overflow:hidden}
-.qr-box canvas{width:210px;height:210px}
+/* Login section */
+.login-box{background:#111c2c;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:24px;margin-bottom:20px}
+.hint-box{background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.2);border-radius:10px;padding:12px 14px;font-size:13px;color:rgba(255,255,255,.6);margin-bottom:16px}
+.hint-box b{color:#25D366}
+.login-err{color:#f87171;font-size:13px;margin-bottom:12px;display:none}
+/* QR section */
+.qr-wrap{text-align:center}
+.qr-box{width:220px;height:220px;margin:0 auto 24px;border-radius:14px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;background:#fff;position:relative;overflow:hidden}
+.qr-box canvas,.qr-box img{width:210px;height:210px;border-radius:10px;display:block}
 .spinner{width:40px;height:40px;border:3px solid rgba(37,211,102,.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .status-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:100px;font-size:13px;font-weight:700;margin-bottom:20px}
@@ -58,233 +66,243 @@ p.sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6;margin-bottom:2
 .step-item{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
 .step-num{width:24px;height:24px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#25D366;flex-shrink:0}
 .step-text{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5}
-.success-msg{display:none;text-align:center}
-.success-msg .big{font-size:56px;margin-bottom:16px}
-.success-msg h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
-.success-msg p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
-.mobile-notice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:22px;text-align:left;display:none}
-.mobile-notice .mn-title{font-size:13px;font-weight:800;color:#60a5fa;margin-bottom:8px}
-.mobile-notice .mn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
-.mobile-notice .mn-icon{font-size:15px;flex-shrink:0;margin-top:1px}
-.mobile-notice .mn-text{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5}
-.mobile-notice .mn-text b{color:#93c5fd}
+.expire-note{font-size:12px;color:#ffa726;margin-top:10px;display:none}
 .qr-tip{font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;line-height:1.5}
-.expire-note{font-size:12px;color:#ffa726;margin-top:8px;display:none}
-.text-center{text-align:center}
-@media(max-width:480px){.two-col{grid-template-columns:1fr}}
-
-/* ── Login section ── */
-#loginSection{display:none}
-.hint-box{background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.2);border-radius:10px;padding:14px 16px;margin-bottom:22px}
-.hint-box p{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6}
-.hint-box p b{color:#25D366}
-.login-field{margin-bottom:16px}
-.login-field label{display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
-.login-field input{width:100%;background:#111c2c;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:13px 14px;color:#fff;font-size:14px;outline:none;transition:border-color .2s;font-family:inherit}
-.login-field input:focus{border-color:rgba(37,211,102,.5)}
-.login-field input::placeholder{color:rgba(255,255,255,.25)}
-.login-err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#f87171;margin-bottom:14px;display:none;line-height:1.5}
+.mobile-notice{background:#0d1a2e;border:1px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:22px;text-align:left;display:none}
+.mn-title{font-size:13px;font-weight:800;color:#60a5fa;margin-bottom:8px}
+.mn-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
+.mn-icon{font-size:15px;flex-shrink:0}
+.mn-text{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5}
+.mn-text b{color:#93c5fd}
+.success-wrap{text-align:center;display:none}
+.success-wrap .big{font-size:56px;margin-bottom:16px}
+.success-wrap h2{font-size:24px;font-weight:900;color:#25D366;margin-bottom:8px}
+.success-wrap p{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:24px}
+.go-btn{background:#25D366;color:#000;padding:13px 28px;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;border:none;display:inline-block;text-decoration:none}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">Forge<span>Bot</span></div>
 
-  <!-- PARTNER LOGIN (shown when ?ref= in URL and no token) -->
-  <div id="loginSection">
-    <h1 style="font-size:24px;margin-bottom:8px">Welcome to ForgeBot</h1>
+  <!-- LOGIN SECTION (shown when ?ref= in URL and no token) -->
+  <div id="loginSection" style="display:none">
+    <h1>Welcome to ForgeBot</h1>
     <p class="sub">Log in with the credentials your partner shared with you.</p>
-    <div class="hint-box">
-      <p>Your login details were given to you by your ForgeBot agent.<br>
-      Default password is <b>forgebot2025</b> — you can change it later in Settings.</p>
+    <div class="login-box">
+      <div class="hint-box">Default password is <b>forgebot2025</b> — change it in Settings after setup.</div>
+      <div class="login-err" id="loginErr"></div>
+      <div class="field"><label>Email address</label><input type="email" id="loginEmail" placeholder="you@example.com"/></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPassword" value="forgebot2025"/></div>
+      <button class="btn" onclick="doLogin()">Log In &amp; Set Up My Bot →</button>
     </div>
-    <div class="login-err" id="loginErr"></div>
-    <div class="login-field">
-      <label>Email Address</label>
-      <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"/>
-    </div>
-    <div class="login-field">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="forgebot2025" autocomplete="current-password"/>
-    </div>
-    <button class="btn" id="loginBtn" onclick="doLogin()">Log In &amp; Set Up My Bot &rarr;</button>
   </div>
 
-  <!-- MAIN CONTENT (questionnaire + QR) — shown after login or if token exists -->
+  <!-- SETUP CONTENT (questionnaire + QR) -->
   <div id="setupContent" style="display:none">
 
-  <div class="progress">
-    <div class="prog-step active" id="prog1">1 &middot; About Your Business</div>
-    <div class="prog-line"></div>
-    <div class="prog-step" id="prog2">2 &middot; Connect WhatsApp</div>
-  </div>
+    <!-- Progress bar -->
+    <div class="progress" id="progressBar">
+      <div class="prog-step active" id="step1tab">1 · About Your Business</div>
+      <div class="prog-line"></div>
+      <div class="prog-step" id="step2tab">2 · Connect WhatsApp</div>
+    </div>
 
-  <!-- STEP 1: QUESTIONNAIRE -->
-  <div id="questionSection">
-    <h1>Tell Us About Your Business</h1>
-    <p class="sub">This helps your bot answer customers correctly from day one.</p>
-    <form id="setupForm" onsubmit="submitSetup(event)">
-      <div class="sec-title" style="margin-top:0">What Does Your Business Do?</div>
-      <div class="field">
-        <div class="radio-group">
-          <label class="radio-card" id="rc_service">
-            <input type="radio" name="biz_type" value="service" onchange="onBizType()"/>
-            <div class="rc-icon">&#128736;</div>
-            <div><strong>Service Business</strong><small>Photography, salon, tutoring, consulting, events, logistics, etc.</small></div>
-          </label>
-          <label class="radio-card" id="rc_product">
-            <input type="radio" name="biz_type" value="product" onchange="onBizType()"/>
-            <div class="rc-icon">&#128230;</div>
-            <div><strong>Product / Physical Business</strong><small>Food, clothing, electronics, groceries, building materials, etc.</small></div>
-          </label>
-          <label class="radio-card" id="rc_both">
-            <input type="radio" name="biz_type" value="both" onchange="onBizType()"/>
-            <div class="rc-icon">&#128260;</div>
-            <div><strong>Both &mdash; Services &amp; Products</strong><small>I provide services AND sell physical products.</small></div>
-          </label>
-        </div>
+    <!-- ── STEP 1: QUESTIONNAIRE ── -->
+    <div id="step1">
+      <h1>Tell Us About Your Business</h1>
+      <p class="sub">This helps your bot answer customers correctly from day one.</p>
+
+      <!-- Business type -->
+      <div class="sec-title">🏢 WHAT DOES YOUR BUSINESS DO?</div>
+      <div class="radio-group" id="bizTypeGroup">
+        <label class="radio-card" onclick="selectBiz(this,'service')">
+          <input type="radio" name="biz" value="service"/>
+          <div class="rc-icon">🔧</div>
+          <div><strong>Service Business</strong><small>I provide services — photography, salon, tutoring, consulting, events, logistics, etc.</small></div>
+        </label>
+        <label class="radio-card" onclick="selectBiz(this,'product')">
+          <input type="radio" name="biz" value="product"/>
+          <div class="rc-icon">📦</div>
+          <div><strong>Product / Physical Business</strong><small>I sell physical products — food, clothing, electronics, groceries, building materials, etc.</small></div>
+        </label>
+        <label class="radio-card" onclick="selectBiz(this,'both')">
+          <input type="radio" name="biz" value="both"/>
+          <div class="rc-icon">🔀</div>
+          <div><strong>Both — Services &amp; Products</strong><small>I provide services AND sell physical products (e.g. fashion designer who also sells fabric).</small></div>
+        </label>
       </div>
 
-      <div class="field" id="occGroup" style="display:none">
+      <!-- Occupation -->
+      <div class="field" style="margin-top:20px">
         <label>Your Industry / Occupation *</label>
-        <select id="occupation" required><option value="">Select your industry...</option></select>
+        <select id="occupation">
+          <option value="">— Select your industry —</option>
+          <option>Fashion &amp; Clothing</option>
+          <option>Food &amp; Catering</option>
+          <option>Beauty &amp; Salon</option>
+          <option>Photography &amp; Videography</option>
+          <option>Tech / IT Services</option>
+          <option>Real Estate &amp; Property</option>
+          <option>Health &amp; Wellness</option>
+          <option>Education &amp; Tutoring</option>
+          <option>Events &amp; Entertainment</option>
+          <option>Logistics &amp; Delivery</option>
+          <option>Auto &amp; Mechanics</option>
+          <option>Agriculture &amp; Farming</option>
+          <option>Interior Design &amp; Decor</option>
+          <option>Legal &amp; Consulting</option>
+          <option>Finance &amp; Accounting</option>
+          <option>Construction &amp; Engineering</option>
+          <option>Retail &amp; Supermarket</option>
+          <option>Other</option>
+        </select>
       </div>
 
-      <div id="serviceQuestions" style="display:none">
-        <div class="sec-title">About Your Services</div>
-        <div class="field"><label>What areas / locations do you serve? *</label><input type="text" id="service_areas" placeholder="e.g. Lagos Island, Abuja, Nationwide"/></div>
-        <div class="field"><label>Studio, office or shop location? <span class="opt">(optional)</span></label><input type="text" id="studio_location" placeholder="e.g. 5 Allen Avenue, Ikeja — or 'No fixed location'"/></div>
+      <!-- SERVICE section -->
+      <div id="serviceSection" style="display:none">
+        <div class="sec-title">🔧 ABOUT YOUR SERVICES</div>
+        <div class="field"><label>What areas / locations do you serve? *</label><input type="text" id="service_areas" placeholder="e.g. Lagos, Abuja, Nationwide"/></div>
+        <div class="field"><label>Do you have a studio, office or shop location? <span class="opt">(optional)</span></label><input type="text" id="studio_location" placeholder="e.g. 14 Adewale St, Ikeja, Lagos"/></div>
         <div class="two-col">
-          <div class="field"><label>Do you visit clients? *</label>
-            <select id="home_service"><option value="">Select...</option><option>Yes, I come to clients</option><option>No, clients come to me</option><option>Both options available</option></select></div>
-          <div class="field"><label>Advance bookings? *</label>
-            <select id="advance_booking"><option value="">Select...</option><option value="Yes">Yes</option><option value="No, walk-in only">No, walk-in only</option></select></div>
+          <div class="field"><label>Do you visit / come to clients? *</label>
+            <select id="home_service"><option value="">Select</option><option>Yes, I come to clients</option><option>No, client comes to me</option><option>Both options available</option></select>
+          </div>
+          <div class="field"><label>Do you accept advance bookings? *</label>
+            <select id="advance_booking"><option value="">Select</option><option>Yes</option><option>No</option><option>Sometimes</option></select>
+          </div>
         </div>
         <div class="two-col">
-          <div class="field"><label>Deposit to book?</label>
-            <select id="deposit_required"><option value="">Select...</option><option value="Yes, deposit required">Yes, deposit required</option><option value="No deposit needed">No deposit needed</option><option value="Sometimes, depends on job">Sometimes / depends on job</option></select></div>
-          <div class="field"><label>Typical job duration?</label><input type="text" id="session_duration" placeholder="e.g. 1–2 hours, Half day"/></div>
+          <div class="field"><label>Do you require a deposit to book?</label>
+            <select id="deposit_required"><option value="">Select</option><option>Yes, always</option><option>No deposit needed</option><option>Sometimes / depends on job</option></select>
+          </div>
+          <div class="field"><label>Typical session / job duration?</label>
+            <input type="text" id="session_duration" placeholder="e.g. 2-3 hours, 1 day"/>
+          </div>
         </div>
         <div class="two-col">
           <div class="field"><label>Who do you mainly serve?</label>
-            <select id="who_do_you_serve"><option value="">Select...</option><option value="Individuals / Personal clients">Individuals</option><option value="Businesses / Corporate">Businesses</option><option value="Both individuals and businesses">Both</option></select></div>
-          <div class="field"><label>Free consultation?</label>
-            <select id="free_consult"><option value="">Select...</option><option value="Yes, free consultation available">Yes, it's free</option><option value="No, consultation is paid">No, paid</option></select></div>
+            <select id="who_do_you_serve"><option value="">Select</option><option>Individuals</option><option>Businesses / Companies</option><option>Both</option></select>
+          </div>
+          <div class="field"><label>Do you offer free consultation?</label>
+            <select id="free_consult"><option value="">Select</option><option>Yes, free consultation</option><option>No, consultation is paid</option></select>
+          </div>
         </div>
       </div>
 
-      <div id="productQuestions" style="display:none">
-        <div class="sec-title">About Your Products</div>
-        <div class="field"><label>Return / exchange policy?</label><input type="text" id="return_policy" placeholder="e.g. No returns, Exchange within 7 days"/></div>
-        <div class="field"><label>Do you deliver? Where to? *</label><input type="text" id="delivers_to" placeholder="e.g. Lagos only, Nationwide, No delivery — pickup only"/></div>
+      <!-- PRODUCT section -->
+      <div id="productSection" style="display:none">
+        <div class="sec-title">📦 ABOUT YOUR PRODUCTS</div>
+        <div class="field"><label>What is your return / exchange policy?</label><input type="text" id="return_policy" placeholder="e.g. No returns after 24 hours"/></div>
+        <div class="field"><label>Do you deliver? Where to? *</label><input type="text" id="delivers_to" placeholder="e.g. Lagos only, Nationwide, International"/></div>
         <div class="two-col">
-          <div class="field"><label>Local delivery fee?</label><input type="text" id="delivery_fee_local" placeholder="e.g. N1,000 flat"/></div>
-          <div class="field"><label>Estimated delivery time?</label><input type="text" id="delivery_time_local" placeholder="e.g. Same day, 1–2 days"/></div>
+          <div class="field"><label>Local delivery fee?</label><input type="text" id="delivery_fee_local" placeholder="e.g. ₦500 within Lagos"/></div>
+          <div class="field"><label>Estimated delivery time?</label><input type="text" id="delivery_time_local" placeholder="e.g. 1-3 business days"/></div>
         </div>
         <div class="two-col">
-          <div class="field"><label>Minimum order amount?</label><input type="text" id="minimum_order" placeholder="e.g. N5,000, No minimum"/></div>
+          <div class="field"><label>Minimum order amount?</label><input type="text" id="minimum_order" placeholder="e.g. ₦5,000 minimum"/></div>
           <div class="field"><label>Bulk / wholesale discounts?</label>
-            <select id="bulk_orders"><option value="">Select...</option><option value="Yes, bulk discounts available">Yes, available</option><option value="No bulk discounts">No bulk discounts</option></select></div>
-        </div>
-      </div>
-
-      <div id="commonQuestions" style="display:none">
-        <div class="sec-title">Availability &amp; Payments</div>
-        <div class="field">
-          <label>What days are you open / available? *</label>
-          <div class="check-group">
-            <label><input type="checkbox" name="days" value="Mon"/> Monday</label>
-            <label><input type="checkbox" name="days" value="Tue"/> Tuesday</label>
-            <label><input type="checkbox" name="days" value="Wed"/> Wednesday</label>
-            <label><input type="checkbox" name="days" value="Thu"/> Thursday</label>
-            <label><input type="checkbox" name="days" value="Fri"/> Friday</label>
-            <label><input type="checkbox" name="days" value="Sat"/> Saturday</label>
-            <label><input type="checkbox" name="days" value="Sun"/> Sunday</label>
+            <select id="bulk_orders"><option value="">Select</option><option>Yes, available</option><option>No bulk discount</option><option>Contact us for bulk pricing</option></select>
           </div>
         </div>
-        <div class="field">
-          <label>Payment methods you accept? *</label>
-          <div class="check-group">
-            <label><input type="checkbox" name="payment" value="Bank Transfer"/> Bank Transfer</label>
-            <label><input type="checkbox" name="payment" value="Cash"/> Cash</label>
-            <label><input type="checkbox" name="payment" value="POS / Card"/> POS / Card</label>
-            <label><input type="checkbox" name="payment" value="Online Payment"/> Online Payment</label>
-            <label><input type="checkbox" name="payment" value="USSD"/> USSD</label>
-          </div>
+      </div>
+
+      <!-- Availability & Payments -->
+      <div class="sec-title">⏰ AVAILABILITY &amp; PAYMENTS</div>
+      <div class="field">
+        <label>What days are you available / open? *</label>
+        <div class="check-group" id="daysGroup">
+          <label><input type="checkbox" value="Monday"/> Monday</label>
+          <label><input type="checkbox" value="Tuesday"/> Tuesday</label>
+          <label><input type="checkbox" value="Wednesday"/> Wednesday</label>
+          <label><input type="checkbox" value="Thursday"/> Thursday</label>
+          <label><input type="checkbox" value="Friday"/> Friday</label>
+          <label><input type="checkbox" value="Saturday"/> Saturday</label>
+          <label><input type="checkbox" value="Sunday"/> Sunday</label>
         </div>
-        <div class="field">
-          <label>Any current promotion or offer? <span class="opt">(optional)</span></label>
-          <textarea id="current_promo" rows="2" placeholder="e.g. 10% off all orders this week..."></textarea>
+      </div>
+      <div class="field">
+        <label>What payment methods do you accept? *</label>
+        <div class="check-group" id="payGroup">
+          <label><input type="checkbox" value="Bank Transfer"/> Bank Transfer</label>
+          <label><input type="checkbox" value="Cash"/> Cash</label>
+          <label><input type="checkbox" value="POS / Card"/> POS / Card</label>
+          <label><input type="checkbox" value="Online Payment"/> Online Payment</label>
+          <label><input type="checkbox" value="USSD"/> USSD</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Any current promotion or offer? <span class="opt">(optional)</span></label>
+        <textarea id="current_promo" placeholder="e.g. 10% off all orders this week, Free delivery on orders above ₦20k..."></textarea>
+      </div>
+
+      <!-- Social media -->
+      <div class="sec-title">📱 YOUR SOCIAL MEDIA</div>
+      <p style="font-size:13px;color:rgba(255,255,255,.4);margin-top:-10px;margin-bottom:14px">Add at least one handle so your bot can direct customers to your pages.</p>
+      <div class="two-col">
+        <div class="field"><label>Instagram</label><input type="text" id="instagram" placeholder="@yourbusiness"/></div>
+        <div class="field"><label>Facebook</label><input type="text" id="facebook" placeholder="Your page name or link"/></div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>TikTok</label><input type="text" id="tiktok" placeholder="@yourusername"/></div>
+        <div class="field"><label>WhatsApp Channel</label><input type="text" id="whatsapp_channel" placeholder="Channel link or name"/></div>
+      </div>
+
+      <div class="err" id="formErr"></div>
+      <button class="btn" id="submitBtn" onclick="submitSetup()">Save &amp; Continue to WhatsApp Setup →</button>
+    </div>
+
+    <!-- ── STEP 2: QR SCAN ── -->
+    <div id="step2" style="display:none">
+      <div class="qr-wrap">
+        <h1>Connect Your WhatsApp</h1>
+        <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
+
+        <div class="mobile-notice" id="mobileNotice">
+          <div class="mn-title">📱 Using your phone? Read this first</div>
+          <div class="mn-row"><div class="mn-icon">👉</div><div class="mn-text">The QR code on this screen must be <b>scanned by your WhatsApp</b> — but WhatsApp cannot scan a code on the same phone it's installed on.</div></div>
+          <div class="mn-row"><div class="mn-icon">✅</div><div class="mn-text"><b>Option 1:</b> Open this link on a <b>laptop or computer</b>, then scan with your phone.</div></div>
+          <div class="mn-row"><div class="mn-icon">✅</div><div class="mn-text"><b>Option 2:</b> Open on a <b>friend's phone</b> and scan with your WhatsApp.</div></div>
         </div>
 
-        <div class="sec-title">Your Social Media</div>
-        <p class="sec-sub">Add at least one so your bot can direct customers to your pages.</p>
-        <div class="two-col">
-          <div class="field"><label>Instagram</label><input type="text" id="instagram" placeholder="@yourbusiness"/></div>
-          <div class="field"><label>Facebook</label><input type="text" id="facebook" placeholder="Page name or link"/></div>
-        </div>
-        <div class="two-col">
-          <div class="field"><label>TikTok</label><input type="text" id="tiktok" placeholder="@yourtiktok"/></div>
-          <div class="field"><label>WhatsApp Channel</label><input type="text" id="whatsapp_channel" placeholder="Channel link or name"/></div>
-        </div>
-        <div class="err" id="socialError">Please add at least one social media handle before continuing.</div>
-        <div class="err" id="formError"></div>
-        <button type="submit" class="btn" id="submitBtn">Save &amp; Continue to WhatsApp Setup &rarr;</button>
-      </div>
-    </form>
-  </div>
-
-  <!-- STEP 2: QR CODE -->
-  <div id="qrSection" style="display:none">
-    <div id="mainContent">
-      <h1>Connect Your WhatsApp</h1>
-      <p class="sub">Scan the QR code below with your WhatsApp app to activate your bot.</p>
-      <div class="mobile-notice" id="mobileNotice">
-        <div class="mn-title">&#128242; Using your phone? Read this first</div>
-        <div class="mn-row"><div class="mn-icon">&#128073;</div><div class="mn-text">The QR code must be <b>scanned by your WhatsApp</b> — but WhatsApp cannot scan a QR on the same phone it is installed on.</div></div>
-        <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 1:</b> Open this link on a <b>laptop or computer</b>, then scan with your phone.</div></div>
-        <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 2:</b> Send this link to a <b>friend's phone</b>. Open it there, then scan with your WhatsApp.</div></div>
-        <div class="mn-row"><div class="mn-icon">&#9989;</div><div class="mn-text"><b>Option 3:</b> Open on a <b>tablet</b> and scan with your phone.</div></div>
-        <div class="mn-row"><div class="mn-icon">&#128736;</div><div class="mn-text"><b>Cyber café:</b> Open this link on their computer and scan from there.</div></div>
-      </div>
-      <div class="text-center">
         <div class="status-badge waiting" id="statusBadge"><div class="sdot"></div><span id="statusText">Generating QR code...</span></div>
-      </div>
-      <div class="qr-box" id="qrBox"><div class="spinner" id="spinner"></div></div>
-      <div class="steps" id="stepsGuide">
-        <h3>How to scan</h3>
-        <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <b style="color:#fff">WhatsApp</b> on the phone you want the bot to run on</div></div>
-        <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap <b style="color:#fff">three dots (&#8942;)</b> &rarr; <b style="color:#fff">Linked Devices</b></div></div>
-        <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> &rarr; scan the QR code on this screen</div></div>
-        <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically &#127881;</div></div>
-        <div class="expire-note" id="expireNote">&#9203; QR refreshes every 30 seconds &mdash; a new one loads automatically.</div>
-        <p class="qr-tip">&#128161; The QR must be on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it.</p>
-      </div>
-    </div>
-    <div class="success-msg" id="successMsg">
-      <div class="big">&#127881;</div>
-      <h2>Your Bot is Live!</h2>
-      <p>WhatsApp connected! Your bot is now replying customers and running 24/7.</p>
-      <a href="/dashboard" class="btn" style="display:inline-block;text-decoration:none;width:auto;padding:14px 28px">Go to My Dashboard &rarr;</a>
-    </div>
-  </div>
 
-  </div><!-- end #setupContent -->
-</div>
+        <div class="qr-box" id="qrBox" style="background:#111c2c">
+          <div class="spinner" id="spinner"></div>
+        </div>
+
+        <div class="steps" id="stepsGuide">
+          <h3>How to scan</h3>
+          <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <b style="color:#fff">WhatsApp</b> on the phone you want the bot to run on</div></div>
+          <div class="step-item"><div class="step-num">2</div><div class="step-text">Tap the <b style="color:#fff">three dots (⋮)</b> at top right → tap <b style="color:#fff">Linked Devices</b></div></div>
+          <div class="step-item"><div class="step-num">3</div><div class="step-text">Tap <b style="color:#fff">"Link a Device"</b> → point your camera at the QR code above</div></div>
+          <div class="step-item"><div class="step-num">4</div><div class="step-text">Done! Your bot activates automatically 🎉</div></div>
+          <div class="expire-note" id="expireNote">⏳ QR code refreshes every 30 seconds — a new one loads automatically.</div>
+          <p class="qr-tip">💡 The QR must be shown on a <b style="color:rgba(255,255,255,.5)">different screen</b> from the phone scanning it.</p>
+        </div>
+      </div>
+
+      <div class="success-wrap" id="successMsg">
+        <div class="big">🎉</div>
+        <h2>Your Bot is Live!</h2>
+        <p>WhatsApp connected successfully. Your bot is now replying to customers, posting status, and running 24/7.</p>
+        <a href="/dashboard" class="go-btn">Go to My Dashboard →</a>
+      </div>
+    </div>
+
+  </div><!-- /setupContent -->
+</div><!-- /card -->
 
 <script>
-var qrScript = document.createElement('script');
-qrScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js';
-document.head.appendChild(qrScript);
-
-// ── URL params ─────────────────────────────────────────────────
+// ── Token / ref detection ──────────────────────────────────────
 var params   = new URLSearchParams(window.location.search);
 var urlToken = params.get('token');
 var refId    = params.get('ref');
 
 if (urlToken) {
   localStorage.setItem('forgebot_token', urlToken);
-  window.history.replaceState({}, '', window.location.pathname + (params.get('activated') ? '?activated=1' : ''));
+  var clean = window.location.pathname + (refId ? '?ref=' + refId : '');
+  window.history.replaceState({}, '', clean);
 }
 
 var token = localStorage.getItem('forgebot_token');
@@ -297,109 +315,84 @@ if (token) {
   window.location.href = '/';
 }
 
-// ── Partner login ──────────────────────────────────────────────
+// ── Login (partner onboard) ────────────────────────────────────
 function doLogin() {
-  var btn   = document.getElementById('loginBtn');
   var email = document.getElementById('loginEmail').value.trim();
   var pw    = document.getElementById('loginPassword').value;
   var errEl = document.getElementById('loginErr');
   errEl.style.display = 'none';
   if (!email || !pw) { errEl.textContent = 'Please enter your email and password.'; errEl.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Logging in...';
-  fetch('/api/client/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pw }) })
-  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-  .then(function(r) {
-    if (!r.ok) {
-      errEl.textContent = r.data.error || 'Login failed. Check your email and password.';
-      errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Log In & Set Up My Bot →';
-      return;
-    }
-    token = r.data.token;
-    localStorage.setItem('forgebot_token', token);
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('setupContent').style.display = 'block';
-  })
-  .catch(function() {
-    errEl.textContent = 'Network error — please check your connection.';
-    errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Log In & Set Up My Bot →';
-  });
+  fetch('/api/client/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email: email, password: pw }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.error) { errEl.textContent = d.error; errEl.style.display = 'block'; return; }
+      localStorage.setItem('forgebot_token', d.token);
+      token = d.token;
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('setupContent').style.display = 'block';
+    })
+    .catch(function() { errEl.textContent = 'Network error. Please try again.'; errEl.style.display = 'block'; });
 }
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && document.getElementById('loginSection').style.display !== 'none') doLogin();
-});
-
-// ── Occupation data ────────────────────────────────────────────
-var SERVICE_OCCUPATIONS = ['Photography / Videography','Beauty / Salon / Spa','Fashion / Tailoring','Education / Tutoring','Events / Decoration','Tech / IT Services','Fitness / Gym','Consulting','Legal / Law Firm','Medical / Clinic','Travel / Tourism','Logistics / Delivery','Auto / Car Services','Interior Design','Agriculture / Farming Services','Religious Organisation','General Service Business'];
-var PRODUCT_OCCUPATIONS = ['Food / Catering / Restaurant','Retail Shop / Store','Supermarket / Grocery','Fashion / Clothing Store','Electronics / Phone Sales','Building Materials','Pharmacy / Chemist','Bakery / Confectionery','Agriculture / Farm Produce','Online Store / E-commerce','Market Trader','Hardware / Tools','Auto / Car Dealer','Real Estate','General Product Business'];
-
-function populateOccupation(bizType) {
-  var sel = document.getElementById('occupation');
-  sel.innerHTML = '<option value="">Select your industry...</option>';
-  if (bizType === 'service') {
-    SERVICE_OCCUPATIONS.forEach(function(o) { sel.innerHTML += '<option value="' + o + '">' + o + '</option>'; });
-  } else if (bizType === 'product') {
-    PRODUCT_OCCUPATIONS.forEach(function(o) { sel.innerHTML += '<option value="' + o + '">' + o + '</option>'; });
-  } else {
-    sel.innerHTML += '<optgroup label="Service Businesses">';
-    SERVICE_OCCUPATIONS.forEach(function(o) { sel.innerHTML += '<option value="' + o + '">' + o + '</option>'; });
-    sel.innerHTML += '</optgroup><optgroup label="Product / Physical Businesses">';
-    PRODUCT_OCCUPATIONS.forEach(function(o) { sel.innerHTML += '<option value="' + o + '">' + o + '</option>'; });
-    sel.innerHTML += '</optgroup>';
-  }
+// ── Business type toggle ───────────────────────────────────────
+var bizType = '';
+function selectBiz(card, type) {
+  bizType = type;
+  document.querySelectorAll('.radio-card').forEach(function(c) { c.classList.remove('selected'); });
+  card.classList.add('selected');
+  document.getElementById('serviceSection').style.display = (type === 'service' || type === 'both') ? 'block' : 'none';
+  document.getElementById('productSection').style.display = (type === 'product'  || type === 'both') ? 'block' : 'none';
 }
 
-function onBizType() {
-  var val = document.querySelector('input[name="biz_type"]:checked');
-  if (!val) return;
-  var biz = val.value;
-  ['rc_service','rc_product','rc_both'].forEach(function(id) { document.getElementById(id).classList.remove('selected'); });
-  document.getElementById('rc_' + biz).classList.add('selected');
-  document.getElementById('occGroup').style.display = 'block';
-  populateOccupation(biz);
-  document.getElementById('serviceQuestions').style.display = (biz === 'service' || biz === 'both') ? 'block' : 'none';
-  document.getElementById('productQuestions').style.display = (biz === 'product' || biz === 'both') ? 'block' : 'none';
-  document.getElementById('commonQuestions').style.display  = 'block';
+// ── Questionnaire submit ───────────────────────────────────────
+function getChecked(groupId) {
+  var vals = [];
+  document.querySelectorAll('#' + groupId + ' input:checked').forEach(function(cb) { vals.push(cb.value); });
+  return vals;
+}
+function showFormErr(msg) {
+  var el = document.getElementById('formErr');
+  el.textContent = '⚠ ' + msg; el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function submitSetup(e) {
-  e.preventDefault();
-  document.getElementById('socialError').style.display = 'none';
-  document.getElementById('formError').style.display   = 'none';
-  var t = localStorage.getItem('forgebot_token');
-  if (!t) { window.location.href = '/'; return; }
-  var bizTypeEl = document.querySelector('input[name="biz_type"]:checked');
-  if (!bizTypeEl) { showFormErr('Please select your business type.'); return; }
-  var bizType = bizTypeEl.value;
+function submitSetup() {
+  var errEl = document.getElementById('formErr');
+  errEl.style.display = 'none';
+
+  if (!bizType) { showFormErr('Please select what your business does.'); return; }
   if (!document.getElementById('occupation').value) { showFormErr('Please select your industry / occupation.'); return; }
-  var days = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(function(c) { return c.value; });
-  if (!days.length) { showFormErr('Please select at least one availability day.'); return; }
-  var payments = Array.from(document.querySelectorAll('input[name="payment"]:checked')).map(function(c) { return c.value; });
-  if (!payments.length) { showFormErr('Please select at least one payment method.'); return; }
+
+  var days = getChecked('daysGroup');
+  if (!days.length) { showFormErr('Please select at least one day you are available.'); return; }
+  var pays = getChecked('payGroup');
+  if (!pays.length) { showFormErr('Please select at least one payment method.'); return; }
+
   var ig = document.getElementById('instagram').value.trim();
   var fb = document.getElementById('facebook').value.trim();
   var tt = document.getElementById('tiktok').value.trim();
-  var wac = document.getElementById('whatsapp_channel').value.trim();
-  if (!ig && !fb && !tt && !wac) {
-    document.getElementById('socialError').style.display = 'block';
-    document.getElementById('socialError').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
+  var wa = document.getElementById('whatsapp_channel').value.trim();
+  if (!ig && !fb && !tt && !wa) { showFormErr('Please add at least one social media handle.'); return; }
+
   if ((bizType === 'service' || bizType === 'both') && !document.getElementById('service_areas').value.trim()) {
     showFormErr('Please fill in the areas you serve.'); return;
   }
   if ((bizType === 'product' || bizType === 'both') && !document.getElementById('delivers_to').value.trim()) {
     showFormErr('Please fill in your delivery info.'); return;
   }
+
   var payload = {
-    occupation: document.getElementById('occupation').value,
+    occupation:      document.getElementById('occupation').value,
     occupation_data: { biz_type: bizType },
-    availability_days: days.join(','), payment_methods: payments.join(', '),
-    current_promo: document.getElementById('current_promo').value.trim() || null,
-    instagram: ig || null, facebook: fb || null, tiktok: tt || null, whatsapp_channel: wac || null
+    availability_days: days,
+    payment_methods:   pays,
+    current_promo:   document.getElementById('current_promo').value.trim() || null,
+    instagram:       ig || null,
+    facebook:        fb || null,
+    tiktok:          tt || null,
+    whatsapp_channel: wa || null
   };
+
   if (bizType === 'service' || bizType === 'both') {
     payload.service_areas    = document.getElementById('service_areas').value.trim();
     payload.studio_location  = document.getElementById('studio_location').value.trim() || null;
@@ -418,109 +411,110 @@ function submitSetup(e) {
     payload.minimum_order       = document.getElementById('minimum_order').value.trim() || null;
     payload.bulk_orders         = document.getElementById('bulk_orders').value || null;
   }
+
   var btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'Saving...';
+
   fetch('/api/client/bot-setup', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(payload)
   })
   .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (data.error) throw new Error(data.error);
-    document.getElementById('questionSection').style.display = 'none';
-    document.getElementById('qrSection').style.display       = 'block';
-    document.getElementById('prog1').classList.remove('active'); document.getElementById('prog1').classList.add('done');
-    document.getElementById('prog2').classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  .then(function(d) {
+    if (d.error) { showFormErr('Something went wrong: ' + d.error + '. Please try again.'); btn.disabled = false; btn.textContent = 'Save & Continue to WhatsApp Setup →'; return; }
+    // Go to step 2
+    document.getElementById('step1').style.display    = 'none';
+    document.getElementById('step2').style.display    = 'block';
+    document.getElementById('step1tab').className     = 'prog-step done';
+    document.getElementById('step2tab').className     = 'prog-step active';
     connectSSE();
-    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) document.getElementById('mobileNotice').style.display = 'block';
+    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      document.getElementById('mobileNotice').style.display = 'block';
+    }
   })
-  .catch(function(err) {
-    showFormErr('Something went wrong: ' + err.message + '. Please try again.');
-    btn.disabled = false; btn.textContent = 'Save & Continue to WhatsApp Setup →';
-  });
+  .catch(function() { showFormErr('Network error. Please try again.'); btn.disabled = false; btn.textContent = 'Save & Continue to WhatsApp Setup →'; });
 }
 
-function showFormErr(msg) {
-  var el = document.getElementById('formError');
-  el.textContent = '⚠️ ' + msg; el.style.display = 'block';
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-// ── QR / SSE ───────────────────────────────────────────────────
+// ── QR / SSE ──────────────────────────────────────────────────
 function setStatus(type, text) {
   var badge = document.getElementById('statusBadge');
   badge.className = 'status-badge ' + type;
   document.getElementById('statusText').textContent = text;
 }
 
+function renderQR(qrData) {
+  var box = document.getElementById('qrBox');
+  // Use canvas first (QRCode.js loaded in <head>)
+  box.innerHTML = '<canvas id="qrCanvas"></canvas>';
+  var canvas = document.getElementById('qrCanvas');
+  try {
+    QRCode.toCanvas(canvas, qrData, { width: 210, margin: 2, color: { dark: '#000000', light: '#ffffff' } }, function(err) {
+      if (err) {
+        console.warn('Canvas QR error, using image fallback:', err);
+        box.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=210x210&data=' + encodeURIComponent(qrData) + '" alt="QR Code" style="width:210px;height:210px;border-radius:8px"/>';
+      }
+    });
+  } catch(e) {
+    box.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=210x210&data=' + encodeURIComponent(qrData) + '" alt="QR Code" style="width:210px;height:210px;border-radius:8px"/>';
+  }
+  box.style.background = '#ffffff';
+}
+
 var sse;
-var sseRetryTimer = null;
+var sseTimer = null;
 
 function connectSSE() {
-  // Close any existing connection first — prevents double-open
   if (sse) { try { sse.close(); } catch(e) {} sse = null; }
-  if (sseRetryTimer) { clearTimeout(sseRetryTimer); sseRetryTimer = null; }
+  if (sseTimer) { clearTimeout(sseTimer); sseTimer = null; }
 
   sse = new EventSource('/api/client/qr-stream?token=' + encodeURIComponent(token));
 
   sse.addEventListener('qr', function(e) {
     var data = JSON.parse(e.data);
-    document.getElementById('spinner').style.display = 'none';
-    document.getElementById('qrBox').innerHTML = '<canvas id="qrCanvas"></canvas>';
     document.getElementById('stepsGuide').style.display = 'block';
     setStatus('scanning', 'Ready to scan — point your WhatsApp camera here');
-    if (window.QRCode) renderQR(data.qr); else qrScript.onload = function() { renderQR(data.qr); };
+    renderQR(data.qr);
+    setTimeout(function() { var n = document.getElementById('expireNote'); if (n) n.style.display = 'block'; }, 25000);
   });
 
   sse.addEventListener('connected', function() {
-    sse.close(); setStatus('connected', 'Connected!');
+    sse.close();
+    setStatus('connected', 'Connected!');
     setTimeout(function() {
-      document.getElementById('mainContent').style.display = 'none';
-      document.getElementById('successMsg').style.display  = 'block';
+      document.getElementById('qrBox').style.display        = 'none';
+      document.getElementById('stepsGuide').style.display   = 'none';
+      document.getElementById('statusBadge').style.display  = 'none';
+      document.getElementById('successMsg').style.display   = 'block';
     }, 1000);
   });
 
-  // Server is auto-retrying with backoff — keep spinner, show quiet message
   sse.addEventListener('reconnecting', function(e) {
-    var data = JSON.parse(e.data);
-    var secs = Math.round((data.retryIn || 5000) / 1000);
-    setStatus('waiting', 'Setting up connection… retrying in ' + secs + 's');
-    // Reset QR box back to spinner in case a stale QR was showing
+    var d = JSON.parse(e.data);
+    var s = Math.round((d.retryIn || 5000) / 1000);
+    setStatus('waiting', 'Setting up connection… retrying in ' + s + 's');
     document.getElementById('qrBox').innerHTML = '<div class="spinner" id="spinner"></div>';
+    document.getElementById('qrBox').style.background = '#111c2c';
     document.getElementById('stepsGuide').style.display = 'none';
   });
 
-  // Server gave up — tell the user to refresh
-  sse.addEventListener('fatal', function(e) {
-    var data = JSON.parse(e.data);
+  sse.addEventListener('fatal', function() {
     setStatus('error', 'Could not connect — please refresh the page');
     sse.close();
   });
 
-  // WhatsApp session disconnected — server will auto-restart
   sse.addEventListener('disconnected', function() {
     setStatus('waiting', 'Reconnecting to WhatsApp…');
     sse.close();
-    sseRetryTimer = setTimeout(connectSSE, 6000);
+    sseTimer = setTimeout(connectSSE, 6000);
   });
 
-  // HTTP-level SSE drop — reconnect after a delay
   sse.onerror = function() {
     setStatus('waiting', 'Connection interrupted — retrying…');
     sse.close();
-    sseRetryTimer = setTimeout(connectSSE, 8000);
+    sseTimer = setTimeout(connectSSE, 8000);
   };
 }
-
-function renderQR(text) {
-  var canvas = document.getElementById('qrCanvas');
-  if (!canvas || !window.QRCode) return;
-  QRCode.toCanvas(canvas, text, { width: 210, margin: 1, color: { dark: '#000', light: '#fff' } });
-}
-
-setTimeout(function() { var n = document.getElementById('expireNote'); if (n) n.style.display = 'block'; }, 25000);
 </script>
 </body>
 </html>
