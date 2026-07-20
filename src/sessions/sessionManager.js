@@ -11,6 +11,7 @@
 //   - Clears auth files every 3rd consecutive failure
 //   - Sends fatal event after 10 retries
 //   - All existing exports preserved + clearSession added
+//   + statusPoster wired in (start on open, stop on close/logout/stop)
 // ============================================================
 
 // ── Crypto polyfill — MUST be first line before any imports ──
@@ -24,6 +25,7 @@ const path = require('path');
 const fs   = require('fs');
 const pino = require('pino');
 const replyEngine = require('../bot/replyEngine');
+const { startStatusPoster, stopStatusPoster } = require('../bot/statusPoster'); // ← ADDED
 
 const sessions = {};  // clientId → { sock }
 const starting  = new Set(); // mutex — prevents double-startSession
@@ -121,6 +123,7 @@ async function startSession(clientId) {
         delete latestQR[clientId];
         retryInfo[clientId] = { count: 0, delay: 5000 }; // reset backoff
         broadcast(clientId, 'connected', { status: 'connected' });
+        startStatusPoster(clientId, sock); // ← ADDED: kick off status poster
       }
 
       // ── Connection closed ────────────────────────────────
@@ -137,6 +140,7 @@ async function startSession(clientId) {
 
         delete sessions[clientId];
         starting.delete(clientId);
+        stopStatusPoster(clientId); // ← ADDED: stop status poster on disconnect
 
         if (loggedOut) {
           // Logged out — clear files and notify SSE
@@ -200,6 +204,7 @@ async function startSession(clientId) {
 
 // ── Stop session ──────────────────────────────────────────────
 async function stopSession(clientId) {
+  stopStatusPoster(clientId); // ← ADDED: stop status poster before closing socket
   try {
     if (sessions[clientId] && sessions[clientId].sock) {
       await sessions[clientId].sock.logout();
