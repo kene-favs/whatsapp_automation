@@ -2,28 +2,27 @@
 
 // ============================================================
 //  ForgeBot — Session Manager (whatsapp-web.js edition)
-//  Replaces: src/sessions/sessionManager.js
+//  File: src/sessions/sessionManager.js
 //
-//  Key changes from Baileys:
-//   - Uses wwebjs + Puppeteer/Chrome (fixes @lid JID replies)
-//   - RemoteAuth stores session ZIP in Supabase (survives Railway restarts)
-//   - startSession(clientId, opts) accepts onQR/onConnected/onDisconnected
-//   - Baileys-compatible sock wrapper so replyEngine needs zero changes
-//   - global.getSock set so clientRoutes qr-stream check works
+//  RAM-safe boot: Chrome only starts for clients who already have
+//  a saved session in Supabase OR when the client opens the
+//  dashboard (on-demand via qr-stream route).
+//  This means 0 Chrome instances at startup for new installs —
+//  no more OOM crashes on Railway.
 // ============================================================
 
-var path           = require('path');
-var fs             = require('fs');
+var path         = require('path');
+var fs           = require('fs');
 var { Client, MessageMedia, RemoteAuth } = require('whatsapp-web.js');
-var db             = require('../db/supabase');
+var db           = require('../db/supabase');
 
 // ── State ─────────────────────────────────────────────────────
 // sessions: clientId → { client, sock, status: 'init'|'ready' }
-var sessions  = new Map();
-// qrCache: clientId → latest QR string (so late SSE joiners get QR immediately)
-var qrCache   = new Map();
-// cbMap: clientId → array of { onQR?, onConnected?, onDisconnected? }
-var cbMap     = new Map();
+var sessions = new Map();
+// qrCache: clientId → latest QR string (so late SSE joiners get it)
+var qrCache  = new Map();
+// cbMap: clientId → [{ onQR?, onConnected?, onDisconnected? }]
+var cbMap    = new Map();
 
 // ── Supabase RemoteAuth store ─────────────────────────────────
 class SupabaseStore {
@@ -54,7 +53,6 @@ class SupabaseStore {
 // ── JID conversion ────────────────────────────────────────────
 function toWwebjs(jid) {
   if (!jid) return jid;
-  // @s.whatsapp.net → @c.us  |  @lid → strip and convert best-effort
   return jid.replace(/@s\.whatsapp\.net$/, '@c.us')
             .replace(/@lid$/, '@c.us');
 }
@@ -114,37 +112,27 @@ function makeSock(client) {
   };
 }
 
-// ── Convert wwebjs msg → Baileys-style for replyEngine ───────
+// ── Convert wwebjs message → Baileys-style for replyEngine ───
 function buildMsg(msg, clientId) {
-  var from = toBaileys(msg.from);
-  var msgContent = {};
-
-  if (msg.hasMedia) {
-    // Let replyEngine know there's media — but text body is the main trigger
-    msgContent = { conversation: msg.body || '', hasMedia: true };
-  } else {
-    msgContent = { conversation: msg.body || '' };
-  }
-
   return {
     key: {
-      remoteJid: from,
+      remoteJid: toBaileys(msg.from),
       fromMe:    msg.fromMe,
       id:        msg.id._serialized
     },
-    message:          msgContent,
+    message:          { conversation: msg.body || '' },
     messageTimestamp: Math.floor(msg.timestamp),
     pushName:         (msg._data && msg._data.notifyName) || '',
     clientId:         clientId
   };
 }
 
-// ── Fire registered callbacks for a client ────────────────────
+// ── Fire registered callbacks ─────────────────────────────────
 function fireCallbacks(clientId, event, data) {
   var cbs = cbMap.get(clientId) || [];
   cbs.forEach(function(cb) {
     try {
-      if (event === 'qr'           && cb.onQR)           cb.onQR(data);
+      if      (event === 'qr'           && cb.onQR)           cb.onQR(data);
       else if (event === 'connected'    && cb.onConnected)    cb.onConnected();
       else if (event === 'disconnected' && cb.onDisconnected) cb.onDisconnected();
     } catch(e) {}
@@ -153,12 +141,11 @@ function fireCallbacks(clientId, event, data) {
 
 // ── Create and wire up a wwebjs Client ────────────────────────
 function createWwebjsClient(clientId) {
-  var store  = new SupabaseStore();
   var client = new Client({
     authStrategy: new RemoteAuth({
       clientId:             clientId,
-      store:                store,
-      backupSyncIntervalMs: 300000   // save session every 5 min
+      store:                new SupabaseStore(),
+      backupSyncIntervalMs: 300000
     }),
     puppeteer: {
       headless: true,
@@ -173,19 +160,16 @@ function createWwebjsClient(clientId) {
     }
   });
 
-  // QR ready — cache it and fire callbacks
   client.on('qr', function(qr) {
     console.log('[SessionManager] QR generated for client ' + clientId);
     qrCache.set(clientId, qr);
     fireCallbacks(clientId, 'qr', qr);
   });
 
-  // Authenticated but not yet ready
   client.on('authenticated', function() {
     console.log('[SessionManager] Authenticated: ' + clientId);
   });
 
-  // WhatsApp Web fully ready — swap from init to ready state
   client.on('ready', function() {
     console.log('[SessionManager] Ready: ' + clientId);
     qrCache.delete(clientId);
@@ -198,36 +182,33 @@ function createWwebjsClient(clientId) {
       sessions.set(clientId, { client: client, sock: sock, status: 'ready' });
     }
     fireCallbacks(clientId, 'connected');
-    cbMap.delete(clientId);   // SSE connections already notified
+    cbMap.delete(clientId);
   });
 
-  // Incoming message → replyEngine
   client.on('message', async function(msg) {
     if (msg.fromMe) return;
     try {
       var entry = sessions.get(clientId);
       if (!entry || !entry.sock) return;
       var replyEngine = require('../bot/replyEngine');
-      var fakeMsg     = buildMsg(msg, clientId);
-      await replyEngine.handleMessage(entry.sock, fakeMsg, clientId);
+      await replyEngine.handleMessage(entry.sock, buildMsg(msg, clientId), clientId);
     } catch(e) {
       console.error('[SessionManager] Message handler error for ' + clientId + ':', e.message);
     }
   });
 
-  // Disconnected — clean up and auto-reconnect (unless logged out)
   client.on('disconnected', function(reason) {
-    console.log('[SessionManager] Disconnected: ' + clientId + ' — reason:', reason);
+    console.log('[SessionManager] Disconnected: ' + clientId + ' — ' + reason);
     fireCallbacks(clientId, 'disconnected');
     sessions.delete(clientId);
     qrCache.delete(clientId);
     if (reason !== 'LOGOUT') {
-      console.log('[SessionManager] Scheduling reconnect for ' + clientId);
+      console.log('[SessionManager] Will reconnect ' + clientId + ' in 10s');
       setTimeout(function() {
         startSession(clientId).catch(function(e) {
           console.error('[SessionManager] Reconnect error for ' + clientId + ':', e.message);
         });
-      }, 8000);
+      }, 10000);
     }
   });
 
@@ -239,16 +220,17 @@ function createWwebjsClient(clientId) {
   return client;
 }
 
-// ── Public: start (or attach callbacks to) a session ─────────
+// ── Public: start (or attach to) a session ───────────────────
 //
 //  opts = { onQR(qr), onConnected(), onDisconnected() }
 //
-//  - Already ready:       fires onConnected immediately, returns
-//  - Already initializing: registers callbacks, fires cached QR if exists, returns
-//  - No session:          creates client + starts Chrome (async, returns quickly)
+//  Behaviour:
+//   - Already ready  → calls onConnected immediately, returns
+//   - Already initing→ registers callbacks, sends cached QR if any
+//   - No session     → starts Chrome in background, returns immediately
 //
 function startSession(clientId, opts) {
-  // Register callbacks first so we don't miss events
+  // Register callbacks before anything else so we never miss an event
   if (opts) {
     var cbs = cbMap.get(clientId) || [];
     cbs.push(opts);
@@ -258,7 +240,6 @@ function startSession(clientId, opts) {
   var existing = sessions.get(clientId);
 
   if (existing && existing.status === 'ready') {
-    // Already connected — notify immediately
     if (opts && opts.onConnected) {
       try { opts.onConnected(); } catch(e) {}
     }
@@ -266,7 +247,7 @@ function startSession(clientId, opts) {
   }
 
   if (existing && existing.status === 'init') {
-    // Chrome is already starting — send cached QR if we have one
+    // Chrome is starting — send cached QR if available so dashboard isn't blank
     var cachedQR = qrCache.get(clientId);
     if (cachedQR && opts && opts.onQR) {
       try { opts.onQR(cachedQR); } catch(e) {}
@@ -274,11 +255,10 @@ function startSession(clientId, opts) {
     return Promise.resolve();
   }
 
-  // No session at all — start one
+  // No session — start Chrome
   var client = createWwebjsClient(clientId);
   sessions.set(clientId, { client: client, sock: null, status: 'init' });
 
-  // Initialize Chrome in the background — don't await here
   client.initialize().catch(function(e) {
     console.error('[SessionManager] initialize() failed for ' + clientId + ':', e.message);
     sessions.delete(clientId);
@@ -287,7 +267,7 @@ function startSession(clientId, opts) {
   return Promise.resolve();
 }
 
-// ── Public: stop a session ────────────────────────────────────
+// ── Public: stop session ──────────────────────────────────────
 async function stopSession(clientId) {
   var entry = sessions.get(clientId);
   if (!entry) return;
@@ -297,13 +277,13 @@ async function stopSession(clientId) {
   cbMap.delete(clientId);
 }
 
-// ── Public: stop + wipe persisted session from Supabase ───────
+// ── Public: stop + delete persisted session from Supabase ─────
 async function clearSession(clientId) {
   await stopSession(clientId);
   try { await db.deleteWwebjsSession(clientId); } catch(e) {}
 }
 
-// ── Public: get sock if connected (null if init or absent) ────
+// ── Public: get sock if connected ────────────────────────────
 function getSession(clientId) {
   var entry = sessions.get(clientId);
   if (!entry || entry.status !== 'ready') return null;
@@ -319,31 +299,46 @@ function getAllSessions() {
   return result;
 }
 
-// ── Public: boot all active clients at startup ────────────────
+// ── Public: boot at startup — ONLY restore existing sessions ──
+//
+//  Clients WITHOUT a saved Supabase session are NOT started here.
+//  Chrome will start on-demand when the client opens the dashboard.
+//  This prevents 3×Chrome from eating all RAM on Railway at boot.
+//
 async function bootAllSessions() {
   try {
     var clients = await db.getActiveClients();
-    console.log('[SessionManager] Booting ' + clients.length + ' session(s)');
+    console.log('[SessionManager] ' + clients.length + ' active client(s). Checking for saved sessions...');
+    var booted = 0;
     for (var i = 0; i < clients.length; i++) {
       var clientId = clients[i].id;
-      console.log('[SessionManager] Starting session for ' + clientId);
-      startSession(clientId);
-      // Stagger Chrome launches to avoid RAM spikes
-      if (i < clients.length - 1) {
-        await new Promise(function(r) { setTimeout(r, 5000); });
+      var hasSaved = false;
+      try { hasSaved = await db.wwebjsSessionExists(clientId); } catch(e) {}
+      if (hasSaved) {
+        console.log('[SessionManager] Restoring saved session for ' + clientId);
+        startSession(clientId);
+        booted++;
+        // Stagger Chrome launches
+        if (booted > 0 && i < clients.length - 1) {
+          await new Promise(function(r) { setTimeout(r, 15000); });
+        }
+      } else {
+        console.log('[SessionManager] No saved session for ' + clientId + ' — will start on dashboard open');
       }
+    }
+    if (booted === 0) {
+      console.log('[SessionManager] No saved sessions found. Open the dashboard to scan QR and connect.');
     }
   } catch(e) {
     console.error('[SessionManager] bootAllSessions error:', e.message);
   }
 }
 
-// ── Legacy shims (kept so nothing breaks) ─────────────────────
+// ── Legacy shims ──────────────────────────────────────────────
 function registerQRListener()   {}
 function unregisterQRListener() {}
 
 // ── Make getSession available globally for clientRoutes ───────
-//    The /api/client/qr-stream route checks: global.getSock && global.getSock(clientId)
 global.getSock = getSession;
 
 // ── Exports ───────────────────────────────────────────────────
