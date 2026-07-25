@@ -1,16 +1,13 @@
 // ============================================================
 //  ForgeBot — Reply Engine (v3 paymentNotifier API)
-//  ✅ Sends to original JID — WhatsApp handles @lid routing
-//  ✅ v3 payment API (isPaymentKeyword, handlePaymentClaim, etc.)
-//  ✅ Receipt image flow
-//  ✅ Smart listings search preserved
-//  ✅ All existing keyword/flow/fallback logic preserved
+//  Sends to original JID — WhatsApp handles @lid routing
+//  v3 payment API (isPaymentKeyword, handlePaymentClaim, etc.)
+//  Receipt image flow, smart listings search, keyword flows
 // ============================================================
 
 'use strict';
 
 const db = require('../db/supabase');
-const { matchKeyword } = require('./keywords');
 const { transcribeVoiceNote } = require('./voiceHandler');
 const {
   isPaymentKeyword,
@@ -23,7 +20,7 @@ const {
   notifyOwnerOfHandoff
 } = require('./paymentNotifier');
 
-// ── Human handoff pause map ────────────────────────────────
+// Human handoff pause map
 const humanPaused = new Map();
 
 function humanDelay() {
@@ -43,52 +40,34 @@ function wantsHuman(text) {
   return HUMAN_HANDOFF_KEYWORDS.some(function(kw) { return lower.includes(kw); });
 }
 
-// ── Smart listings search ──────────────────────────────────
-// Searches the client's service_listings for relevant matches
-// to the customer's message, returns up to 3 results.
-
+// Smart listings search
 async function searchListings(clientId, query) {
   try {
-    var sb = db.getSupabase();
+    var sb    = db.getSupabase();
     var lower = query.toLowerCase();
-
     var result = await sb
       .from('service_listings')
       .select('*, listing_media(url, media_type, sort_order)')
       .eq('client_id', clientId)
       .eq('available', true)
       .order('created_at', { ascending: false });
-
     if (result.error || !result.data || !result.data.length) return [];
-
     var scored = result.data.map(function(listing) {
-      var score = 0;
-      var fields = [
-        listing.name        || '',
-        listing.description || '',
-        listing.keywords    || '',
-        listing.category    || '',
-        listing.location    || '',
-        listing.price_label || ''
-      ].map(function(f) { return f.toLowerCase(); });
-
-      var words = lower.split(/\s+/).filter(function(w) { return w.length > 2; });
+      var score  = 0;
+      var fields = [listing.name||'', listing.description||'', listing.keywords||'',
+                    listing.category||'', listing.location||'', listing.price_label||'']
+                    .map(function(f) { return f.toLowerCase(); });
+      var words  = lower.split(/\s+/).filter(function(w) { return w.length > 2; });
       words.forEach(function(word) {
-        fields.forEach(function(field) {
-          if (field.includes(word)) score += word.length;
-        });
+        fields.forEach(function(field) { if (field.includes(word)) score += word.length; });
       });
-
       if (fields[0].includes(lower)) score += 20;
-
       return { listing: listing, score: score };
     });
-
-    return scored
-      .filter(function(s) { return s.score > 0; })
-      .sort(function(a, b) { return b.score - a.score; })
-      .slice(0, 3)
-      .map(function(s) { return s.listing; });
+    return scored.filter(function(s) { return s.score > 0; })
+                 .sort(function(a, b) { return b.score - a.score; })
+                 .slice(0, 3)
+                 .map(function(s) { return s.listing; });
   } catch (e) {
     console.error('[ReplyEngine] Listing search error:', e.message);
     return [];
@@ -112,18 +91,14 @@ function isListingQuery(text) {
 
 async function sendListingResults(sock, jid, listings, client) {
   if (!listings.length) return false;
-
   if (listings.length === 1) {
-    var l = listings[0];
-    var msg = '✅ Yes! Here is what we have:\n\n';
-    msg += '*' + l.name + '*\n';
-    if (l.price) msg += '💰 *Price:* ' + l.price + '\n';
-    if (l.description) msg += '📝 ' + l.description + '\n';
-    if (l.location) msg += '📍 *Location:* ' + l.location + '\n';
-    msg += '\nInterested? DM us or reply to place your order! 😊';
-
+    var l   = listings[0];
+    var msg = 'Yes! Here is what we have:\n\n*' + l.name + '*\n';
+    if (l.price)       msg += 'Price: ' + l.price + '\n';
+    if (l.description) msg += l.description + '\n';
+    if (l.location)    msg += 'Location: ' + l.location + '\n';
+    msg += '\nInterested? Reply to place your order!';
     await sock.sendMessage(jid, { text: msg });
-
     var media = (l.listing_media || []).filter(function(m) { return m.media_type === 'image'; });
     for (var i = 0; i < Math.min(media.length, 3); i++) {
       try {
@@ -131,37 +106,24 @@ async function sendListingResults(sock, jid, listings, client) {
         await new Promise(function(r) { setTimeout(r, 800); });
       } catch (e) {}
     }
-
-    var pdf = (l.listing_media || []).find(function(m) { return m.media_type === 'pdf'; });
-    if (pdf) {
-      try {
-        await sock.sendMessage(jid, {
-          document: { url: pdf.url },
-          mimetype: 'application/pdf',
-          fileName: l.name + '.pdf',
-          caption: 'Full details for ' + l.name
-        });
-      } catch (e) {}
-    }
   } else {
-    var intro = '✅ We found *' + listings.length + ' options* for you:\n\n';
+    var intro = 'We found *' + listings.length + ' options* for you:\n\n';
     listings.forEach(function(l, i) {
       intro += '*' + (i + 1) + '. ' + l.name + '*\n';
-      if (l.price) intro += '   💰 ' + l.price + '\n';
-      if (l.location) intro += '   📍 ' + l.location + '\n';
-      if (l.description) intro += '   ' + l.description.slice(0, 80) + (l.description.length > 80 ? '...' : '') + '\n';
+      if (l.price)       intro += '   ' + l.price + '\n';
+      if (l.location)    intro += '   ' + l.location + '\n';
+      if (l.description) intro += '   ' + l.description.slice(0, 80) + '\n';
       intro += '\n';
     });
-    intro += 'Reply with the *number* of the one you want more details on, or DM us directly! 😊';
+    intro += 'Reply with the *number* of the one you want more details on!';
     await sock.sendMessage(jid, { text: intro });
-
     for (var j = 0; j < listings.length; j++) {
       var imgs = (listings[j].listing_media || []).filter(function(m) { return m.media_type === 'image'; });
       if (imgs.length) {
         try {
           await sock.sendMessage(jid, {
             image: { url: imgs[0].url },
-            caption: '*' + (j + 1) + '.* ' + listings[j].name + (listings[j].price ? ' — ' + listings[j].price : '')
+            caption: (j + 1) + '. ' + listings[j].name + (listings[j].price ? ' - ' + listings[j].price : '')
           });
           await new Promise(function(r) { setTimeout(r, 800); });
         } catch (e) {}
@@ -171,7 +133,7 @@ async function sendListingResults(sock, jid, listings, client) {
   return true;
 }
 
-// ── Main message handler ───────────────────────────────────
+// Main message handler
 
 async function handleMessage(sock, msg, clientId) {
   try {
@@ -189,7 +151,7 @@ async function handleMessage(sock, msg, clientId) {
 
     console.log('[ReplyEngine] MSG from', jid, '| text:', text.slice(0, 60), '| isImage:', isImage);
 
-    // ── Voice note handling ─────────────────────────────────
+    // Voice note handling
     if (isVoice || isAudio) {
       await sock.sendPresenceUpdate('composing', jid);
       var transcribed = await transcribeVoiceNote(sock, msg);
@@ -201,43 +163,34 @@ async function handleMessage(sock, msg, clientId) {
         return;
       }
       text = transcribed;
-      await sock.sendMessage(jid, {
-        text: 'I heard: _"' + transcribed + '"_\n\nLet me help you with that...'
-      });
+      await sock.sendMessage(jid, { text: 'I heard: _"' + transcribed + '"_\n\nLet me help you with that...' });
     }
 
     if (!text.trim() && !isImage) return;
 
-    // ── Get client ──────────────────────────────────────────
+    // Get client
     var client = await db.getClientById(clientId);
     if (!client) { console.log('[ReplyEngine] No client found:', clientId); return; }
     console.log('[ReplyEngine] client status:', client.status, '| sub_active:', client.subscription_active);
     if (client.status !== 'active' || !client.subscription_active) return;
 
-    // ── Track customer ──────────────────────────────────────
+    // Track customer
     try {
       var sb = db.getSupabase();
       await sb.from('customers').upsert({
-        client_id:    clientId,
-        jid:          jid,
-        last_contact: new Date().toISOString(),
-        last_seen:    new Date().toISOString()
+        client_id: clientId, jid: jid,
+        last_contact: new Date().toISOString(), last_seen: new Date().toISOString()
       }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
     } catch (e) {}
 
-    // ── Receipt image flow (v3) ─────────────────────────────
-    // If customer is in AWAITING_RECEIPT state and sends an image, forward to owner
+    // Receipt image flow (v3)
     if (isImage && isAwaitingReceipt(jid)) {
-      try {
-        await handleReceiptImage(sock, msg, clientId);
-      } catch (e) {
-        console.error('[ReplyEngine] handleReceiptImage error:', e.message);
-      }
+      try { await handleReceiptImage(sock, msg, clientId); }
+      catch (e) { console.error('[ReplyEngine] handleReceiptImage error:', e.message); }
       return;
     }
 
-    // ── Owner reply check (v3: 5-param signature) ───────────
-    // Checks if message is owner replying 1/2/3 to confirm payment
+    // Owner reply check (v3 — 5-param signature)
     if (text.trim() && (isOwnerConfirmationReply(text) || hasPendingConfirmation(jid))) {
       try {
         var ownerClient = await db.getClientById(clientId);
@@ -245,13 +198,11 @@ async function handleMessage(sock, msg, clientId) {
           ? ownerClient.notification_number.replace(/\D/g, '') + '@s.whatsapp.net'
           : null;
         await handleOwnerReply(sock, msg, clientId, ownerJid, text.trim());
-      } catch (e) {
-        console.error('[ReplyEngine] handleOwnerReply error:', e.message);
-      }
+      } catch (e) { console.error('[ReplyEngine] handleOwnerReply error:', e.message); }
       return;
     }
 
-    // ── Human pause check ───────────────────────────────────
+    // Human pause check
     var pauseKey    = clientId + ':' + jid;
     var pausedUntil = humanPaused.get(pauseKey);
     if (pausedUntil && Date.now() < pausedUntil) return;
@@ -259,31 +210,27 @@ async function handleMessage(sock, msg, clientId) {
 
     if (!text.trim()) return;
 
-    // ── Human handoff detection ─────────────────────────────
+    // Human handoff detection
     if (wantsHuman(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
       await sock.sendMessage(jid, {
-        text: 'Got it! I am connecting you with the owner right now. Please hold on — they will be with you shortly.'
+        text: 'Got it! I am connecting you with the owner right now. Please hold on, they will be with you shortly.'
       });
       humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000);
-      try { await notifyOwnerOfHandoff(sock, clientId, jid); } catch (e) {
-        console.error('[ReplyEngine] notifyOwnerOfHandoff error:', e.message);
-      }
+      try { await notifyOwnerOfHandoff(sock, clientId, jid); }
+      catch (e) { console.error('[ReplyEngine] notifyOwnerOfHandoff error:', e.message); }
       return;
     }
 
-    // ── Payment keyword detection (v3) ─────────────────────
+    // Payment keyword detection (v3)
     if (isPaymentKeyword(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
-      try {
-        await handlePaymentClaim(sock, msg, clientId);
-      } catch (e) {
+      try { await handlePaymentClaim(sock, msg, clientId); }
+      catch (e) {
         console.error('[ReplyEngine] handlePaymentClaim error:', e.message);
-        await sock.sendMessage(jid, {
-          text: 'Thank you! Your payment has been noted. The owner will confirm shortly.'
-        });
+        await sock.sendMessage(jid, { text: 'Thank you! Your payment has been noted. The owner will confirm shortly.' });
       }
       return;
     }
@@ -292,7 +239,7 @@ async function handleMessage(sock, msg, clientId) {
     await humanDelay();
     await sock.sendPresenceUpdate('paused', jid);
 
-    // ── Smart listings search (before keyword matching) ─────
+    // Smart listings search (before keyword matching)
     if (isListingQuery(text)) {
       var matches = await searchListings(clientId, text);
       if (matches.length > 0) {
@@ -301,18 +248,15 @@ async function handleMessage(sock, msg, clientId) {
       }
     }
 
-    // ── Flow keyword matching ───────────────────────────────
+    // Flow keyword matching
     var flows = await db.getFlows(clientId, true);
     console.log('[ReplyEngine] Loaded', flows.length, 'flows');
     var matched = null;
     for (var i = 0; i < flows.length; i++) {
-      var flow = flows[i];
-      var kws  = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
+      var flow      = flows[i];
+      var kws       = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
       var textLower = text.toLowerCase();
-      if (kws.some(function(kw) { return textLower.includes(kw); })) {
-        matched = flow;
-        break;
-      }
+      if (kws.some(function(kw) { return textLower.includes(kw); })) { matched = flow; break; }
     }
 
     if (matched) {
@@ -324,7 +268,7 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
-    // ── Broader listings search (fallback before text fallback) ─
+    // Broader listings search
     if (!isListingQuery(text)) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length > 0) {
@@ -333,9 +277,8 @@ async function handleMessage(sock, msg, clientId) {
       }
     }
 
-    // ── Fallback message ────────────────────────────────────
-    var fallback = client.fallback_message ||
-      'Thank you for reaching out! Someone will get back to you shortly.';
+    // Fallback message
+    var fallback = client.fallback_message || 'Thank you for reaching out! Someone will get back to you shortly.';
     console.log('[ReplyEngine] Sending fallback to', jid);
     await sock.sendMessage(jid, { text: fallback });
     console.log('[ReplyEngine] Fallback sent OK');
