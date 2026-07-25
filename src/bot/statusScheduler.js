@@ -2,16 +2,15 @@
 //  ForgeBot — Status Scheduler (fixed)
 //  File location: src/bot/statusScheduler.js
 //
-//  Fixes vs old version:
-//   1. Import sessionManager correctly (not { sessions })
-//   2. Use sessionManager.getSession(clientId) everywhere
-//   3. sock.sendMessage API unchanged — the wrapper handles it
+//  Fixes:
+//   1. Use sessionManager.getSession(clientId) — not sessions.get()
+//   2. Pass todayDate ISO string to getDueStatusPosts — not "Sat"
 // ============================================================
 
 'use strict';
 
-const cron          = require('node-cron');
-const db            = require('../db/supabase');
+const cron           = require('node-cron');
+const db             = require('../db/supabase');
 const sessionManager = require('../sessions/sessionManager');
 
 // ── Nigerian Business Memes (rotate weekly) ──────────────────
@@ -30,7 +29,6 @@ const MEMES = [
   "The fact that my WhatsApp bot just replied a customer in Pidgin and made a sale while I was at church 🙏🤖\n\nGod and technology working together 😂 #ForgeBot",
   "Your competition: manually replying WhatsApp 24/7, stressed, burning out\nYou with ForgeBot: automated, organized, sleeping well AND making more sales\n\n2025 is for those who work smart 💡 #NaijaEntrepreneur",
   "Customer: Do you deliver to my area?\nMe (before): Let me check... *30 min later* Sorry I was busy!\nMe (after ForgeBot): Bot replied in 2 seconds with full delivery info 😌\n\nNever lose a customer to slow replies again.",
-  "The audacity of this bot 😂\nCustomer sent a voice note in Yoruba at midnight\nForgeBot: *transcribed it* *replied in English* *sent price list*\n\nI woke up to a completed order. This thing is something else 🔥 #ForgeBot",
   "Top 3 things Nigerian business owners worry about:\n1. Sales dropping\n2. Missing customers\n3. NEPA taking light\n\nForgeBot handles number 1 and 2.\nFor number 3... we're working on it 😂 #NaijaProblems",
   "Plot twist: The bot is more professional than me 😭\n\nCustomer: Can I get a discount?\nMe: *would have said yes immediately*\nForgeBot: Thank you for asking! Our prices are fixed but we offer bulk discounts for 10+ orders 😊\n\nThe bot has better business sense 🤣 #ForgeBot",
   "Hustle culture said work 18 hours a day 😤\nForgeBot said: work smart, automate the rest, and enjoy your life 😌\n\nThe real glow up is automating your WhatsApp and getting your time back 💯 #NaijaEntrepreneur",
@@ -45,7 +43,6 @@ function getWeeklyMeme() {
 
 // ── Post status for a single client ──────────────────────────
 async function postStatus(clientId, mediaUrl, caption) {
-  // FIX: use getSession() — sessions is not exported directly
   var sock = sessionManager.getSession(clientId);
   if (!sock) {
     console.log('[StatusScheduler] Client', clientId, 'not connected — skipping');
@@ -69,26 +66,25 @@ async function postStatus(clientId, mediaUrl, caption) {
 
 // ── Main scheduler ────────────────────────────────────────────
 function startScheduler() {
-  // Every minute: check for due status posts
+  // Every minute: check for due scheduled status posts
   cron.schedule('* * * * *', async function() {
     try {
-      var now     = new Date();
-      var timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      var days    = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      var today   = days[now.getDay()];
-      var todayDate = now.toISOString().split('T')[0];
+      var now       = new Date();
+      var timeStr   = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+      var todayDate = now.toISOString().split('T')[0]; // "2026-07-25" — ISO date, not "Sat"
 
-      var duePosts = await db.getDueStatusPosts(timeStr, today);
+      // FIX: pass ISO date string, NOT day name like "Sat"
+      var duePosts = await db.getDueStatusPosts(timeStr, todayDate);
 
       for (var i = 0; i < duePosts.length; i++) {
         var post   = duePosts[i];
-        if (post.last_posted_date === todayDate) continue; // already done today
+        // Skip if already posted today (DB already filters, this is a safety check)
+        if (post.last_posted === todayDate) continue;
 
         var client = post.clients;
         if (!client || client.status !== 'active' || !client.subscription_active) continue;
 
-        var caption = post.caption || '';
-        await postStatus(client.id, post.media_url, caption);
+        await postStatus(client.id, post.media_url, post.caption || '');
         await db.markStatusPosted(post.id, todayDate);
       }
     } catch (err) {
@@ -104,10 +100,9 @@ function startScheduler() {
       var meme    = getWeeklyMeme();
 
       for (var i = 0; i < clients.length; i++) {
-        var c = clients[i];
+        var c    = clients[i];
         if (!c.subscription_active) continue;
 
-        // FIX: use getSession() not sessions.get()
         var sock = sessionManager.getSession(c.id);
         if (!sock) continue;
 
@@ -118,7 +113,6 @@ function startScheduler() {
           console.error('[StatusScheduler] Meme failed for client', c.id, ':', err.message);
         }
 
-        // Spread requests to avoid WhatsApp rate limits
         await new Promise(function(r) { setTimeout(r, 2000); });
       }
     } catch (err) {
