@@ -41,6 +41,17 @@ function wantsHuman(text) {
   return HUMAN_HANDOFF_KEYWORDS.some(function(kw) { return lower.includes(kw); });
 }
 
+// ── @lid JID normalization ────────────────────────────────────
+// WhatsApp Linked Identity (@lid) JIDs are device-level encryption IDs.
+// Sending messages to @lid can result in silent delivery failures on the
+// recipient's phone. Normalising to @s.whatsapp.net fixes this.
+function normalizeSendJid(jid) {
+  if (jid && jid.endsWith('@lid')) {
+    return jid.replace('@lid', '@s.whatsapp.net');
+  }
+  return jid;
+}
+
 // ── Smart listings search ──────────────────────────────────
 async function searchListings(clientId, query) {
   try {
@@ -172,6 +183,15 @@ async function handleMessage(sock, msg, clientId) {
     var jid = msg.key.remoteJid;
     if (jid === 'status@broadcast') return;
 
+    // Normalize @lid to @s.whatsapp.net for sending — @lid JIDs cause
+    // silent delivery failures on the recipient's phone in Baileys v6.7.
+    // We keep the original jid for presence updates and state tracking
+    // (those work fine with @lid), and use sendJid for all sendMessage calls.
+    var sendJid = normalizeSendJid(jid);
+    if (sendJid !== jid) {
+      console.log('[ReplyEngine] @lid normalized for sending:', jid, '→', sendJid);
+    }
+
     var msgContent = msg.message;
     var isVoice    = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
     var isAudio    = !!(msgContent && msgContent.audioMessage);
@@ -186,7 +206,7 @@ async function handleMessage(sock, msg, clientId) {
     // ── Receipt image check (must be before text guard) ────────
     if (isImage && !text) {
       if (isAwaitingReceipt(clientId, jid)) {
-        await handleReceiptImage(sock, msg, clientId, jid);
+        await handleReceiptImage(sock, msg, clientId, sendJid);
         return;
       }
     }
@@ -197,13 +217,13 @@ async function handleMessage(sock, msg, clientId) {
       var transcribed = await transcribeVoiceNote(sock, msg);
       if (!transcribed) {
         await humanDelay();
-        await sock.sendMessage(jid, {
+        await sock.sendMessage(sendJid, {
           text: 'I received your voice note! Could you please type your message so I can help you faster?'
         });
         return;
       }
       text = transcribed;
-      await sock.sendMessage(jid, {
+      await sock.sendMessage(sendJid, {
         text: 'I heard: _"' + transcribed + '"_\n\nLet me help you with that...'
       });
     }
@@ -260,25 +280,25 @@ async function handleMessage(sock, msg, clientId) {
     if (wantsHuman(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
-      await sock.sendMessage(jid, {
+      await sock.sendMessage(sendJid, {
         text: 'Got it! I am connecting you with the owner right now. Please hold on — they will be with you shortly.'
       });
       humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000);
-      await notifyOwnerOfHandoff(sock, clientId, jid, null, 'customer requested human');
+      await notifyOwnerOfHandoff(sock, clientId, sendJid, null, 'customer requested human');
       return;
     }
 
     // ── Payment claim detection (v3 API) ────────────────────────
     if (isPaymentKeyword(text)) {
       await sock.sendPresenceUpdate('composing', jid);
-      await handlePaymentClaim(sock, msg, clientId, jid, text);
+      await handlePaymentClaim(sock, msg, clientId, sendJid, text);
       return;
     }
 
     // ── Awaiting receipt — remind customer to send photo ────────
     if (isAwaitingReceipt(clientId, jid)) {
       await humanDelay();
-      await sock.sendMessage(jid, {
+      await sock.sendMessage(sendJid, {
         text: 'Please send a *photo or screenshot* of your payment receipt to confirm. 📸'
       });
       return;
@@ -293,7 +313,7 @@ async function handleMessage(sock, msg, clientId) {
     if (isListingQuery(text)) {
       var matches = await searchListings(clientId, text);
       if (matches.length > 0) {
-        var sent = await sendListingResults(sock, jid, matches, client);
+        var sent = await sendListingResults(sock, sendJid, matches, client);
         if (sent) return;
       }
     }
@@ -321,18 +341,18 @@ async function handleMessage(sock, msg, clientId) {
     if (matched) {
       console.log('[ReplyEngine] Keyword match:', matched.keywords);
       if (matched.response_type === 'image' && matched.media_url) {
-        await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response });
+        await sock.sendMessage(sendJid, { image: { url: matched.media_url }, caption: matched.response });
       } else {
-        await sock.sendMessage(jid, { text: matched.response });
+        await sock.sendMessage(sendJid, { text: matched.response });
       }
       return;
     }
 
-    // ── Broader listing search ───────────────────────────────────
+    // ── Broader listing search (no keyword match found) ──────────
     if (!isListingQuery(text)) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length > 0) {
-        var broadSent = await sendListingResults(sock, jid, broadMatches, client);
+        var broadSent = await sendListingResults(sock, sendJid, broadMatches, client);
         if (broadSent) return;
       }
     }
@@ -340,8 +360,8 @@ async function handleMessage(sock, msg, clientId) {
     // ── Fallback message ─────────────────────────────────────────
     var fallback = client.fallback_message ||
       'Thank you for reaching out! Someone will get back to you shortly.';
-    console.log('[ReplyEngine] Sending fallback to', jid);
-    await sock.sendMessage(jid, { text: fallback });
+    console.log('[ReplyEngine] Sending fallback to', sendJid);
+    await sock.sendMessage(sendJid, { text: fallback });
     console.log('[ReplyEngine] Fallback sent OK');
 
   } catch (err) {
