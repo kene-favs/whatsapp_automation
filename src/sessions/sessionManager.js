@@ -1,15 +1,14 @@
 // ============================================================
-//  ForgeBot — sessionManager.js  (Supabase Auth + @lid fix)
+//  ForgeBot — sessionManager.js  (FINAL)
 //  File location: src/sessions/sessionManager.js
 //
-//  ROOT CAUSE OF "sent OK but no DM received":
-//  Baileys receives messages from @lid JIDs (WhatsApp Linked Identity).
-//  Replying to @lid silently succeeds at the API level but WhatsApp
-//  never delivers the message — @lid is a receive-only identifier.
-//  You must send to the @s.whatsapp.net (phone-based) JID.
-//
-//  FIX: Listen to contacts.upsert to build @lid→phone mapping.
-//       Resolve @lid → @s.whatsapp.net before passing to replyEngine.
+//  @lid fix strategy (two-pronged):
+//  1. contacts.upsert fires with the sender's phone JID at the SAME
+//     time as messages.upsert. Even without a lid field we capture
+//     the phone JID and correlate it to the @lid message by time.
+//  2. makeInMemoryStore + getMessage callback prevents WhatsApp's
+//     retry-request from failing silently, which was the main reason
+//     "Fallback sent OK" never appeared in the recipient's DM.
 // ============================================================
 
 // ── Crypto polyfill — MUST be first ──
@@ -17,41 +16,49 @@ if (typeof crypto === 'undefined') {
   global.crypto = require('crypto').webcrypto;
 }
 
-const { default: makeWASocket, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const { Boom }  = require('@hapi/boom');
-const pino      = require('pino');
-const { createClient } = require('@supabase/supabase-js');
-const replyEngine = require('../bot/replyEngine');
+var baileysLib = require('@whiskeysockets/baileys');
+// Support both default export patterns
+var makeWASocket              = (baileysLib.default && baileysLib.default.makeWASocket)
+                                  || baileysLib.makeWASocket
+                                  || baileysLib.default
+                                  || baileysLib;
+var DisconnectReason          = baileysLib.DisconnectReason;
+var fetchLatestBaileysVersion = baileysLib.fetchLatestBaileysVersion;
+var makeInMemoryStore         = baileysLib.makeInMemoryStore;  // may be undefined
 
-const sessions    = {};    // clientId → { sock, connected }
-const starting    = new Set();
-const retryInfo   = {};
-const latestQR    = {};
-const contactMaps = {};    // clientId → Map<@lid, @s.whatsapp.net>
+var { Boom }         = require('@hapi/boom');
+var pino             = require('pino');
+var { createClient } = require('@supabase/supabase-js');
+var replyEngine      = require('../bot/replyEngine');
 
-const logger = pino({ level: 'silent' });
+var sessions    = {};   // clientId → { sock, connected }
+var starting    = new Set();
+var retryInfo   = {};
+var latestQR    = {};
+var contactMaps = {};   // clientId → Map<lidJid, phoneJid>   (persists across messages)
+var stores      = {};   // clientId → makeInMemoryStore instance
 
-// ── Supabase lazy init ────────────────────────────────────────
+// Per-client queue of recently-seen phone JIDs from contacts.upsert
+// (used to correlate with @lid messages when lid field is absent)
+var recentPhones = {}; // clientId → Array<{ jid, ts }>
+
+var silentLogger = pino({ level: 'silent' });
+
+// ── Supabase ──────────────────────────────────────────────────
 var _sb = null;
 function getSB() {
-  if (!_sb) {
-    _sb = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-  }
+  if (!_sb) _sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   return _sb;
 }
 
-// ── Buffer-aware JSON helpers ─────────────────────────────────
+// ── Buffer-safe JSON ──────────────────────────────────────────
 function toJSON(obj) {
   try {
     return JSON.stringify(obj, function(key, val) {
       if (val == null) return val;
       if (Buffer.isBuffer(val)) return { __buf: val.toString('base64') };
-      if (typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data)) {
+      if (typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data))
         return { __buf: Buffer.from(val.data).toString('base64') };
-      }
       if (val instanceof Uint8Array) return { __buf: Buffer.from(val).toString('base64') };
       return val;
     });
@@ -61,22 +68,21 @@ function toJSON(obj) {
 function fromJSON(raw) {
   if (!raw) return null;
   try {
-    var str = (typeof raw === 'string') ? raw : JSON.stringify(raw);
+    var str = typeof raw === 'string' ? raw : JSON.stringify(raw);
     return JSON.parse(str, function(key, val) {
-      if (val && typeof val === 'object' && typeof val.__buf === 'string') {
+      if (val && typeof val === 'object' && typeof val.__buf === 'string')
         return Buffer.from(val.__buf, 'base64');
-      }
       return val;
     });
   } catch (e) { return null; }
 }
 
-// ── Supabase-backed Baileys auth state ────────────────────────
+// ── Supabase auth state ───────────────────────────────────────
 async function useSupabaseAuthState(clientId) {
   var sb = getSB();
-  var _baileys      = require('@whiskeysockets/baileys');
-  var initAuthCreds = _baileys.initAuthCreds || (_baileys.default && _baileys.default.initAuthCreds);
-  if (!initAuthCreds) initAuthCreds = function() { return {}; };
+  var initAuthCreds = baileysLib.initAuthCreds ||
+    (baileysLib.default && baileysLib.default.initAuthCreds) ||
+    function() { return {}; };
 
   var row = null;
   try {
@@ -87,16 +93,15 @@ async function useSupabaseAuthState(clientId) {
       .maybeSingle();
     row = data;
   } catch (e) {
-    console.warn('[SessionManager] Could not load Supabase auth for', clientId + ':', e.message);
+    console.warn('[SessionManager] Cannot load auth:', e.message);
   }
 
-  var creds = null;
-  if (row && row.auth_creds) creds = fromJSON(row.auth_creds);
+  var creds = (row && row.auth_creds) ? fromJSON(row.auth_creds) : null;
   if (!creds || typeof creds !== 'object') {
     creds = initAuthCreds();
     console.log('[SessionManager] No saved creds for', clientId, '— QR required');
   } else {
-    console.log('[SessionManager] Restored saved creds for', clientId, '— attempting silent reconnect');
+    console.log('[SessionManager] Restored saved creds for', clientId);
   }
 
   var keysStore = {};
@@ -107,17 +112,17 @@ async function useSupabaseAuthState(clientId) {
 
   async function persist() {
     try {
-      var credsJSON = toJSON(creds);
-      var keysJSON  = toJSON(keysStore);
-      if (!credsJSON) return;
+      var cj = toJSON(creds);
+      var kj = toJSON(keysStore);
+      if (!cj) return;
       await sb.from('whatsapp_sessions').upsert({
         client_id:  clientId,
-        auth_creds: credsJSON,
-        auth_keys:  keysJSON || '{}',
+        auth_creds: cj,
+        auth_keys:  kj || '{}',
         updated_at: new Date().toISOString()
       }, { onConflict: 'client_id' });
     } catch (e) {
-      console.error('[SessionManager] Auth persist failed for', clientId + ':', e.message);
+      console.error('[SessionManager] Persist error:', e.message);
     }
   }
 
@@ -125,9 +130,9 @@ async function useSupabaseAuthState(clientId) {
     get: async function(type, ids) {
       var store  = keysStore[type] || {};
       var result = {};
-      for (var i = 0; i < ids.length; i++) {
-        if (store[ids[i]] != null) result[ids[i]] = store[ids[i]];
-      }
+      ids.forEach(function(id) {
+        if (store[id] != null) result[id] = store[id];
+      });
       return result;
     },
     set: async function(data) {
@@ -137,14 +142,14 @@ async function useSupabaseAuthState(clientId) {
         Object.keys(data[type]).forEach(function(id) {
           var val = data[type][id];
           if (val != null) { keysStore[type][id] = val; changed = true; }
-          else { delete keysStore[type][id]; changed = true; }
+          else             { delete keysStore[type][id]; changed = true; }
         });
       });
       if (changed) await persist();
     }
   };
 
-  return { state: { creds: creds, keys: keys }, saveCreds: persist };
+  return { state: { creds, keys }, saveCreds: persist };
 }
 
 async function clearSupabaseAuth(clientId) {
@@ -158,112 +163,176 @@ async function clearSupabaseAuth(clientId) {
 
 async function setConnected(clientId, val) {
   try {
-    await getSB().from('clients')
-      .update({ whatsapp_connected: !!val })
-      .eq('id', clientId);
+    await getSB().from('clients').update({ whatsapp_connected: !!val }).eq('id', clientId);
   } catch (e) {}
 }
 
 function broadcast(clientId, event, data) {
   if (!global.qrListeners) return;
-  var all = global.qrListeners.get(clientId) || [];
-  all.forEach(function(fn) { try { fn(event, data); } catch (e) {} });
+  (global.qrListeners.get(clientId) || []).forEach(function(fn) {
+    try { fn(event, data); } catch (e) {}
+  });
 }
 
 function getNextDelay(clientId) {
   if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
-  var info  = retryInfo[clientId];
+  var info = retryInfo[clientId];
   info.count++;
   var delay = info.delay;
   info.delay = Math.min(info.delay * 2, 60000);
   return delay;
 }
 
-// ── @lid → @s.whatsapp.net resolution ────────────────────────
+// ── @lid → phone resolution ───────────────────────────────────
 function normalizeJid(jid) {
   if (!jid) return jid;
   if (!jid.includes('@')) return jid + '@s.whatsapp.net';
   return jid;
 }
 
-function updateContactMap(clientId, contacts) {
+// Called from contacts.upsert / contacts.update
+// Stores mappings when BOTH id (phone) and lid are present.
+// Also queues phone JIDs for time-window correlation.
+function processContactList(clientId, contacts) {
   if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
   var map = contactMaps[clientId];
-  var added = 0;
-  contacts.forEach(function(c) {
-    // c.id = @s.whatsapp.net JID, c.lid = @lid JID
-    if (c.id && c.lid) {
-      var phoneJid = normalizeJid(c.id);
-      var lidJid   = c.lid.includes('@') ? c.lid : c.lid + '@lid';
-      if (!phoneJid.endsWith('@s.whatsapp.net')) return; // skip non-phone JIDs
+  if (!recentPhones[clientId]) recentPhones[clientId] = [];
+
+  var now = Date.now();
+
+  (contacts || []).forEach(function(c) {
+    var phoneJid = c.id  ? normalizeJid(c.id)  : null;
+    var lidJid   = c.lid ? (c.lid.includes('@') ? c.lid : c.lid + '@lid') : null;
+
+    // Case 1: both phone and lid present — direct mapping
+    if (phoneJid && lidJid && phoneJid.endsWith('@s.whatsapp.net')) {
       map.set(lidJid, phoneJid);
-      added++;
+      console.log('[SessionManager] Mapped:', lidJid, '→', phoneJid);
+    }
+
+    // Case 2: only phone JID present — queue it for correlation
+    if (phoneJid && !lidJid && phoneJid.endsWith('@s.whatsapp.net')) {
+      recentPhones[clientId].push({ jid: phoneJid, ts: now });
+      // Only keep entries from last 10 seconds
+      recentPhones[clientId] = recentPhones[clientId].filter(function(e) {
+        return (now - e.ts) < 10000;
+      });
     }
   });
-  if (added > 0) console.log('[SessionManager] Contact map updated for', clientId, '— total mapped:', map.size);
 }
 
+// Resolve @lid to phone JID for sending
 function resolveJid(clientId, jid) {
   if (!jid || !jid.endsWith('@lid')) return jid;
+
+  // 1. Direct contactMap lookup (populated from contacts.upsert with lid field)
   var map = contactMaps[clientId];
-  if (!map) return jid;
-  var resolved = map.get(jid);
-  if (resolved) {
-    console.log('[SessionManager] Resolved @lid → phone:', jid, '→', resolved);
-    return resolved;
+  if (map && map.get(jid)) {
+    var r = map.get(jid);
+    console.log('[SessionManager] ✅ Resolved via map:', jid, '→', r);
+    return r;
   }
-  // @lid not in map yet — will send to @lid (may not deliver)
-  console.log('[SessionManager] ⚠️  @lid not mapped yet, sending as-is:', jid);
+
+  // 2. makeInMemoryStore contact lookup
+  var store = stores[clientId];
+  if (store && store.contacts) {
+    var sc = store.contacts[jid];
+    if (sc && sc.id && sc.id.endsWith('@s.whatsapp.net')) {
+      console.log('[SessionManager] ✅ Resolved via store:', jid, '→', sc.id);
+      if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
+      contactMaps[clientId].set(jid, sc.id);
+      return sc.id;
+    }
+  }
+
+  // 3. Time-window correlation: use the most-recent phone JID from contacts.upsert
+  // (contacts.upsert fires for new contacts at same time as messages.upsert)
+  var recent = recentPhones[clientId] || [];
+  var now    = Date.now();
+  var fresh  = recent.filter(function(e) { return (now - e.ts) < 5000; });
+  if (fresh.length === 1) {
+    // Exactly one new phone JID arrived in the last 5 seconds — must be the sender
+    var phoneJid = fresh[0].jid;
+    console.log('[SessionManager] ✅ Resolved via time-correlation:', jid, '→', phoneJid);
+    if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
+    contactMaps[clientId].set(jid, phoneJid);
+    recentPhones[clientId] = [];
+    return phoneJid;
+  }
+
+  // 4. Fallback — send to @lid (may not deliver, but we've tried everything)
+  console.log('[SessionManager] ⚠️  Could not resolve @lid:', jid, '— sending as-is');
   return jid;
 }
 
-// ── Main: start or reuse session ─────────────────────────────
+// ── Main: start session ───────────────────────────────────────
 async function startSession(clientId) {
   if (sessions[clientId] && sessions[clientId].connected) return;
   if (sessions[clientId] && sessions[clientId].sock) return;
-  if (starting.has(clientId)) {
-    console.log('[SessionManager] Already starting for', clientId);
-    return;
-  }
+  if (starting.has(clientId)) return;
   starting.add(clientId);
 
-  // Initialise contact map for this client
   if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
 
   try {
     if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
-    var retry = retryInfo[clientId];
-    console.log('[SessionManager] Starting session for', clientId, '(attempt #' + (retry.count + 1) + ')');
-    broadcast(clientId, 'status', { status: 'connecting', attempt: retry.count + 1 });
+    console.log('[SessionManager] Starting session for', clientId,
+      '(attempt #' + (retryInfo[clientId].count + 1) + ')');
+    broadcast(clientId, 'status', { status: 'connecting', attempt: retryInfo[clientId].count + 1 });
 
     var { state, saveCreds } = await useSupabaseAuthState(clientId);
     var { version }          = await fetchLatestBaileysVersion();
 
+    // Build in-memory store for getMessage callback (required for message retransmission)
+    var store = null;
+    if (makeInMemoryStore) {
+      try {
+        store = makeInMemoryStore({ logger: silentLogger });
+        stores[clientId] = store;
+      } catch (e) {}
+    }
+
     var sock = makeWASocket({
       version,
-      logger,
+      logger:                        silentLogger,
       auth:                          state,
       printQRInTerminal:             false,
-      browser:                       ['ForgeBot', 'Chrome', '1.0.0'],
+      browser:                       ['ForgeBot', 'Chrome', '122.0.0.0'],
       generateHighQualityLinkPreview: false,
-      connectTimeoutMs:              30000
+      connectTimeoutMs:              60000,
+      // getMessage is REQUIRED for WhatsApp retry-request handling.
+      // Without it, "sent OK" messages get silently dropped when WhatsApp
+      // can't route them on the first attempt.
+      getMessage: async function(key) {
+        if (store) {
+          try {
+            var storedMsg = await store.loadMessage(key.remoteJid, key.id);
+            if (storedMsg && storedMsg.message) return storedMsg.message;
+          } catch (e) {}
+        }
+        // Return a stub so Baileys can still form the retry response
+        return { conversation: '' };
+      }
     });
 
-    sessions[clientId] = { sock: sock, connected: false };
+    // Bind store BEFORE registering other listeners
+    if (store) store.bind(sock.ev);
+
+    sessions[clientId] = { sock, connected: false };
     starting.delete(clientId);
 
     sock.ev.on('creds.update', saveCreds);
 
-    // ── Build @lid→phone map from contact sync ────────────────
-    // Fires during initial WhatsApp sync and when new contacts message
+    // ── Contact events → build @lid map ──────────────────────
     sock.ev.on('contacts.upsert', function(contacts) {
-      updateContactMap(clientId, contacts);
+      processContactList(clientId, contacts);
     });
 
     sock.ev.on('contacts.update', function(updates) {
-      updateContactMap(clientId, updates);
+      processContactList(clientId, updates);
     });
 
+    // ── Connection lifecycle ──────────────────────────────────
     sock.ev.on('connection.update', async function(update) {
       var connection     = update.connection;
       var lastDisconnect = update.lastDisconnect;
@@ -272,7 +341,7 @@ async function startSession(clientId) {
       if (qr) {
         latestQR[clientId] = qr;
         console.log('[SessionManager] QR ready for', clientId);
-        broadcast(clientId, 'qr', { qr: qr });
+        broadcast(clientId, 'qr', { qr });
       }
 
       if (connection === 'open') {
@@ -287,15 +356,15 @@ async function startSession(clientId) {
       if (connection === 'close') {
         var code = 0;
         try {
-          if (lastDisconnect && lastDisconnect.error instanceof Boom) {
+          if (lastDisconnect && lastDisconnect.error instanceof Boom)
             code = lastDisconnect.error.output.statusCode;
-          }
         } catch (e) {}
 
         var loggedOut = (code === DisconnectReason.loggedOut);
         console.log('[SessionManager] Disconnected:', clientId, '| code:', code, '| loggedOut:', loggedOut);
 
         delete sessions[clientId];
+        delete stores[clientId];
         starting.delete(clientId);
         setConnected(clientId, false);
 
@@ -315,22 +384,19 @@ async function startSession(clientId) {
           return;
         }
 
-        if (info.count > 0 && info.count % 3 === 0) {
-          clearSupabaseAuth(clientId);
-        }
+        if (info.count > 0 && info.count % 3 === 0) clearSupabaseAuth(clientId);
 
         var delay = getNextDelay(clientId);
-        console.log('[SessionManager] Retry #' + retryInfo[clientId].count + ' for', clientId, 'in', delay + 'ms');
-        broadcast(clientId, 'reconnecting', { delay: delay, attempt: retryInfo[clientId].count });
+        console.log('[SessionManager] Retry #' + retryInfo[clientId].count + ' in', delay + 'ms');
+        broadcast(clientId, 'reconnecting', { delay, attempt: retryInfo[clientId].count });
         setTimeout(function() { startSession(clientId); }, delay);
       }
     });
 
     // ── Incoming messages ─────────────────────────────────────
     sock.ev.on('messages.upsert', async function(payload) {
+      if (payload.type !== 'notify') return;
       var messages = payload.messages || [];
-      var type     = payload.type;
-      if (type !== 'notify') return;
 
       for (var i = 0; i < messages.length; i++) {
         var msg = messages[i];
@@ -339,22 +405,18 @@ async function startSession(clientId) {
         if (msg.key.remoteJid === 'status@broadcast') continue;
 
         var originalJid = msg.key.remoteJid;
-
-        // ── KEY FIX: resolve @lid → @s.whatsapp.net ──────────
-        // @lid is WhatsApp's internal Linked Identity. Sending to @lid
-        // succeeds at the API level but is silently dropped by WhatsApp.
-        // We must use the phone-based @s.whatsapp.net JID for sending.
         var resolvedJid = resolveJid(clientId, originalJid);
 
-        // Rewrite remoteJid in the message so replyEngine sends to the correct JID
+        console.log('[SessionManager] 📩 Message for', clientId,
+          'from', originalJid,
+          resolvedJid !== originalJid ? '→ resolved to ' + resolvedJid : '');
+
+        // Rewrite key so replyEngine sends to the resolved JID
         if (resolvedJid !== originalJid) {
           msg = Object.assign({}, msg, {
             key: Object.assign({}, msg.key, { remoteJid: resolvedJid })
           });
         }
-
-        console.log('[SessionManager] 📩 Message for', clientId, 'from', originalJid,
-          resolvedJid !== originalJid ? '(resolved to ' + resolvedJid + ')' : '');
 
         try {
           await replyEngine.handleMessage(sock, msg, clientId);
@@ -365,24 +427,23 @@ async function startSession(clientId) {
     });
 
   } catch (err) {
-    console.error('[SessionManager] startSession error for', clientId + ':', err.message);
+    console.error('[SessionManager] startSession error:', err.message);
     starting.delete(clientId);
     delete sessions[clientId];
-    var info  = retryInfo[clientId] || { count: 0, delay: 5000 };
-    retryInfo[clientId] = info;
+    if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
     var delay = getNextDelay(clientId);
-    broadcast(clientId, 'reconnecting', { delay: delay, attempt: retryInfo[clientId].count });
     setTimeout(function() { startSession(clientId); }, delay);
   }
 }
 
+// ── Public API ────────────────────────────────────────────────
 async function stopSession(clientId) {
   try {
-    if (sessions[clientId] && sessions[clientId].sock) {
+    if (sessions[clientId] && sessions[clientId].sock)
       await sessions[clientId].sock.logout();
-    }
   } catch (e) {}
   delete sessions[clientId];
+  delete stores[clientId];
   starting.delete(clientId);
   delete retryInfo[clientId];
   delete latestQR[clientId];
@@ -403,12 +464,11 @@ function getAllSessions() {
 }
 
 async function bootAllSessions(activeClients) {
-  console.log('[SessionManager] Booting ' + activeClients.length + ' session(s)...');
+  console.log('[SessionManager] Booting', activeClients.length, 'session(s)...');
   for (var i = 0; i < activeClients.length; i++) {
     var client = activeClients[i];
     try {
       await startSession(client.id);
-      console.log('[SessionManager] Started session for', client.business_name || client.id);
     } catch (err) {
       console.error('[SessionManager] Failed to start session for', client.id + ':', err.message);
     }
@@ -420,9 +480,7 @@ function registerQRListener(clientId, fn) {
   var all = global.qrListeners.get(clientId) || [];
   all.push(fn);
   global.qrListeners.set(clientId, all);
-  if (latestQR[clientId]) {
-    try { fn('qr', { qr: latestQR[clientId] }); } catch (e) {}
-  }
+  if (latestQR[clientId]) { try { fn('qr', { qr: latestQR[clientId] }); } catch (e) {} }
 }
 
 function unregisterQRListener(clientId, fn) {
@@ -432,12 +490,7 @@ function unregisterQRListener(clientId, fn) {
 }
 
 module.exports = {
-  startSession,
-  stopSession,
-  clearSession,
-  getSession,
-  getAllSessions,
-  bootAllSessions,
-  registerQRListener,
-  unregisterQRListener
+  startSession, stopSession, clearSession,
+  getSession, getAllSessions, bootAllSessions,
+  registerQRListener, unregisterQRListener
 };
