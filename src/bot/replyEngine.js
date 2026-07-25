@@ -9,16 +9,16 @@ const db = require('../db/supabase');
 const { matchKeyword } = require('./keywords');
 const { transcribeVoiceNote } = require('./voiceHandler');
 
-// ── paymentNotifier v3 API (names changed in v3) ─────────────
+// ── paymentNotifier v3 API ────────────────────────────────────
 const {
-  isPaymentKeyword,          // was: isPaymentClaim
-  isAwaitingReceipt,         // new in v3
-  handlePaymentClaim,        // new in v3 (replaces notifyOwnerOfPaymentClaim)
-  handleReceiptImage,        // new in v3
-  handleOwnerReply,          // signature changed in v3
-  isOwnerConfirmationReply,  // new in v3
-  hasPendingConfirmation,    // new in v3
-  notifyOwnerOfHandoff       // was: notifyOwnerHumanRequest
+  isPaymentKeyword,
+  isAwaitingReceipt,
+  handlePaymentClaim,
+  handleReceiptImage,
+  handleOwnerReply,
+  isOwnerConfirmationReply,
+  hasPendingConfirmation,
+  notifyOwnerOfHandoff
 } = require('./paymentNotifier');
 
 // ── Human handoff pause map ────────────────────────────────
@@ -75,7 +75,6 @@ async function searchListings(clientId, query) {
       });
 
       if (fields[0].includes(lower)) score += 20;
-
       return { listing: listing, score: score };
     });
 
@@ -182,8 +181,9 @@ async function handleMessage(sock, msg, clientId) {
                (msgContent && msgContent.extendedTextMessage && msgContent.extendedTextMessage.text) ||
                (msgContent && msgContent.imageMessage && msgContent.imageMessage.caption) || '';
 
+    console.log('[ReplyEngine] MSG from', jid, '| text:', (text || '').slice(0, 30), '| isImage:', isImage);
+
     // ── Receipt image check (must be before text guard) ────────
-    // Customer sending receipt photo after paying
     if (isImage && !text) {
       if (isAwaitingReceipt(clientId, jid)) {
         await handleReceiptImage(sock, msg, clientId, jid);
@@ -208,11 +208,18 @@ async function handleMessage(sock, msg, clientId) {
       });
     }
 
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim()) {
+      console.log('[ReplyEngine] Empty text — skipping');
+      return;
+    }
 
     // ── Get client ──────────────────────────────────────────────
     var client = await db.getClientById(clientId);
-    if (!client || client.status !== 'active' || !client.subscription_active) return;
+    console.log('[ReplyEngine] client status:', client && client.status, '| sub_active:', client && client.subscription_active);
+    if (!client || client.status !== 'active' || !client.subscription_active) {
+      console.log('[ReplyEngine] Client not eligible — returning');
+      return;
+    }
 
     // ── Track customer ──────────────────────────────────────────
     try {
@@ -226,7 +233,6 @@ async function handleMessage(sock, msg, clientId) {
     } catch (e) {}
 
     // ── Owner confirmation reply check (v3 API) ─────────────────
-    // Owner replies 1/2/3 to confirm/deny a payment
     try {
       var senderIsOwner = await isOwnerConfirmationReply(clientId, jid);
       if (senderIsOwner) {
@@ -244,7 +250,10 @@ async function handleMessage(sock, msg, clientId) {
     // ── Human pause check ───────────────────────────────────────
     var pauseKey    = clientId + ':' + jid;
     var pausedUntil = humanPaused.get(pauseKey);
-    if (pausedUntil && Date.now() < pausedUntil) return;
+    if (pausedUntil && Date.now() < pausedUntil) {
+      console.log('[ReplyEngine] Human pause active — skipping');
+      return;
+    }
     if (pausedUntil && Date.now() >= pausedUntil) humanPaused.delete(pauseKey);
 
     // ── Human handoff detection ─────────────────────────────────
@@ -260,7 +269,6 @@ async function handleMessage(sock, msg, clientId) {
     }
 
     // ── Payment claim detection (v3 API) ────────────────────────
-    // handlePaymentClaim asks customer for receipt THEN notifies owner
     if (isPaymentKeyword(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await handlePaymentClaim(sock, msg, clientId, jid, text);
@@ -276,6 +284,7 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
+    console.log('[ReplyEngine] Sending composing to', jid);
     await sock.sendPresenceUpdate('composing', jid);
     await humanDelay();
     await sock.sendPresenceUpdate('paused', jid);
@@ -293,13 +302,14 @@ async function handleMessage(sock, msg, clientId) {
     var flows = [];
     try {
       flows = (await db.getFlows(clientId, true)) || [];
+      console.log('[ReplyEngine] Loaded', flows.length, 'flows');
     } catch (e) {
       console.error('[ReplyEngine] getFlows error for client ' + clientId + ':', e.message);
     }
     var matched = null;
     for (var i = 0; i < flows.length; i++) {
       var flow = flows[i];
-      if (!flow.keywords) continue;   // null safety
+      if (!flow.keywords) continue;
       var kws       = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
       var textLower = text.toLowerCase();
       if (kws.some(function(kw) { return textLower.includes(kw); })) {
@@ -309,6 +319,7 @@ async function handleMessage(sock, msg, clientId) {
     }
 
     if (matched) {
+      console.log('[ReplyEngine] Keyword match:', matched.keywords);
       if (matched.response_type === 'image' && matched.media_url) {
         await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response });
       } else {
@@ -317,7 +328,7 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
-    // ── Broader listing search (no keyword match found) ──────────
+    // ── Broader listing search ───────────────────────────────────
     if (!isListingQuery(text)) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length > 0) {
@@ -329,7 +340,9 @@ async function handleMessage(sock, msg, clientId) {
     // ── Fallback message ─────────────────────────────────────────
     var fallback = client.fallback_message ||
       'Thank you for reaching out! Someone will get back to you shortly.';
+    console.log('[ReplyEngine] Sending fallback to', jid);
     await sock.sendMessage(jid, { text: fallback });
+    console.log('[ReplyEngine] Fallback sent OK');
 
   } catch (err) {
     console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message);
