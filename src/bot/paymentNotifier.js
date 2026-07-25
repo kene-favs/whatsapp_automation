@@ -393,14 +393,116 @@ async function notifyOwnerOfOrder(clientId, customerName, orderSummary) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  v2 API compatibility wrappers
+//  replyEngine.js calls the OLD function names — these bridge them
+// ══════════════════════════════════════════════════════════════
+
+// isPaymentClaim → isPaymentKeyword
+function isPaymentClaim(text) {
+  return isPaymentKeyword(text);
+}
+
+// notifyOwnerOfPaymentClaim(sock, clientId, customerJid, customerMessage)
+// v3 equivalent: handlePaymentClaim(sock, msg, clientId, customerJid, originalMessage)
+// We don't have the msg here (replyEngine gives us text only), so we skip receipt request
+// and notify owner directly — simpler but still functional
+async function notifyOwnerOfPaymentClaim(sock, clientId, customerJid, customerMessage) {
+  try {
+    var client = await getClientData(clientId);
+    if (!client) return;
+
+    var ownerJid = ((client.notification_number || client.whatsapp_number) || '')
+      .replace(/\D/g, '') + '@s.whatsapp.net';
+    if (!ownerJid || ownerJid === '@s.whatsapp.net') return;
+
+    var phone      = formatPhone(customerJid);
+    var alertText  =
+      '*💰 PAYMENT ALERT*\n\n' +
+      'Customer: +' + phone + '\n' +
+      'Message: _"' + (customerMessage || '') + '"_\n\n' +
+      'Reply with a number:\n' +
+      '*1* ✅ Payment confirmed\n' +
+      '*2* ⏳ Ask customer to wait\n' +
+      '*3* ❌ Payment not received';
+
+    await sock.sendMessage(ownerJid, { text: alertText });
+
+    // Store so handleOwnerReply can find it
+    var confirmKey = ownerJid + ':' + clientId;
+    pendingConfirmations.set(confirmKey, {
+      customerJid:  customerJid,
+      customerName: phone,
+      phone:        phone,
+      ts:           Date.now()
+    });
+
+    await sendPushToClient(clientId,
+      '💰 Payment Claim Received',
+      'Customer +' + phone + ' claims they paid. Review in dashboard.',
+      '/dashboard'
+    );
+
+    console.log('[PaymentNotifier] Owner alerted for client', clientId);
+  } catch(e) {
+    console.error('[PaymentNotifier] notifyOwnerOfPaymentClaim error:', e.message);
+  }
+}
+
+// handleOwnerReply(sock, fromJid, text, clientId)  ← v2 signature replyEngine uses
+// Internally uses v3 logic
+async function handleOwnerReplyV2(sock, fromJid, text, clientId) {
+  try {
+    if (!fromJid || !text || !clientId) return false;
+
+    var client = await getClientData(clientId);
+    if (!client) return false;
+
+    // Build expected owner JID (phone digits + @s.whatsapp.net)
+    var ownerPhone = ((client.notification_number || client.whatsapp_number) || '').replace(/\D/g, '');
+    if (!ownerPhone) return false;
+
+    // Compare digits only — handles @lid, @s.whatsapp.net, different country prefixes
+    var fromDigits  = fromJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/\D/g, '');
+    var isOwner     = (fromDigits === ownerPhone) ||
+                      (ownerPhone.length >= 10 && fromDigits.endsWith(ownerPhone.slice(-10))) ||
+                      (fromDigits.length >= 10 && ownerPhone.endsWith(fromDigits.slice(-10)));
+
+    if (!isOwner) return false;
+
+    // Check there's a pending confirmation
+    var ownerJid   = ownerPhone + '@s.whatsapp.net';
+    var confirmKey = ownerJid + ':' + clientId;
+    if (!pendingConfirmations.has(confirmKey)) return false;
+
+    // Delegate to v3 handleOwnerReply
+    return await handleOwnerReply(sock, null, clientId, ownerJid, text);
+  } catch(e) {
+    console.error('[PaymentNotifier] handleOwnerReply error:', e.message);
+    return false;
+  }
+}
+
+// notifyOwnerHumanRequest(sock, clientId, customerJid) ← v2 name
+async function notifyOwnerHumanRequest(sock, clientId, customerJid) {
+  return notifyOwnerOfHandoff(sock, clientId, customerJid, null, 'Customer requested human support');
+}
+
+// ══════════════════════════════════════════════════════════════
 //  Exports
 // ══════════════════════════════════════════════════════════════
 module.exports = {
+  // ── v2 API (what replyEngine.js imports by name) ──────────
+  isPaymentClaim,                    // ← was missing → bot crashed every message
+  notifyOwnerOfPaymentClaim,         // ← wrapper around v3 logic
+  handleOwnerReply: handleOwnerReplyV2, // ← v2 signature (sock, fromJid, text, clientId)
+  notifyOwnerHumanRequest,           // ← alias for notifyOwnerOfHandoff
+  pendingConfirmations,
+
+  // ── v3 API (full feature set) ────────────────────────────
   isPaymentKeyword,
   isAwaitingReceipt,
   handlePaymentClaim,
   handleReceiptImage,
-  handleOwnerReply,
   isOwnerConfirmationReply,
   hasPendingConfirmation,
   notifyOwnerOfHandoff,
