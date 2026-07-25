@@ -1,38 +1,32 @@
-// ============================================================
-//  ForgeBot — Reply Engine (v3 paymentNotifier API)
-//  Sends to original JID — WhatsApp handles @lid routing
-//  v3 payment API (isPaymentKeyword, handlePaymentClaim, etc.)
-//  Receipt image flow, smart listings search, keyword flows
-// ============================================================
-
 'use strict';
 
 const db = require('../db/supabase');
 const { transcribeVoiceNote } = require('./voiceHandler');
-const {
-  isPaymentKeyword,
-  isAwaitingReceipt,
-  handlePaymentClaim,
-  handleReceiptImage,
-  handleOwnerReply,
-  isOwnerConfirmationReply,
-  hasPendingConfirmation,
-  notifyOwnerOfHandoff
-} = require('./paymentNotifier');
 
-// Human handoff pause map
-const humanPaused = new Map();
-
-function humanDelay() {
-  return new Promise(function(r) { setTimeout(r, 1500 + Math.random() * 2000); });
+// ── Import paymentNotifier with safe destructuring ─────────────
+// The deployed version may be v2 or v3 — we guard every call with typeof.
+var paymentNotifier = {};
+try { paymentNotifier = require('./paymentNotifier'); } catch (e) {
+  console.warn('[ReplyEngine] Could not load paymentNotifier:', e.message);
 }
 
+var isPaymentKeyword         = typeof paymentNotifier.isPaymentKeyword         === 'function' ? paymentNotifier.isPaymentKeyword         : null;
+var isAwaitingReceipt        = typeof paymentNotifier.isAwaitingReceipt        === 'function' ? paymentNotifier.isAwaitingReceipt        : null;
+var handlePaymentClaim       = typeof paymentNotifier.handlePaymentClaim       === 'function' ? paymentNotifier.handlePaymentClaim       : null;
+var handleReceiptImage       = typeof paymentNotifier.handleReceiptImage       === 'function' ? paymentNotifier.handleReceiptImage       : null;
+var handleOwnerReply         = typeof paymentNotifier.handleOwnerReply         === 'function' ? paymentNotifier.handleOwnerReply         : null;
+var isOwnerConfirmationReply = typeof paymentNotifier.isOwnerConfirmationReply === 'function' ? paymentNotifier.isOwnerConfirmationReply : null;
+var hasPendingConfirmation   = typeof paymentNotifier.hasPendingConfirmation   === 'function' ? paymentNotifier.hasPendingConfirmation   : null;
+var notifyOwnerOfHandoff     = typeof paymentNotifier.notifyOwnerOfHandoff     === 'function' ? paymentNotifier.notifyOwnerOfHandoff     : null;
+
+// ── Human handoff ─────────────────────────────────────────────
+const humanPaused = new Map(); // jid → true (bot paused, human handling)
+
 const HUMAN_HANDOFF_KEYWORDS = [
-  'speak to human', 'talk to human', 'real person', 'speak to someone',
-  'talk to agent', 'connect me', 'i want to talk', 'speak to owner',
-  'talk to owner', 'human please', 'abeg connect me', 'give me human',
-  'i want owner', 'customer service', 'customer care', 'live agent',
-  'actual person', 'not bot', 'no bot', 'human being'
+  'talk to human', 'speak to human', 'real person', 'agent please',
+  'customer service', 'human please', 'i want to talk to someone',
+  'connect me to someone', 'i need a human', 'speak to agent',
+  'talk to agent', 'speak to a person', 'i want a human'
 ];
 
 function wantsHuman(text) {
@@ -40,48 +34,16 @@ function wantsHuman(text) {
   return HUMAN_HANDOFF_KEYWORDS.some(function(kw) { return lower.includes(kw); });
 }
 
-// Smart listings search
-async function searchListings(clientId, query) {
-  try {
-    var sb    = db.getSupabase();
-    var lower = query.toLowerCase();
-    var result = await sb
-      .from('service_listings')
-      .select('*, listing_media(url, media_type, sort_order)')
-      .eq('client_id', clientId)
-      .eq('available', true)
-      .order('created_at', { ascending: false });
-    if (result.error || !result.data || !result.data.length) return [];
-    var scored = result.data.map(function(listing) {
-      var score  = 0;
-      var fields = [listing.name||'', listing.description||'', listing.keywords||'',
-                    listing.category||'', listing.location||'', listing.price_label||'']
-                    .map(function(f) { return f.toLowerCase(); });
-      var words  = lower.split(/\s+/).filter(function(w) { return w.length > 2; });
-      words.forEach(function(word) {
-        fields.forEach(function(field) { if (field.includes(word)) score += word.length; });
-      });
-      if (fields[0].includes(lower)) score += 20;
-      return { listing: listing, score: score };
-    });
-    return scored.filter(function(s) { return s.score > 0; })
-                 .sort(function(a, b) { return b.score - a.score; })
-                 .slice(0, 3)
-                 .map(function(s) { return s.listing; });
-  } catch (e) {
-    console.error('[ReplyEngine] Listing search error:', e.message);
-    return [];
-  }
+function humanDelay() {
+  var ms = 800 + Math.floor(Math.random() * 1200);
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-const LISTING_TRIGGERS = [
-  'do you have', 'do you sell', 'do you offer', 'is it available', 'price of',
-  'how much is', 'how much for', 'what is the price', 'i want to buy', 'i want to order',
-  'i need', 'looking for', 'show me', 'send me', 'any available', 'in stock',
-  'do you do', 'can you do', 'available for', 'services', 'products', 'what do you have',
-  'what do you sell', 'your prices', 'package', 'packages', 'catalogue', 'catalog',
-  'bedroom', 'apartment', 'house', 'land', 'property', 'plot', 'duplex', 'flat',
-  'size', 'colour', 'color', 'style', 'design', 'type', 'model'
+// ── Smart listings search ─────────────────────────────────────
+var LISTING_TRIGGERS = [
+  'do you have', 'do you sell', 'how much', 'price of', 'cost of',
+  'cost for', 'price for', 'what is the price', 'i want to buy',
+  'i need', 'looking for', 'available', 'in stock', 'sell', 'show me'
 ];
 
 function isListingQuery(text) {
@@ -89,202 +51,234 @@ function isListingQuery(text) {
   return LISTING_TRIGGERS.some(function(t) { return lower.includes(t); });
 }
 
-async function sendListingResults(sock, jid, listings, client) {
-  if (!listings.length) return false;
-  if (listings.length === 1) {
-    var l   = listings[0];
-    var msg = 'Yes! Here is what we have:\n\n*' + l.name + '*\n';
-    if (l.price)       msg += 'Price: ' + l.price + '\n';
-    if (l.description) msg += l.description + '\n';
-    if (l.location)    msg += 'Location: ' + l.location + '\n';
-    msg += '\nInterested? Reply to place your order!';
-    await sock.sendMessage(jid, { text: msg });
-    var media = (l.listing_media || []).filter(function(m) { return m.media_type === 'image'; });
-    for (var i = 0; i < Math.min(media.length, 3); i++) {
-      try {
-        await sock.sendMessage(jid, { image: { url: media[i].url }, caption: l.name });
-        await new Promise(function(r) { setTimeout(r, 800); });
-      } catch (e) {}
-    }
-  } else {
-    var intro = 'We found *' + listings.length + ' options* for you:\n\n';
-    listings.forEach(function(l, i) {
-      intro += '*' + (i + 1) + '. ' + l.name + '*\n';
-      if (l.price)       intro += '   ' + l.price + '\n';
-      if (l.location)    intro += '   ' + l.location + '\n';
-      if (l.description) intro += '   ' + l.description.slice(0, 80) + '\n';
-      intro += '\n';
-    });
-    intro += 'Reply with the *number* of the one you want more details on!';
-    await sock.sendMessage(jid, { text: intro });
-    for (var j = 0; j < listings.length; j++) {
-      var imgs = (listings[j].listing_media || []).filter(function(m) { return m.media_type === 'image'; });
-      if (imgs.length) {
-        try {
-          await sock.sendMessage(jid, {
-            image: { url: imgs[0].url },
-            caption: (j + 1) + '. ' + listings[j].name + (listings[j].price ? ' - ' + listings[j].price : '')
-          });
-          await new Promise(function(r) { setTimeout(r, 800); });
-        } catch (e) {}
-      }
-    }
+async function searchListings(clientId, text) {
+  try {
+    var sb     = db.getSupabase ? db.getSupabase() : null;
+    if (!sb) return [];
+    var result = await sb
+      .from('service_listings')
+      .select('name, price, price_label, description, keywords')
+      .eq('client_id', clientId)
+      .eq('available', true);
+    if (result.error || !result.data || !result.data.length) return [];
+    var lower = text.toLowerCase();
+    return result.data.filter(function(item) {
+      var searchable = ((item.name || '') + ' ' + (item.keywords || '') + ' ' + (item.description || '')).toLowerCase();
+      return lower.split(/\s+/).some(function(word) {
+        return word.length > 2 && searchable.includes(word);
+      });
+    }).slice(0, 5);
+  } catch (e) {
+    return [];
   }
-  return true;
 }
 
-// Main message handler
+function buildListingReply(matches) {
+  if (!matches.length) return null;
+  var lines = matches.map(function(m) {
+    var price = m.price_label || (m.price ? '₦' + Number(m.price).toLocaleString() : null);
+    return '• *' + m.name + '*' + (price ? ' — ' + price : '') + (m.description ? '\n  ' + m.description.slice(0, 80) : '');
+  });
+  return 'Here\'s what I found:\n\n' + lines.join('\n\n');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MAIN MESSAGE HANDLER
+// ════════════════════════════════════════════════════════════════
 
 async function handleMessage(sock, msg, clientId) {
   try {
     var jid = msg.key.remoteJid;
+    if (!jid) return;
     if (jid === 'status@broadcast') return;
 
     var msgContent = msg.message;
-    var isImage = !!(msgContent && msgContent.imageMessage);
-    var isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
-    var isAudio = !!(msgContent && msgContent.audioMessage);
+    if (!msgContent) return;
 
-    var text = (msgContent && msgContent.conversation) ||
-               (msgContent && msgContent.extendedTextMessage && msgContent.extendedTextMessage.text) ||
-               (msgContent && msgContent.imageMessage && msgContent.imageMessage.caption) || '';
+    var isImage = !!(msgContent.imageMessage);
+    var isVoice = !!(msgContent.audioMessage && msgContent.audioMessage.ptt);
+    var isAudio = !!(msgContent.audioMessage);
 
-    console.log('[ReplyEngine] MSG from', jid, '| text:', text.slice(0, 60), '| isImage:', isImage);
+    var text = (msgContent.conversation)
+            || (msgContent.extendedTextMessage && msgContent.extendedTextMessage.text)
+            || (msgContent.imageMessage && msgContent.imageMessage.caption)
+            || (msgContent.videoMessage && msgContent.videoMessage.caption)
+            || '';
 
-    // Voice note handling
-    if (isVoice || isAudio) {
-      await sock.sendPresenceUpdate('composing', jid);
-      var transcribed = await transcribeVoiceNote(sock, msg);
-      if (!transcribed) {
-        await humanDelay();
-        await sock.sendMessage(jid, {
-          text: 'I received your voice note! Could you please type your message so I can help you faster?'
-        });
+    console.log('[ReplyEngine] MSG from', jid, '| text:', text.slice(0, 60), '| isImage:', isImage, '| isVoice:', isVoice);
+
+    // ── Voice note: transcribe and treat as text ───────────────
+    if (isVoice && !text.trim()) {
+      try {
+        var transcribed = await transcribeVoiceNote(msg);
+        if (transcribed) {
+          text = transcribed;
+          console.log('[ReplyEngine] Transcribed voice:', text.slice(0, 60));
+        }
+      } catch (e) {
+        console.log('[ReplyEngine] Voice transcription failed:', e.message);
+      }
+    }
+
+    // Skip if nothing to process
+    if (!text.trim() && !isImage) {
+      console.log('[ReplyEngine] Empty message, skipping');
+      return;
+    }
+
+    // ── Load client ───────────────────────────────────────────
+    var client = await db.getClientById(clientId);
+    if (!client) {
+      console.log('[ReplyEngine] No client found:', clientId);
+      return;
+    }
+    console.log('[ReplyEngine] client status:', client.status, '| sub_active:', client.subscription_active);
+
+    if (client.status !== 'active' || !client.subscription_active) {
+      console.log('[ReplyEngine] Client inactive or no subscription, skipping');
+      return;
+    }
+
+    // ── Track customer ────────────────────────────────────────
+    try {
+      var sb = db.getSupabase ? db.getSupabase() : null;
+      if (sb) {
+        await sb.from('customers').upsert({
+          client_id:    clientId,
+          jid:          jid,
+          last_contact: new Date().toISOString()
+        }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
+      }
+    } catch (e) {
+      // non-critical
+    }
+
+    console.log('[ReplyEngine] Passed customer tracking');
+
+    // ── Receipt image (paymentNotifier v3) ───────────────────
+    if (isImage && isAwaitingReceipt && isAwaitingReceipt(jid)) {
+      console.log('[ReplyEngine] Handling receipt image');
+      if (handleReceiptImage) await handleReceiptImage(sock, msg, clientId);
+      return;
+    }
+
+    // ── Owner confirmation reply (paymentNotifier v3) ────────
+    if (text.trim()) {
+      var isOwnerReply = (isOwnerConfirmationReply && isOwnerConfirmationReply(text))
+                      || (hasPendingConfirmation && hasPendingConfirmation(jid));
+      if (isOwnerReply) {
+        console.log('[ReplyEngine] Handling owner confirmation reply');
+        if (handleOwnerReply) {
+          var ownerJid = null;
+          try {
+            var ownerNum = client.notification_number;
+            if (ownerNum) ownerJid = ownerNum.replace(/\D/g, '') + '@s.whatsapp.net';
+          } catch (e) {}
+          await handleOwnerReply(sock, msg, clientId, ownerJid, text.trim());
+        }
         return;
       }
-      text = transcribed;
-      await sock.sendMessage(jid, { text: 'I heard: _"' + transcribed + '"_\n\nLet me help you with that...' });
     }
 
-    if (!text.trim() && !isImage) return;
+    // ── Human pause check ────────────────────────────────────
+    if (humanPaused.get(jid)) {
+      console.log('[ReplyEngine] Bot paused for human handoff on', jid);
+      return;
+    }
 
-    // Get client
-    var client = await db.getClientById(clientId);
-    if (!client) { console.log('[ReplyEngine] No client found:', clientId); return; }
-    console.log('[ReplyEngine] client status:', client.status, '| sub_active:', client.subscription_active);
-    if (client.status !== 'active' || !client.subscription_active) return;
+    // ── Human handoff request ────────────────────────────────
+    if (text.trim() && wantsHuman(text)) {
+      console.log('[ReplyEngine] Human handoff requested by', jid);
+      humanPaused.set(jid, true);
+      if (notifyOwnerOfHandoff) {
+        try { await notifyOwnerOfHandoff(sock, msg, clientId); } catch (e) {}
+      }
+      var handoffMsg = 'I\'ll connect you with our team right away! A human agent will be with you shortly. 🙏';
+      await sock.sendMessage(jid, { text: handoffMsg });
+      return;
+    }
 
-    // Track customer
+    // ── Payment keyword (paymentNotifier v3) ─────────────────
+    if (text.trim() && isPaymentKeyword && isPaymentKeyword(text)) {
+      console.log('[ReplyEngine] Payment keyword detected');
+      if (handlePaymentClaim) await handlePaymentClaim(sock, msg, clientId);
+      return;
+    }
+
+    // ── Typing indicator ──────────────────────────────────────
     try {
-      var sb = db.getSupabase();
-      await sb.from('customers').upsert({
-        client_id: clientId, jid: jid,
-        last_contact: new Date().toISOString(), last_seen: new Date().toISOString()
-      }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
-    } catch (e) {}
-
-    // Receipt image flow (v3)
-    if (isImage && isAwaitingReceipt(jid)) {
-      try { await handleReceiptImage(sock, msg, clientId); }
-      catch (e) { console.error('[ReplyEngine] handleReceiptImage error:', e.message); }
-      return;
-    }
-
-    // Owner reply check (v3 — 5-param signature)
-    if (text.trim() && (isOwnerConfirmationReply(text) || hasPendingConfirmation(jid))) {
-      try {
-        var ownerClient = await db.getClientById(clientId);
-        var ownerJid = ownerClient && ownerClient.notification_number
-          ? ownerClient.notification_number.replace(/\D/g, '') + '@s.whatsapp.net'
-          : null;
-        await handleOwnerReply(sock, msg, clientId, ownerJid, text.trim());
-      } catch (e) { console.error('[ReplyEngine] handleOwnerReply error:', e.message); }
-      return;
-    }
-
-    // Human pause check
-    var pauseKey    = clientId + ':' + jid;
-    var pausedUntil = humanPaused.get(pauseKey);
-    if (pausedUntil && Date.now() < pausedUntil) return;
-    if (pausedUntil && Date.now() >= pausedUntil) humanPaused.delete(pauseKey);
-
-    if (!text.trim()) return;
-
-    // Human handoff detection
-    if (wantsHuman(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
-      await sock.sendMessage(jid, {
-        text: 'Got it! I am connecting you with the owner right now. Please hold on, they will be with you shortly.'
-      });
-      humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000);
-      try { await notifyOwnerOfHandoff(sock, clientId, jid); }
-      catch (e) { console.error('[ReplyEngine] notifyOwnerOfHandoff error:', e.message); }
-      return;
+      await sock.sendPresenceUpdate('paused', jid);
+    } catch (e) {
+      console.log('[ReplyEngine] Presence update failed:', e.message);
     }
 
-    // Payment keyword detection (v3)
-    if (isPaymentKeyword(text)) {
-      await sock.sendPresenceUpdate('composing', jid);
-      await humanDelay();
-      try { await handlePaymentClaim(sock, msg, clientId); }
-      catch (e) {
-        console.error('[ReplyEngine] handlePaymentClaim error:', e.message);
-        await sock.sendMessage(jid, { text: 'Thank you! Your payment has been noted. The owner will confirm shortly.' });
-      }
-      return;
-    }
-
-    await sock.sendPresenceUpdate('composing', jid);
-    await humanDelay();
-    await sock.sendPresenceUpdate('paused', jid);
-
-    // Smart listings search (before keyword matching)
-    if (isListingQuery(text)) {
+    // ── Smart listings search (before keyword matching) ───────
+    if (text.trim() && isListingQuery(text)) {
       var matches = await searchListings(clientId, text);
-      if (matches.length > 0) {
-        var sent = await sendListingResults(sock, jid, matches, client);
-        if (sent) return;
+      if (matches.length) {
+        var listingReply = buildListingReply(matches);
+        if (listingReply) {
+          console.log('[ReplyEngine] Sending listings reply to', jid);
+          await sock.sendMessage(jid, { text: listingReply });
+          return;
+        }
       }
     }
 
-    // Flow keyword matching
+    // ── Keyword / flow matching ───────────────────────────────
     var flows = await db.getFlows(clientId, true);
     console.log('[ReplyEngine] Loaded', flows.length, 'flows');
-    var matched = null;
-    for (var i = 0; i < flows.length; i++) {
-      var flow      = flows[i];
-      var kws       = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
-      var textLower = text.toLowerCase();
-      if (kws.some(function(kw) { return textLower.includes(kw); })) { matched = flow; break; }
-    }
 
-    if (matched) {
-      if (matched.response_type === 'image' && matched.media_url) {
-        await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response });
-      } else {
-        await sock.sendMessage(jid, { text: matched.response });
+    if (text.trim() && flows.length) {
+      var lower = text.toLowerCase();
+      for (var i = 0; i < flows.length; i++) {
+        var flow = flows[i];
+        var kws  = (flow.keywords || '').toLowerCase().split(',').map(function(k) { return k.trim(); }).filter(Boolean);
+        var matched = kws.some(function(kw) { return lower.includes(kw); });
+        if (matched) {
+          console.log('[ReplyEngine] Matched flow:', flow.id, '| keyword hit on:', kws.find(function(kw) { return lower.includes(kw); }));
+          if (flow.response_type === 'image' && flow.media_url) {
+            await sock.sendMessage(jid, {
+              image: { url: flow.media_url },
+              caption: flow.response || ''
+            });
+          } else {
+            await sock.sendMessage(jid, { text: flow.response || '' });
+          }
+          // Update trigger count
+          try {
+            var sbf = db.getSupabase ? db.getSupabase() : null;
+            if (sbf) await sbf.from('chat_flows').update({ trigger_count: (flow.trigger_count || 0) + 1 }).eq('id', flow.id);
+          } catch (e) {}
+          return;
+        }
       }
-      return;
     }
 
-    // Broader listings search
-    if (!isListingQuery(text)) {
+    // ── Broader listings fallback ─────────────────────────────
+    if (text.trim()) {
       var broadMatches = await searchListings(clientId, text);
-      if (broadMatches.length > 0) {
-        var broadSent = await sendListingResults(sock, jid, broadMatches, client);
-        if (broadSent) return;
+      if (broadMatches.length) {
+        var broadReply = buildListingReply(broadMatches);
+        if (broadReply) {
+          console.log('[ReplyEngine] Sending broad listings reply to', jid);
+          await sock.sendMessage(jid, { text: broadReply });
+          return;
+        }
       }
     }
 
-    // Fallback message
-    var fallback = client.fallback_message || 'Thank you for reaching out! Someone will get back to you shortly.';
+    // ── Fallback message ──────────────────────────────────────
+    var fallback = client.fallback_message
+      || 'Thank you for reaching out! 😊 I didn\'t quite understand that. You can ask about our products, prices, or services and I\'ll do my best to help!';
     console.log('[ReplyEngine] Sending fallback to', jid);
     await sock.sendMessage(jid, { text: fallback });
     console.log('[ReplyEngine] Fallback sent OK');
 
   } catch (err) {
-    console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message);
+    console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message, err.stack ? err.stack.split('\n')[1] : '');
   }
 }
 

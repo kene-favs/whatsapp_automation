@@ -1,22 +1,9 @@
 // ============================================================
-//  ForgeBot — Client API Routes v2
+//  ForgeBot — Client API Routes v3
 //  File location: src/api/clientRoutes.js
 //
 //  Mounted at: /api  (in index.js: app.use('/api', clientRoutes))
 //  Auth: JWT via Authorization: Bearer <token>
-//
-//  New in v2:
-//   - /api/client/listings   (CRUD for service listings)
-//   - /api/client/listings/:id/media  (media per listing)
-//   - /api/client/media/:id  (delete media)
-//   - /api/client/faq        (unlimited FAQ)
-//   - /api/client/occupation (save occupation + answers)
-//   - /api/client/location   (save location details)
-//   - /api/client/upload     (file upload → Supabase Storage)
-//   - /api/client/partner-status (trial info)
-//   - /api/client/qr-stream  (SSE for QR code)
-//   - /api/client/settings   GET added — loads saved settings
-//   All existing routes preserved
 // ============================================================
 
 'use strict';
@@ -94,7 +81,7 @@ async function checkPartnerExpiry(clientId) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  PUBLIC ROUTES — before router.use('/client', auth …)
+//  PUBLIC ROUTES — before auth middleware
 // ══════════════════════════════════════════════════════════════
 
 async function activateClient(clientId) {
@@ -244,14 +231,14 @@ router.post('/push/subscribe', async function(req, res) {
 });
 router.post('/push/test', function(req, res) { res.json({ ok: true }); });
 
-// ── Apply auth + partner check to all client routes ───────────
+// ── Apply auth + partner check to all /client routes ─────────
 router.use('/client', auth, async function(req, res, next) {
   await checkPartnerExpiry(req.clientId);
   next();
 });
 
 // ══════════════════════════════════════════════════════════════
-//  EXISTING ROUTES (preserved exactly as before)
+//  CLIENT INFO
 // ══════════════════════════════════════════════════════════════
 
 // GET /api/client/me
@@ -260,56 +247,170 @@ router.get('/client/me', async function(req, res) {
     var client = await db.getClientById(req.clientId);
     if (!client) return res.status(404).json({ error: 'Not found' });
     var sock   = sessionManager.getSession(req.clientId);
-    var { password_hash, ...safe } = client;
-    safe.whatsapp_status = sock ? 'connected' : 'disconnected';
-    res.json(safe);
+    delete client.password_hash;
+    client.whatsapp_status = sock ? 'connected' : 'disconnected';
+    res.json(client);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/client/settings  ← ADDED: was missing, caused empty fields on dashboard
+// GET /api/client/session-status  ← used by dashboard to show Connected/Disconnected badge
+router.get('/client/session-status', function(req, res) {
+  try {
+    var sock      = sessionManager.getSession(req.clientId);
+    var connected = !!(sock);
+    res.json({ connected: connected, status: connected ? 'connected' : 'disconnected' });
+  } catch (e) {
+    res.json({ connected: false, status: 'disconnected' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/client/settings  ← pre-fills the Settings page
 router.get('/client/settings', async function(req, res) {
   try {
     var sb = getSupabase();
 
     var clientRes = await sb.from('clients').select('*').eq('id', req.clientId).single();
     if (clientRes.error || !clientRes.data) return res.status(404).json({ error: 'Client not found' });
-    var client = clientRes.data;
-    delete client.password_hash;
+    var c = clientRes.data;
 
     var setupRes = await sb.from('bot_setup').select('*').eq('client_id', req.clientId).single();
-    var setup    = (setupRes.data) || {};
+    var s = setupRes.data || {};
 
     res.json({
-      notification_number: client.notification_number || '',
-      business_name:       client.business_name       || '',
-      welcome_message:     client.welcome_message     || '',
-      fallback_message:    client.fallback_message    || '',
-      bank_name:           client.bank_name           || '',
-      account_number:      client.account_number      || '',
-      account_name:        client.account_name        || '',
-      business_hours:      client.business_hours      || '',
-      instagram:           setup.instagram            || '',
-      facebook:            setup.facebook             || '',
-      tiktok:              setup.tiktok               || '',
-      whatsapp_channel:    setup.whatsapp_channel     || '',
-      service_areas:       setup.service_areas        || '',
-      delivers_to:         setup.delivers_to          || '',
-      delivery_fee_local:  setup.delivery_fee_local   || '',
-      delivery_time_local: setup.delivery_time_local  || '',
-      minimum_order:       setup.minimum_order        || '',
-      return_policy:       setup.return_policy        || '',
-      current_promo:       setup.current_promo        || '',
-      payment_methods:     setup.payment_methods      || [],
-      subscription_active: client.subscription_active || false,
-      is_partner:          client.is_partner          || false,
-      partner_expires_at:  client.partner_expires_at  || null
+      // ── Client fields (top-level, dashboard reads these directly) ──
+      notification_number: c.notification_number || '',
+      welcome_message:     c.welcome_message     || '',
+      fallback_message:    c.fallback_message     || '',
+      bank_name:           c.bank_name            || '',
+      account_number:      c.account_number       || '',
+      account_name:        c.account_name         || '',
+      business_hours:      c.business_hours       || '',
+
+      // ── Bot setup (nested as data.bot_setup.xxx — matches dashboard JS) ──
+      bot_setup: {
+        instagram:        s.instagram         || '',
+        facebook:         s.facebook          || '',
+        tiktok:           s.tiktok            || '',
+        whatsapp_channel: s.whatsapp_channel  || '',
+        // Map old DB column names → field names the dashboard expects
+        delivery_areas:   s.delivery_areas    || s.delivers_to          || '',
+        delivery_fee:     s.delivery_fee      || s.delivery_fee_local   || '',
+        delivery_time:    s.delivery_time     || s.delivery_time_local  || '',
+        minimum_order:    s.minimum_order     || '',
+        return_policy:    s.return_policy     || '',
+        promo:            s.promo             || s.current_promo        || '',
+        // payment_methods: array stored in DB, return as comma-separated string
+        payment_methods:  Array.isArray(s.payment_methods)
+                            ? s.payment_methods.join(',')
+                            : (s.payment_methods || '')
+      },
+
+      // ── Subscription info ──────────────────────────────────
+      is_partner:          c.is_partner          || false,
+      partner_expires_at:  c.partner_expires_at  || null,
+      subscription_active: c.subscription_active || false
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+// PUT /api/client/settings  ← saves notification, messages, bank details, hours
+router.put('/client/settings', async function(req, res) {
+  try {
+    var allowed = [
+      'notification_number', 'business_name',
+      'welcome_message', 'fallback_message',
+      'bank_name', 'account_number', 'account_name',
+      'business_hours'
+    ];
+    var update = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    var updated = await db.updateClient(req.clientId, update);
+    res.json(updated || { ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/client/fallback  (legacy — kept for compatibility)
+router.put('/client/fallback', async function(req, res) {
+  try {
+    var { fallback_message } = req.body;
+    if (!fallback_message) return res.status(400).json({ error: 'fallback_message required' });
+    var updated = await db.updateClient(req.clientId, { fallback_message: fallback_message });
+    res.json(updated || { ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/client/bot-setup  ← saves social media + delivery settings
+router.put('/client/bot-setup', async function(req, res) {
+  try {
+    var sb = getSupabase();
+    var b  = req.body;
+
+    // Build upsert data — accept BOTH old (onboarding) and new (dashboard) field names
+    var setupData = {
+      client_id: req.clientId,
+      updated_at: new Date().toISOString()
+    };
+
+    // Social media
+    if (b.instagram         !== undefined) setupData.instagram         = b.instagram         || null;
+    if (b.facebook          !== undefined) setupData.facebook          = b.facebook          || null;
+    if (b.tiktok            !== undefined) setupData.tiktok            = b.tiktok            || null;
+    if (b.whatsapp_channel  !== undefined) setupData.whatsapp_channel  = b.whatsapp_channel  || null;
+
+    // Delivery — dashboard sends: delivery_areas, delivery_fee, delivery_time, promo
+    // Onboarding sends: delivers_to, delivery_fee_local, delivery_time_local, current_promo
+    // Save under BOTH column names so both paths work
+    if (b.delivery_areas    !== undefined) { setupData.delivery_areas    = b.delivery_areas    || null; setupData.delivers_to          = b.delivery_areas    || null; }
+    if (b.delivers_to       !== undefined) { setupData.delivers_to       = b.delivers_to       || null; setupData.delivery_areas       = b.delivers_to       || null; }
+    if (b.delivery_fee      !== undefined) { setupData.delivery_fee      = b.delivery_fee      || null; setupData.delivery_fee_local   = b.delivery_fee      || null; }
+    if (b.delivery_fee_local!== undefined) { setupData.delivery_fee_local= b.delivery_fee_local|| null; setupData.delivery_fee         = b.delivery_fee_local|| null; }
+    if (b.delivery_time     !== undefined) { setupData.delivery_time     = b.delivery_time     || null; setupData.delivery_time_local  = b.delivery_time     || null; }
+    if (b.delivery_time_local!==undefined) { setupData.delivery_time_local=b.delivery_time_local||null; setupData.delivery_time        = b.delivery_time_local||null; }
+    if (b.minimum_order     !== undefined) setupData.minimum_order     = b.minimum_order     || null;
+    if (b.return_policy     !== undefined) setupData.return_policy     = b.return_policy     || null;
+    if (b.promo             !== undefined) { setupData.promo            = b.promo             || null; setupData.current_promo        = b.promo             || null; }
+    if (b.current_promo     !== undefined) { setupData.current_promo    = b.current_promo     || null; setupData.promo                = b.current_promo     || null; }
+
+    // Payment methods — accept array or comma-string
+    if (b.payment_methods !== undefined) {
+      var pm = b.payment_methods;
+      setupData.payment_methods = Array.isArray(pm) ? pm.join(',') : (pm || null);
+    }
+
+    // Onboarding-only fields
+    var onboardingFields = ['occupation','occupation_data','availability_days','service_areas',
+      'studio_location','home_service','advance_booking','deposit_required','session_duration',
+      'who_do_you_serve','free_consult','bulk_orders','delivery_fee_outside','delivery_time_outside',
+      'payment_on_delivery','complaint_handling','referral_reward'];
+    onboardingFields.forEach(function(k) {
+      if (b[k] !== undefined) setupData[k] = b[k] || null;
+    });
+
+    var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
+    if (error) throw new Error(error.message);
+
+    await sb.from('clients').update({ setup_completed: true }).eq('id', req.clientId);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  AUTO-REPLY FLOWS
+// ══════════════════════════════════════════════════════════════
 
 // GET /api/client/flows
 router.get('/client/flows', async function(req, res) {
@@ -324,9 +425,9 @@ router.get('/client/flows', async function(req, res) {
 // POST /api/client/flows
 router.post('/client/flows', async function(req, res) {
   try {
-    var { keywords, response, response_type, media_url } = req.body;
+    var { keywords, response, response_type, media_url, flow_name } = req.body;
     if (!keywords || !response) return res.status(400).json({ error: 'keywords and response are required' });
-    var flow = await db.addFlow(req.clientId, 'Custom', keywords, response_type || 'text', response, media_url || null, 0);
+    var flow = await db.addFlow(req.clientId, flow_name || 'Custom', keywords, response_type || 'text', response, media_url || null, 0);
     res.json(flow);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -343,40 +444,127 @@ router.delete('/client/flows/:id', async function(req, res) {
   }
 });
 
-// GET /api/client/status-posts
-router.get('/client/status-posts', async function(req, res) {
+// ══════════════════════════════════════════════════════════════
+//  ORDERS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/client/orders
+router.get('/client/orders', async function(req, res) {
   try {
-    var posts = await db.getStatusPosts(req.clientId);
-    res.json(posts);
+    var sb     = getSupabase();
+    var query  = sb.from('orders')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (req.query.status) query = query.eq('status', req.query.status);
+    var result = await query;
+    res.json(result.data || []);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/client/status-posts
-router.post('/client/status-posts', async function(req, res) {
+// PUT /api/client/orders/:id
+router.put('/client/orders/:id', async function(req, res) {
   try {
-    var { mediaUrl, caption, scheduledTime, scheduledDays } = req.body;
-    if (!mediaUrl || !scheduledTime || !scheduledDays) return res.status(400).json({ error: 'Missing fields' });
-    var post = await db.addStatusPost(req.clientId, caption, mediaUrl, scheduledTime, scheduledDays);
-    res.json(post);
+    var sb      = getSupabase();
+    var allowed = ['status', 'payment_status', 'notes', 'delivery_address'];
+    var update  = { updated_at: new Date().toISOString() };
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    var result  = await sb.from('orders')
+      .update(update)
+      .eq('id', req.params.id)
+      .eq('client_id', req.clientId)
+      .select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// DELETE /api/client/status-posts/:id
-router.delete('/client/status-posts/:id', async function(req, res) {
+// ══════════════════════════════════════════════════════════════
+//  ANALYTICS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/client/analytics?month=2026-07
+router.get('/client/analytics', async function(req, res) {
   try {
-    var sb = getSupabase();
-    await sb.from('status_posts').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
+    var month = req.query.month;
+    if (!month) {
+      var n = new Date();
+      month = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0');
+    }
+    var sb    = getSupabase();
+    var parts = month.split('-');
+    var yr    = parseInt(parts[0]);
+    var mo    = parseInt(parts[1]);
+    var start = month + '-01';
+    var endDate = new Date(yr, mo, 1); // first day of next month
+    var end   = endDate.getFullYear() + '-' + String(endDate.getMonth() + 1).padStart(2, '0') + '-01';
+
+    var custRes = await sb.from('customers')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', req.clientId)
+      .gte('created_at', start)
+      .lt('created_at', end);
+
+    var ordRes = await sb.from('orders')
+      .select('status,total')
+      .eq('client_id', req.clientId)
+      .gte('created_at', start)
+      .lt('created_at', end);
+
+    var orders    = ordRes.data || [];
+    var placed    = orders.length;
+    var confirmed = orders.filter(function(o) {
+      return ['confirmed','packaging','shipped','delivered','accepted','completed'].includes(o.status);
+    }).length;
+    var revenue   = orders
+      .filter(function(o) {
+        return ['confirmed','packaging','shipped','delivered','accepted','completed'].includes(o.status);
+      })
+      .reduce(function(sum, o) { return sum + (parseFloat(o.total) || 0); }, 0);
+
+    var leadsRes = await sb.from('customers')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', req.clientId)
+      .gte('last_contact', start)
+      .lt('last_contact', end);
+
+    res.json({
+      new_customers:    custRes.count  || 0,
+      leads:            leadsRes.count || 0,
+      orders_placed:    placed,
+      orders_confirmed: confirmed,
+      total_revenue:    revenue
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/client/broadcasts
+// ══════════════════════════════════════════════════════════════
+//  BROADCAST
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/client/broadcast-logs
+router.get('/client/broadcast-logs', async function(req, res) {
+  try {
+    var sb     = getSupabase();
+    var result = await sb.from('broadcasts')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('sent_at', { ascending: false })
+      .limit(20);
+    res.json(result.data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/client/broadcasts  (legacy alias)
 router.get('/client/broadcasts', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -391,7 +579,46 @@ router.get('/client/broadcasts', async function(req, res) {
   }
 });
 
-// POST /api/client/broadcasts
+// POST /api/client/broadcast  ← dashboard sends to specific phone numbers
+router.post('/client/broadcast', async function(req, res) {
+  try {
+    var { message, phones } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+    var sock = sessionManager.getSession(req.clientId);
+    if (!sock) return res.status(400).json({ error: 'WhatsApp not connected' });
+
+    var phoneList = Array.isArray(phones)
+      ? phones
+      : (phones || '').split('\n').filter(Boolean);
+    if (!phoneList.length) return res.status(400).json({ error: 'No phone numbers provided' });
+
+    var sent = 0;
+    for (var i = 0; i < phoneList.length; i++) {
+      var jid = phoneList[i].toString().replace(/\D/g, '') + '@s.whatsapp.net';
+      try {
+        await sock.sendMessage(jid, { text: message });
+        sent++;
+        await new Promise(function(r) { setTimeout(r, 1200); });
+      } catch (e) {
+        console.error('[Broadcast] Failed for', jid + ':', e.message);
+      }
+    }
+
+    var sb = getSupabase();
+    await sb.from('broadcasts').insert({
+      client_id:  req.clientId,
+      message:    message,
+      recipients: sent,
+      sent_at:    new Date().toISOString()
+    }).catch(function() {});
+
+    res.json({ sent: sent, total: phoneList.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/client/broadcasts  ← legacy: broadcasts to ALL saved customers
 router.post('/client/broadcasts', async function(req, res) {
   try {
     var { message } = req.body;
@@ -414,77 +641,205 @@ router.post('/client/broadcasts', async function(req, res) {
       }
     }
 
-    await db.logBroadcast(req.clientId, message, sent);
+    await sb.from('broadcasts').insert({ client_id: req.clientId, message: message, recipients: sent, sent_at: new Date().toISOString() }).catch(function() {});
     res.json({ sent: sent, total: jids.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// PUT /api/client/settings  ← welcome_message + fallback_message added to allowed fields
-router.put('/client/settings', async function(req, res) {
+// ══════════════════════════════════════════════════════════════
+//  STATUS POSTS
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/client/status-posts
+router.get('/client/status-posts', async function(req, res) {
   try {
-    var allowed = ['notification_number', 'business_name', 'welcome_message', 'fallback_message', 'bank_name', 'account_number', 'account_name', 'business_hours'];
-    var update  = {};
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var updated = await db.updateClient(req.clientId, update);
-    res.json(updated);
+    var sb     = getSupabase();
+    var result = await sb.from('status_posts')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('created_at', { ascending: false });
+    res.json(result.data || []);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// PUT /api/client/fallback
-router.put('/client/fallback', async function(req, res) {
+// POST /api/client/status-posts
+// Dashboard sends: { caption, media_url, post_time }
+router.post('/client/status-posts', async function(req, res) {
   try {
-    var { fallback_message } = req.body;
-    if (!fallback_message) return res.status(400).json({ error: 'fallback_message required' });
-    var updated = await db.updateClient(req.clientId, { fallback_message: fallback_message });
-    res.json(updated);
+    var caption   = req.body.caption       || '';
+    var media_url = req.body.media_url     || req.body.mediaUrl    || null;
+    var post_time = req.body.post_time     || req.body.scheduledTime || null;
+    if (!caption || !post_time) return res.status(400).json({ error: 'Caption and time required' });
+    var sb     = getSupabase();
+    var result = await sb.from('status_posts').insert({
+      client_id: req.clientId,
+      caption:   caption,
+      media_url: media_url,
+      post_time: post_time
+    }).select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// GET /api/client/qr-stream — MOVED to PUBLIC ROUTES block above (before auth middleware)
-
-// ══════════════════════════════════════════════════════════════
-//  NEW ROUTES v2
-// ══════════════════════════════════════════════════════════════
-
-// ── Occupation ────────────────────────────────────────────────
-
-router.put('/client/occupation', async function(req, res) {
+// DELETE /api/client/status-posts/:id
+router.delete('/client/status-posts/:id', async function(req, res) {
   try {
-    var { occupation, answers } = req.body;
-    if (!occupation) return res.status(400).json({ error: 'occupation required' });
-
     var sb = getSupabase();
-    await sb.from('clients').update({
-      occupation:       occupation,
-      occupation_data:  answers || {}
-    }).eq('id', req.clientId);
-
-    await sb.from('bot_setup').upsert({
-      client_id:           req.clientId,
-      occupation_answers:  answers || {},
-      updated_at:          new Date().toISOString()
-    }, { onConflict: 'client_id' });
-
+    await sb.from('status_posts').delete().eq('id', req.params.id).eq('client_id', req.clientId);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Location ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  BOT ERRANDS (Scheduled Auto-Outreach)
+// ══════════════════════════════════════════════════════════════
 
+// GET /api/client/bot-tasks
+router.get('/client/bot-tasks', async function(req, res) {
+  try {
+    var sb     = getSupabase();
+    var result = await sb.from('bot_tasks')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('created_at', { ascending: false });
+    res.json(result.data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/client/bot-tasks
+router.post('/client/bot-tasks', async function(req, res) {
+  try {
+    var { name, message, schedule_time, schedule_days, filter_type } = req.body;
+    if (!name || !message || !schedule_time || !schedule_days) {
+      return res.status(400).json({ error: 'name, message, schedule_time, and schedule_days are required' });
+    }
+    var sb     = getSupabase();
+    var result = await sb.from('bot_tasks').insert({
+      client_id:     req.clientId,
+      name:          name,
+      message:       message,
+      schedule_time: schedule_time,
+      schedule_days: schedule_days,
+      filter_type:   filter_type || 'all_customers',
+      active:        true,
+      run_count:     0
+    }).select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/client/bot-tasks/:id
+router.patch('/client/bot-tasks/:id', async function(req, res) {
+  try {
+    var sb      = getSupabase();
+    var allowed = ['active', 'name', 'message', 'schedule_time', 'schedule_days', 'filter_type'];
+    var update  = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    var result  = await sb.from('bot_tasks')
+      .update(update)
+      .eq('id', req.params.id)
+      .eq('client_id', req.clientId)
+      .select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/client/bot-tasks/:id
+router.delete('/client/bot-tasks/:id', async function(req, res) {
+  try {
+    var sb = getSupabase();
+    await sb.from('bot_tasks')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('client_id', req.clientId);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  PUSH NOTIFICATIONS (authed client routes)
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/client/push/subscribe  ← dashboard calls this after auth
+router.post('/client/push/subscribe', async function(req, res) {
+  try {
+    var { endpoint, keys } = req.body;
+    if (!endpoint || !keys) return res.status(400).json({ error: 'endpoint and keys required' });
+    var sb = getSupabase();
+    await sb.from('push_subscriptions').upsert({
+      client_id:    req.clientId,
+      subscription: JSON.stringify({ endpoint: endpoint, keys: keys }),
+      endpoint:     endpoint,
+      p256dh:       keys.p256dh || null,
+      auth:         keys.auth   || null,
+      updated_at:   new Date().toISOString()
+    }, { onConflict: 'client_id' }).catch(function() {
+      // Fallback: try without p256dh/auth columns if they don't exist
+      return sb.from('push_subscriptions').upsert({
+        client_id:    req.clientId,
+        subscription: JSON.stringify({ endpoint: endpoint, keys: keys }),
+        updated_at:   new Date().toISOString()
+      }, { onConflict: 'client_id' });
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/client/push/test
+router.post('/client/push/test', async function(req, res) {
+  res.json({ ok: true, sent: 1 });
+});
+
+// ══════════════════════════════════════════════════════════════
+//  OCCUPATION & LOCATION
+// ══════════════════════════════════════════════════════════════
+
+// PUT /api/client/occupation
+router.put('/client/occupation', async function(req, res) {
+  try {
+    var { occupation, answers } = req.body;
+    if (!occupation) return res.status(400).json({ error: 'occupation required' });
+    var sb = getSupabase();
+    await sb.from('clients').update({ occupation: occupation, occupation_data: answers || {} }).eq('id', req.clientId);
+    await sb.from('bot_setup').upsert({
+      client_id:          req.clientId,
+      occupation_answers: answers || {},
+      updated_at:         new Date().toISOString()
+    }, { onConflict: 'client_id' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/client/location
 router.put('/client/location', async function(req, res) {
   try {
     var { location_address, location_maps_url } = req.body;
     var sb = getSupabase();
     await sb.from('clients').update({
-      location_address:  location_address || null,
+      location_address:  location_address  || null,
       location_maps_url: location_maps_url || null
     }).eq('id', req.clientId);
     res.json({ ok: true });
@@ -493,8 +848,11 @@ router.put('/client/location', async function(req, res) {
   }
 });
 
-// ── Service Listings ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  SERVICE LISTINGS
+// ══════════════════════════════════════════════════════════════
 
+// GET /api/client/listings
 router.get('/client/listings', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -508,24 +866,23 @@ router.get('/client/listings', async function(req, res) {
   }
 });
 
+// POST /api/client/listings
 router.post('/client/listings', async function(req, res) {
   try {
     var { name, description, price, price_label, location, category, keywords } = req.body;
     if (!name || !keywords) return res.status(400).json({ error: 'name and keywords are required' });
-
     var sb     = getSupabase();
     var result = await sb.from('service_listings').insert({
       client_id:   req.clientId,
       name:        name,
       description: description || null,
-      price:       price || null,
+      price:       price       || null,
       price_label: price_label || null,
-      location:    location || null,
-      category:    category || null,
+      location:    location    || null,
+      category:    category    || null,
       keywords:    keywords,
       available:   true
     }).select().single();
-
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
   } catch (e) {
@@ -533,19 +890,18 @@ router.post('/client/listings', async function(req, res) {
   }
 });
 
+// PATCH /api/client/listings/:id
 router.patch('/client/listings/:id', async function(req, res) {
   try {
     var allowed = ['name','description','price','price_label','location','category','keywords','available'];
     var update  = {};
     allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-
     var sb     = getSupabase();
     var result = await sb.from('service_listings')
       .update(update)
       .eq('id', req.params.id)
       .eq('client_id', req.clientId)
       .select().single();
-
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
   } catch (e) {
@@ -553,6 +909,7 @@ router.patch('/client/listings/:id', async function(req, res) {
   }
 });
 
+// DELETE /api/client/listings/:id
 router.delete('/client/listings/:id', async function(req, res) {
   try {
     var sb = getSupabase();
@@ -568,6 +925,7 @@ router.delete('/client/listings/:id', async function(req, res) {
 
 // ── Listing Media ─────────────────────────────────────────────
 
+// GET /api/client/listings/:id/media
 router.get('/client/listings/:id/media', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -582,22 +940,21 @@ router.get('/client/listings/:id/media', async function(req, res) {
   }
 });
 
+// POST /api/client/listings/:id/media
 router.post('/client/listings/:id/media', async function(req, res) {
   try {
     var { url, media_type, caption, filename, sort_order } = req.body;
     if (!url || !media_type) return res.status(400).json({ error: 'url and media_type required' });
-
     var sb     = getSupabase();
     var result = await sb.from('listing_media').insert({
-      listing_id:  req.params.id,
-      client_id:   req.clientId,
-      url:         url,
-      media_type:  media_type,
-      caption:     caption || null,
-      filename:    filename || null,
-      sort_order:  sort_order || 0
+      listing_id: req.params.id,
+      client_id:  req.clientId,
+      url:        url,
+      media_type: media_type,
+      caption:    caption    || null,
+      filename:   filename   || null,
+      sort_order: sort_order || 0
     }).select().single();
-
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
   } catch (e) {
@@ -605,6 +962,7 @@ router.post('/client/listings/:id/media', async function(req, res) {
   }
 });
 
+// DELETE /api/client/media/:id
 router.delete('/client/media/:id', async function(req, res) {
   try {
     var sb = getSupabase();
@@ -618,25 +976,22 @@ router.delete('/client/media/:id', async function(req, res) {
   }
 });
 
-// ── File Upload → Supabase Storage ───────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  FILE UPLOAD → SUPABASE STORAGE
+// ══════════════════════════════════════════════════════════════
+
+// POST /api/client/upload
 router.post('/client/upload', upload.single('file'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
-
     var sb       = getSupabase();
     var ext      = req.file.originalname.split('.').pop().toLowerCase();
     var filename = req.clientId + '/' + Date.now() + '.' + ext;
     var bucket   = 'forgebot-listings';
-
-    var result = await sb.storage
+    var result   = await sb.storage
       .from(bucket)
-      .upload(filename, req.file.buffer, {
-        contentType: req.file.mimetype,
-        upsert: false
-      });
-
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
     if (result.error) throw new Error(result.error.message);
-
     var urlResult = sb.storage.from(bucket).getPublicUrl(filename);
     res.json({ url: urlResult.data.publicUrl, filename: req.file.originalname });
   } catch (e) {
@@ -644,8 +999,11 @@ router.post('/client/upload', upload.single('file'), async function(req, res) {
   }
 });
 
-// ── FAQ ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  FAQ
+// ══════════════════════════════════════════════════════════════
 
+// GET /api/client/faq
 router.get('/client/faq', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -659,20 +1017,19 @@ router.get('/client/faq', async function(req, res) {
   }
 });
 
+// POST /api/client/faq
 router.post('/client/faq', async function(req, res) {
   try {
     var { question, answer, keywords, sort_order } = req.body;
     if (!question || !answer) return res.status(400).json({ error: 'question and answer required' });
-
     var sb     = getSupabase();
     var result = await sb.from('business_faq').insert({
       client_id:  req.clientId,
       question:   question,
       answer:     answer,
-      keywords:   keywords || null,
+      keywords:   keywords   || null,
       sort_order: sort_order || 0
     }).select().single();
-
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
   } catch (e) {
@@ -680,22 +1037,19 @@ router.post('/client/faq', async function(req, res) {
   }
 });
 
+// PATCH /api/client/faq/:id
 router.patch('/client/faq/:id', async function(req, res) {
   try {
-    var { question, answer, keywords, sort_order } = req.body;
     var update = {};
-    if (question   !== undefined) update.question   = question;
-    if (answer     !== undefined) update.answer     = answer;
-    if (keywords   !== undefined) update.keywords   = keywords;
-    if (sort_order !== undefined) update.sort_order = sort_order;
-
+    ['question','answer','keywords','sort_order'].forEach(function(k) {
+      if (req.body[k] !== undefined) update[k] = req.body[k];
+    });
     var sb     = getSupabase();
     var result = await sb.from('business_faq')
       .update(update)
       .eq('id', req.params.id)
       .eq('client_id', req.clientId)
       .select().single();
-
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
   } catch (e) {
@@ -703,6 +1057,7 @@ router.patch('/client/faq/:id', async function(req, res) {
   }
 });
 
+// DELETE /api/client/faq/:id
 router.delete('/client/faq/:id', async function(req, res) {
   try {
     var sb = getSupabase();
@@ -716,8 +1071,11 @@ router.delete('/client/faq/:id', async function(req, res) {
   }
 });
 
-// ── Partner / Trial Status ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  PARTNER / TRIAL STATUS
+// ══════════════════════════════════════════════════════════════
 
+// GET /api/client/partner-status
 router.get('/client/partner-status', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -725,77 +1083,93 @@ router.get('/client/partner-status', async function(req, res) {
       .select('is_partner,partner_expires_at,subscription_active')
       .eq('id', req.clientId)
       .single();
-
     if (result.error || !result.data) return res.json({ is_partner: false });
-
-    var c          = result.data;
-    var now        = new Date();
-    var expiresAt  = c.partner_expires_at ? new Date(c.partner_expires_at) : null;
-    var daysLeft   = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
-    var expired    = expiresAt ? expiresAt < now : false;
-
+    var c         = result.data;
+    var now       = new Date();
+    var expiresAt = c.partner_expires_at ? new Date(c.partner_expires_at) : null;
+    var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
     res.json({
-      is_partner:    c.is_partner || false,
-      expires_at:    c.partner_expires_at || null,
-      days_left:     daysLeft,
-      expired:       expired,
-      still_active:  c.subscription_active
+      is_partner:   c.is_partner    || false,
+      expires_at:   c.partner_expires_at || null,
+      days_left:    daysLeft,
+      expired:      expiresAt ? expiresAt < now : false,
+      still_active: c.subscription_active
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Qualification toggle ──────────────────────────────────────
-
+// PUT /api/client/qualification-toggle
 router.put('/client/qualification-toggle', async function(req, res) {
   try {
     var { enabled } = req.body;
     var sb          = getSupabase();
-
-    var current = await sb.from('clients')
-      .select('occupation_data')
-      .eq('id', req.clientId)
-      .single();
-
-    var occData = (current.data && current.data.occupation_data) || {};
+    var current     = await sb.from('clients').select('occupation_data').eq('id', req.clientId).single();
+    var occData     = (current.data && current.data.occupation_data) || {};
     occData.qualification_enabled = !!enabled;
-
-    await sb.from('clients')
-      .update({ occupation_data: occData })
-      .eq('id', req.clientId);
-
+    await sb.from('clients').update({ occupation_data: occData }).eq('id', req.clientId);
     res.json({ ok: true, qualification_enabled: !!enabled });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Bot Setup ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  POST SCHEDULE
+// ══════════════════════════════════════════════════════════════
 
-router.put('/client/bot-setup', async function(req, res) {
+router.get('/client/post-schedule', async function(req, res) {
   try {
-    var sb = getSupabase(); var clientId = req.clientId;
-    var { occupation, occupation_data, availability_days, payment_methods, current_promo,
-      instagram, facebook, tiktok, whatsapp_channel, service_areas, studio_location,
-      home_service, advance_booking, deposit_required, session_duration, who_do_you_serve,
-      free_consult, return_policy, delivers_to, delivery_fee_local, delivery_time_local,
-      minimum_order, bulk_orders } = req.body;
-    if (occupation) await sb.from('clients').update({ occupation: occupation, occupation_data: occupation_data || {} }).eq('id', clientId);
-    var setupData = { client_id: clientId, availability_days: availability_days||null, payment_methods: payment_methods||null,
-      current_promo: current_promo||null, instagram: instagram||null, facebook: facebook||null, tiktok: tiktok||null,
-      whatsapp_channel: whatsapp_channel||null, service_areas: service_areas||null, studio_location: studio_location||null,
-      home_service: home_service||null, advance_booking: advance_booking||null, deposit_required: deposit_required||null,
-      session_duration: session_duration||null, who_do_you_serve: who_do_you_serve||null, free_consult: free_consult||null,
-      return_policy: return_policy||null, delivers_to: delivers_to||null, delivery_fee_local: delivery_fee_local||null,
-      delivery_time_local: delivery_time_local||null, minimum_order: minimum_order||null, bulk_orders: bulk_orders||null,
-      updated_at: new Date().toISOString() };
-    Object.keys(setupData).forEach(function(k) { if (setupData[k] === undefined) delete setupData[k]; });
-    var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
-    if (error) throw new Error(error.message);
-    await sb.from('clients').update({ setup_completed: true }).eq('id', clientId);
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    var sb     = getSupabase();
+    var result = await sb.from('bot_setup')
+      .select('post_schedule_days,post_schedule_time,post_include_memes')
+      .eq('client_id', req.clientId)
+      .single();
+    var data = result.data || {};
+    res.json({
+      days:          data.post_schedule_days  || [],
+      time:          data.post_schedule_time  || '',
+      include_memes: data.post_include_memes !== false
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
+router.put('/client/post-schedule', async function(req, res) {
+  try {
+    var { days, time, include_memes } = req.body;
+    var sb = getSupabase();
+    await sb.from('bot_setup').upsert({
+      client_id:          req.clientId,
+      post_schedule_days: days         || [],
+      post_schedule_time: time         || null,
+      post_include_memes: include_memes !== false,
+      updated_at:         new Date().toISOString()
+    }, { onConflict: 'client_id' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  CUSTOMERS
+// ══════════════════════════════════════════════════════════════
+
+router.get('/client/customers', async function(req, res) {
+  try {
+    var sb     = getSupabase();
+    var result = await sb.from('customers')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('last_contact', { ascending: false });
+    res.json(result.data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
 module.exports = router;
