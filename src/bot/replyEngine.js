@@ -53,7 +53,7 @@ function isListingQuery(text) {
 
 async function searchListings(clientId, text) {
   try {
-    var sb     = db.getSupabase ? db.getSupabase() : null;
+    var sb = db.getSupabase ? db.getSupabase() : null;
     if (!sb) return [];
     var result = await sb
       .from('service_listings')
@@ -97,7 +97,6 @@ async function handleMessage(sock, msg, clientId) {
 
     var isImage = !!(msgContent.imageMessage);
     var isVoice = !!(msgContent.audioMessage && msgContent.audioMessage.ptt);
-    var isAudio = !!(msgContent.audioMessage);
 
     var text = (msgContent.conversation)
             || (msgContent.extendedTextMessage && msgContent.extendedTextMessage.text)
@@ -162,20 +161,30 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
-    // ── Owner confirmation reply (paymentNotifier v3) ────────
+    // ── Owner confirmation reply ──────────────────────────────
+    // CRITICAL: Only fires when ALL three conditions are true:
+    //   1. Message is FROM the owner's notification_number
+    //   2. There IS a pending payment confirmation for that JID
+    //   3. The text IS a valid confirmation reply (1/2/3 etc.)
+    // This prevents customer messages from ever being intercepted.
     if (text.trim()) {
-      var isOwnerReply = (isOwnerConfirmationReply && isOwnerConfirmationReply(text))
-                      || (hasPendingConfirmation && hasPendingConfirmation(jid));
-      if (isOwnerReply) {
-        console.log('[ReplyEngine] Handling owner confirmation reply');
-        if (handleOwnerReply) {
-          var ownerJid = null;
-          try {
-            var ownerNum = client.notification_number;
-            if (ownerNum) ownerJid = ownerNum.replace(/\D/g, '') + '@s.whatsapp.net';
-          } catch (e) {}
-          await handleOwnerReply(sock, msg, clientId, ownerJid, text.trim());
-        }
+      var ownerPhoneNum = client.notification_number
+        ? client.notification_number.replace(/\D/g, '')
+        : null;
+
+      // Check if this JID belongs to the owner (matches the digits in their number)
+      var isFromOwner = ownerPhoneNum && jid.includes(ownerPhoneNum);
+
+      var isValidOwnerReply = isFromOwner
+        && hasPendingConfirmation && hasPendingConfirmation(jid)
+        && isOwnerConfirmationReply && isOwnerConfirmationReply(text);
+
+      console.log('[ReplyEngine] isFromOwner:', isFromOwner, '| hasPending:', !!(hasPendingConfirmation && hasPendingConfirmation(jid)), '| validReply:', !!(isOwnerConfirmationReply && isOwnerConfirmationReply(text)));
+
+      if (isValidOwnerReply) {
+        console.log('[ReplyEngine] Processing owner payment confirmation');
+        var ownerJid = ownerPhoneNum + '@s.whatsapp.net';
+        if (handleOwnerReply) await handleOwnerReply(sock, msg, clientId, ownerJid, text.trim());
         return;
       }
     }
@@ -211,7 +220,7 @@ async function handleMessage(sock, msg, clientId) {
       await humanDelay();
       await sock.sendPresenceUpdate('paused', jid);
     } catch (e) {
-      console.log('[ReplyEngine] Presence update failed:', e.message);
+      console.log('[ReplyEngine] Presence update failed (non-fatal):', e.message);
     }
 
     // ── Smart listings search (before keyword matching) ───────
@@ -238,7 +247,8 @@ async function handleMessage(sock, msg, clientId) {
         var kws  = (flow.keywords || '').toLowerCase().split(',').map(function(k) { return k.trim(); }).filter(Boolean);
         var matched = kws.some(function(kw) { return lower.includes(kw); });
         if (matched) {
-          console.log('[ReplyEngine] Matched flow:', flow.id, '| keyword hit on:', kws.find(function(kw) { return lower.includes(kw); }));
+          var hitKw = kws.find(function(kw) { return lower.includes(kw); });
+          console.log('[ReplyEngine] Matched flow:', flow.id, '| keyword:', hitKw);
           if (flow.response_type === 'image' && flow.media_url) {
             await sock.sendMessage(jid, {
               image: { url: flow.media_url },
@@ -247,17 +257,18 @@ async function handleMessage(sock, msg, clientId) {
           } else {
             await sock.sendMessage(jid, { text: flow.response || '' });
           }
-          // Update trigger count
+          // Update trigger count (non-critical)
           try {
             var sbf = db.getSupabase ? db.getSupabase() : null;
             if (sbf) await sbf.from('chat_flows').update({ trigger_count: (flow.trigger_count || 0) + 1 }).eq('id', flow.id);
           } catch (e) {}
+          console.log('[ReplyEngine] Flow reply sent OK');
           return;
         }
       }
     }
 
-    // ── Broader listings fallback ─────────────────────────────
+    // ── Broader listings fallback search ──────────────────────
     if (text.trim()) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length) {
