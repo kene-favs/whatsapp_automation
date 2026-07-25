@@ -1,119 +1,100 @@
-// ============================================================
-//  ForgeBot — Session Manager (whatsapp-web.js edition)
-//  File location: src/sessions/sessionManager.js
-// ============================================================
-
 'use strict';
 
-const { Client, RemoteAuth, MessageMedia } = require('whatsapp-web.js');
-const fs   = require('fs');
-const path = require('path');
-// Use the existing Supabase module — no second client needed
-const db = require('../db/supabase');
-const replyEngine = require('../bot/replyEngine');
+// ============================================================
+//  ForgeBot — Session Manager (whatsapp-web.js edition)
+//  Replaces: src/sessions/sessionManager.js
+//
+//  Key changes from Baileys:
+//   - Uses wwebjs + Puppeteer/Chrome (fixes @lid JID replies)
+//   - RemoteAuth stores session ZIP in Supabase (survives Railway restarts)
+//   - startSession(clientId, opts) accepts onQR/onConnected/onDisconnected
+//   - Baileys-compatible sock wrapper so replyEngine needs zero changes
+//   - global.getSock set so clientRoutes qr-stream check works
+// ============================================================
 
-// ── RemoteAuth store backed by Supabase ───────────────────────
-// Uses the db helper functions so we don't need a second Supabase client.
+var path           = require('path');
+var fs             = require('fs');
+var { Client, MessageMedia, RemoteAuth } = require('whatsapp-web.js');
+var db             = require('../db/supabase');
+
+// ── State ─────────────────────────────────────────────────────
+// sessions: clientId → { client, sock, status: 'init'|'ready' }
+var sessions  = new Map();
+// qrCache: clientId → latest QR string (so late SSE joiners get QR immediately)
+var qrCache   = new Map();
+// cbMap: clientId → array of { onQR?, onConnected?, onDisconnected? }
+var cbMap     = new Map();
+
+// ── Supabase RemoteAuth store ─────────────────────────────────
 class SupabaseStore {
   async sessionExists({ session }) {
     try { return await db.wwebjsSessionExists(session); }
-    catch (e) { console.error('[SessionManager] sessionExists error:', e.message); return false; }
+    catch (e) { return false; }
   }
-
   async save({ session }) {
-    try {
-      var zipPath = path.join('/tmp', 'wwebjs-auth', session + '.zip');
-      if (!fs.existsSync(zipPath)) {
-        console.warn('[SessionManager] save() zip not found:', zipPath);
-        return;
-      }
-      var base64 = fs.readFileSync(zipPath).toString('base64');
-      await db.saveWwebjsSession(session, base64);
-      console.log('[SessionManager] Session saved to Supabase for', session);
-    } catch (e) {
-      console.error('[SessionManager] save() error:', e.message);
-    }
+    var zipPath = path.join('/tmp', 'wwebjs-auth', session + '.zip');
+    if (!fs.existsSync(zipPath)) return;
+    var base64 = fs.readFileSync(zipPath).toString('base64');
+    await db.saveWwebjsSession(session, base64);
   }
-
   async extract({ session, path: destPath }) {
-    try {
-      var base64 = await db.loadWwebjsSession(session);
-      if (!base64) return;
-      fs.mkdirSync(destPath, { recursive: true });
-      fs.writeFileSync(path.join(destPath, session + '.zip'), Buffer.from(base64, 'base64'));
-      console.log('[SessionManager] Session extracted from Supabase for', session);
-    } catch (e) {
-      console.error('[SessionManager] extract() error:', e.message);
-    }
+    var base64 = await db.loadWwebjsSession(session);
+    if (!base64) return;
+    fs.mkdirSync(destPath, { recursive: true });
+    fs.writeFileSync(
+      path.join(destPath, session + '.zip'),
+      Buffer.from(base64, 'base64')
+    );
   }
-
   async delete({ session }) {
-    try { await db.deleteWwebjsSession(session); }
-    catch (e) { console.error('[SessionManager] delete() error:', e.message); }
+    await db.deleteWwebjsSession(session);
   }
 }
 
-const store = new SupabaseStore();
-
-// ── Session registry ──────────────────────────────────────────
-var sessions = {}; // clientId → { client, sock, connected }
-var starting = new Set();
-
-// ── JID helpers ───────────────────────────────────────────────
-// wwebjs uses @c.us; replyEngine / clientRoutes use @s.whatsapp.net
+// ── JID conversion ────────────────────────────────────────────
 function toWwebjs(jid) {
-  if (!jid || jid === 'status@broadcast') return jid;
-  return jid.replace(/@s\.whatsapp\.net$/, '@c.us');
+  if (!jid) return jid;
+  // @s.whatsapp.net → @c.us  |  @lid → strip and convert best-effort
+  return jid.replace(/@s\.whatsapp\.net$/, '@c.us')
+            .replace(/@lid$/, '@c.us');
 }
+
 function toBaileys(jid) {
-  if (!jid || jid === 'status@broadcast') return jid;
+  if (!jid) return jid;
   return jid.replace(/@c\.us$/, '@s.whatsapp.net');
 }
 
 // ── Baileys-compatible sock wrapper ───────────────────────────
-// replyEngine / statusScheduler call:
-//   sock.sendMessage(jid, { text }) / { image: {url}, caption } / { audio, ptt } / { document }
-//   sock.sendPresenceUpdate('composing' | 'paused', jid)
-// We translate these to the wwebjs Client API.
-
 function makeSock(client) {
   return {
     sendMessage: async function(jid, content) {
       var to = toWwebjs(jid);
-
-      // Text
       if (content.text) {
         return await client.sendMessage(to, content.text);
       }
-
-      // Image with URL
       if (content.image && content.image.url) {
         var media = await MessageMedia.fromUrl(content.image.url, { unsafeMime: true });
         return await client.sendMessage(to, media, { caption: content.caption || '' });
       }
-
-      // Image from Buffer
       if (content.image && Buffer.isBuffer(content.image)) {
         var media = new MessageMedia('image/jpeg', content.image.toString('base64'));
         return await client.sendMessage(to, media, { caption: content.caption || '' });
       }
-
-      // Audio / voice note
       if (content.audio && Buffer.isBuffer(content.audio)) {
-        var mime  = content.mimetype || 'audio/ogg; codecs=opus';
-        var media = new MessageMedia(mime, content.audio.toString('base64'));
+        var media = new MessageMedia(
+          content.mimetype || 'audio/ogg; codecs=opus',
+          content.audio.toString('base64')
+        );
         return await client.sendMessage(to, media, { sendAudioAsVoice: !!content.ptt });
       }
-
-      // Document / file
       if (content.document && Buffer.isBuffer(content.document)) {
-        var mime  = content.mimetype || 'application/octet-stream';
-        var fname = content.fileName || 'file';
-        var media = new MessageMedia(mime, content.document.toString('base64'), fname);
+        var media = new MessageMedia(
+          content.mimetype || 'application/octet-stream',
+          content.document.toString('base64'),
+          content.fileName || 'file'
+        );
         return await client.sendMessage(to, media);
       }
-
-      // Fallback: send as plain text
       var fallback = content.caption || '';
       if (fallback) return await client.sendMessage(to, fallback);
     },
@@ -123,9 +104,7 @@ function makeSock(client) {
         var chat = await client.getChatById(toWwebjs(jid));
         if (status === 'composing') await chat.sendStateTyping();
         else await chat.clearState();
-      } catch (e) {
-        // Non-critical — ignore silently
-      }
+      } catch (e) {}
     },
 
     profilePictureUrl: async function(jid) {
@@ -135,62 +114,51 @@ function makeSock(client) {
   };
 }
 
-// ── Build a Baileys-style msg from a wwebjs Message ──────────
-function buildMsg(msg) {
-  var jid     = toBaileys(msg.from || '');
-  var content = {};
+// ── Convert wwebjs msg → Baileys-style for replyEngine ───────
+function buildMsg(msg, clientId) {
+  var from = toBaileys(msg.from);
+  var msgContent = {};
 
-  switch (msg.type) {
-    case 'chat':
-      content.conversation = msg.body || '';
-      break;
-    case 'image':
-      content.imageMessage = { caption: msg.body || '' };
-      break;
-    case 'ptt':
-      content.audioMessage = { ptt: true };
-      break;
-    case 'audio':
-      content.audioMessage = { ptt: false };
-      break;
-    default:
-      content.conversation = msg.body || '';
+  if (msg.hasMedia) {
+    // Let replyEngine know there's media — but text body is the main trigger
+    msgContent = { conversation: msg.body || '', hasMedia: true };
+  } else {
+    msgContent = { conversation: msg.body || '' };
   }
 
   return {
     key: {
-      remoteJid: jid,
+      remoteJid: from,
       fromMe:    msg.fromMe,
-      id:        (msg.id && (msg.id._serialized || msg.id.id)) || ''
+      id:        msg.id._serialized
     },
-    message:          content,
-    pushName:         msg.notifyName || '',
-    messageTimestamp: Math.floor(Date.now() / 1000),
-    _wwebjsMsg:       msg  // keep original in case voiceHandler needs it
+    message:          msgContent,
+    messageTimestamp: Math.floor(msg.timestamp),
+    pushName:         (msg._data && msg._data.notifyName) || '',
+    clientId:         clientId
   };
 }
 
-// ── startSession ──────────────────────────────────────────────
-async function startSession(clientId, callbacks) {
-  callbacks = callbacks || {};
+// ── Fire registered callbacks for a client ────────────────────
+function fireCallbacks(clientId, event, data) {
+  var cbs = cbMap.get(clientId) || [];
+  cbs.forEach(function(cb) {
+    try {
+      if (event === 'qr'           && cb.onQR)           cb.onQR(data);
+      else if (event === 'connected'    && cb.onConnected)    cb.onConnected();
+      else if (event === 'disconnected' && cb.onDisconnected) cb.onDisconnected();
+    } catch(e) {}
+  });
+}
 
-  if (sessions[clientId] && sessions[clientId].connected) {
-    if (callbacks.onConnected) callbacks.onConnected();
-    return function() {};
-  }
-
-  if (starting.has(clientId)) return function() {};
-  starting.add(clientId);
-
-  var dataPath = '/tmp/wwebjs-auth';
-  fs.mkdirSync(dataPath, { recursive: true });
-
+// ── Create and wire up a wwebjs Client ────────────────────────
+function createWwebjsClient(clientId) {
+  var store  = new SupabaseStore();
   var client = new Client({
     authStrategy: new RemoteAuth({
       clientId:             clientId,
       store:                store,
-      dataPath:             dataPath,
-      backupSyncIntervalMs: 300000  // backup every 5 minutes
+      backupSyncIntervalMs: 300000   // save session every 5 min
     }),
     puppeteer: {
       headless: true,
@@ -198,116 +166,187 @@ async function startSession(clientId, callbacks) {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
         '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process'
+        '--single-process',
+        '--no-zygote'
       ]
     }
   });
 
-  var sock = makeSock(client);
-  sessions[clientId] = { client: client, sock: sock, connected: false };
-  starting.delete(clientId);
-
+  // QR ready — cache it and fire callbacks
   client.on('qr', function(qr) {
-    console.log('[SessionManager] QR ready for client', clientId);
-    if (callbacks.onQR) callbacks.onQR(qr);
+    console.log('[SessionManager] QR generated for client ' + clientId);
+    qrCache.set(clientId, qr);
+    fireCallbacks(clientId, 'qr', qr);
   });
 
+  // Authenticated but not yet ready
+  client.on('authenticated', function() {
+    console.log('[SessionManager] Authenticated: ' + clientId);
+  });
+
+  // WhatsApp Web fully ready — swap from init to ready state
   client.on('ready', function() {
-    console.log('[SessionManager] ✅ Connected:', clientId);
-    sessions[clientId].connected = true;
-    if (callbacks.onConnected) callbacks.onConnected();
+    console.log('[SessionManager] Ready: ' + clientId);
+    qrCache.delete(clientId);
+    var sock  = makeSock(client);
+    var entry = sessions.get(clientId);
+    if (entry) {
+      entry.sock   = sock;
+      entry.status = 'ready';
+    } else {
+      sessions.set(clientId, { client: client, sock: sock, status: 'ready' });
+    }
+    fireCallbacks(clientId, 'connected');
+    cbMap.delete(clientId);   // SSE connections already notified
+  });
+
+  // Incoming message → replyEngine
+  client.on('message', async function(msg) {
+    if (msg.fromMe) return;
+    try {
+      var entry = sessions.get(clientId);
+      if (!entry || !entry.sock) return;
+      var replyEngine = require('../bot/replyEngine');
+      var fakeMsg     = buildMsg(msg, clientId);
+      await replyEngine.handleMessage(entry.sock, fakeMsg, clientId);
+    } catch(e) {
+      console.error('[SessionManager] Message handler error for ' + clientId + ':', e.message);
+    }
+  });
+
+  // Disconnected — clean up and auto-reconnect (unless logged out)
+  client.on('disconnected', function(reason) {
+    console.log('[SessionManager] Disconnected: ' + clientId + ' — reason:', reason);
+    fireCallbacks(clientId, 'disconnected');
+    sessions.delete(clientId);
+    qrCache.delete(clientId);
+    if (reason !== 'LOGOUT') {
+      console.log('[SessionManager] Scheduling reconnect for ' + clientId);
+      setTimeout(function() {
+        startSession(clientId).catch(function(e) {
+          console.error('[SessionManager] Reconnect error for ' + clientId + ':', e.message);
+        });
+      }, 8000);
+    }
   });
 
   client.on('auth_failure', function(msg) {
-    console.error('[SessionManager] Auth failed for', clientId, '—', msg);
-    if (sessions[clientId]) sessions[clientId].connected = false;
-    if (callbacks.onDisconnected) callbacks.onDisconnected();
+    console.error('[SessionManager] Auth failure for ' + clientId + ':', msg);
+    sessions.delete(clientId);
   });
 
-  client.on('disconnected', function(reason) {
-    console.log('[SessionManager] Disconnected:', clientId, '| reason:', reason);
-    if (sessions[clientId]) sessions[clientId].connected = false;
-    if (callbacks.onDisconnected) callbacks.onDisconnected();
-    delete sessions[clientId];
-
-    if (reason !== 'LOGOUT') {
-      console.log('[SessionManager] Reconnecting', clientId, 'in 10s...');
-      setTimeout(function() { startSession(clientId, {}); }, 10000);
-    }
-  });
-
-  client.on('message', async function(msg) {
-    if (msg.fromMe) return;
-    if (msg.from === 'status@broadcast') return;
-
-    try {
-      var baileysMsg = buildMsg(msg);
-      console.log('[SessionManager] 📩 Message for', clientId, 'from', baileysMsg.key.remoteJid);
-      await replyEngine.handleMessage(sock, baileysMsg, clientId);
-    } catch (err) {
-      console.error('[SessionManager] handleMessage error for', clientId, ':', err.message);
-    }
-  });
-
-  client.initialize().catch(function(err) {
-    console.error('[SessionManager] initialize() error for', clientId, ':', err.message);
-    delete sessions[clientId];
-  });
-
-  return function() {};
+  return client;
 }
 
-// ── stopSession ───────────────────────────────────────────────
+// ── Public: start (or attach callbacks to) a session ─────────
+//
+//  opts = { onQR(qr), onConnected(), onDisconnected() }
+//
+//  - Already ready:       fires onConnected immediately, returns
+//  - Already initializing: registers callbacks, fires cached QR if exists, returns
+//  - No session:          creates client + starts Chrome (async, returns quickly)
+//
+function startSession(clientId, opts) {
+  // Register callbacks first so we don't miss events
+  if (opts) {
+    var cbs = cbMap.get(clientId) || [];
+    cbs.push(opts);
+    cbMap.set(clientId, cbs);
+  }
+
+  var existing = sessions.get(clientId);
+
+  if (existing && existing.status === 'ready') {
+    // Already connected — notify immediately
+    if (opts && opts.onConnected) {
+      try { opts.onConnected(); } catch(e) {}
+    }
+    return Promise.resolve(existing.sock);
+  }
+
+  if (existing && existing.status === 'init') {
+    // Chrome is already starting — send cached QR if we have one
+    var cachedQR = qrCache.get(clientId);
+    if (cachedQR && opts && opts.onQR) {
+      try { opts.onQR(cachedQR); } catch(e) {}
+    }
+    return Promise.resolve();
+  }
+
+  // No session at all — start one
+  var client = createWwebjsClient(clientId);
+  sessions.set(clientId, { client: client, sock: null, status: 'init' });
+
+  // Initialize Chrome in the background — don't await here
+  client.initialize().catch(function(e) {
+    console.error('[SessionManager] initialize() failed for ' + clientId + ':', e.message);
+    sessions.delete(clientId);
+  });
+
+  return Promise.resolve();
+}
+
+// ── Public: stop a session ────────────────────────────────────
 async function stopSession(clientId) {
-  if (sessions[clientId] && sessions[clientId].client) {
-    try { await sessions[clientId].client.destroy(); } catch (e) {}
-    delete sessions[clientId];
-  }
+  var entry = sessions.get(clientId);
+  if (!entry) return;
+  try { await entry.client.destroy(); } catch(e) {}
+  sessions.delete(clientId);
+  qrCache.delete(clientId);
+  cbMap.delete(clientId);
 }
 
-// ── clearSession — logout + wipe saved session ────────────────
+// ── Public: stop + wipe persisted session from Supabase ───────
 async function clearSession(clientId) {
-  if (sessions[clientId] && sessions[clientId].client) {
-    try { await sessions[clientId].client.logout(); } catch (e) {}
-    delete sessions[clientId];
-  }
-  await store.delete({ session: clientId });
-  console.log('[SessionManager] Session cleared for', clientId);
+  await stopSession(clientId);
+  try { await db.deleteWwebjsSession(clientId); } catch(e) {}
 }
 
-// ── getSession — returns the sock wrapper or null ─────────────
+// ── Public: get sock if connected (null if init or absent) ────
 function getSession(clientId) {
-  var s = sessions[clientId];
-  if (!s || !s.connected) return null;
-  return s.sock;
+  var entry = sessions.get(clientId);
+  if (!entry || entry.status !== 'ready') return null;
+  return entry.sock;
 }
 
+// ── Public: all connected socks ───────────────────────────────
 function getAllSessions() {
-  return Object.keys(sessions);
+  var result = {};
+  sessions.forEach(function(entry, clientId) {
+    if (entry.status === 'ready') result[clientId] = entry.sock;
+  });
+  return result;
 }
 
-// ── bootAllSessions — called once at server startup ───────────
-async function bootAllSessions(activeClients) {
-  console.log('[SessionManager] Booting', activeClients.length, 'session(s)...');
-  for (var i = 0; i < activeClients.length; i++) {
-    var c = activeClients[i];
-    try {
-      await startSession(c.id, {});
-      console.log('[SessionManager] Started session for', c.business_name || c.id);
-    } catch (err) {
-      console.error('[SessionManager] Failed to start session for', c.id, ':', err.message);
+// ── Public: boot all active clients at startup ────────────────
+async function bootAllSessions() {
+  try {
+    var clients = await db.getActiveClients();
+    console.log('[SessionManager] Booting ' + clients.length + ' session(s)');
+    for (var i = 0; i < clients.length; i++) {
+      var clientId = clients[i].id;
+      console.log('[SessionManager] Starting session for ' + clientId);
+      startSession(clientId);
+      // Stagger Chrome launches to avoid RAM spikes
+      if (i < clients.length - 1) {
+        await new Promise(function(r) { setTimeout(r, 5000); });
+      }
     }
+  } catch(e) {
+    console.error('[SessionManager] bootAllSessions error:', e.message);
   }
 }
 
-// Legacy shims
-function registerQRListener() {}
+// ── Legacy shims (kept so nothing breaks) ─────────────────────
+function registerQRListener()   {}
 function unregisterQRListener() {}
 
+// ── Make getSession available globally for clientRoutes ───────
+//    The /api/client/qr-stream route checks: global.getSock && global.getSock(clientId)
+global.getSock = getSession;
+
+// ── Exports ───────────────────────────────────────────────────
 module.exports = {
   startSession,
   stopSession,

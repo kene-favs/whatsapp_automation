@@ -5,6 +5,11 @@ const supabase = createClient(
   process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Expose raw client for legacy code that calls db.getSupabase()
+function getSupabase() {
+  return supabase;
+}
+
 // ── CLIENTS ───────────────────────────────────────────────────
 
 async function createClient_(data) {
@@ -116,7 +121,7 @@ async function addStatusPost(clientId, caption, mediaUrl, postTime, repeatDaily 
   return data;
 }
 
-// FIXED: second param is now ISO date string "2026-07-25", not "Sat"
+// FIXED: second param must be ISO date like "2026-07-25", not day name like "Sat"
 async function getDueStatusPosts(currentTime, todayDate) {
   const { data, error } = await supabase
     .from('status_posts')
@@ -193,8 +198,7 @@ async function getBroadcastLogs(clientId) {
 }
 
 // ── WWEBJS SESSION STORAGE ────────────────────────────────────
-// Stores the Chrome session ZIP (base64) so Railway restarts don't need re-scan.
-// Run once in Supabase: ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS session_data TEXT;
+// Requires once in Supabase: ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS session_data TEXT;
 
 async function wwebjsSessionExists(clientId) {
   var result = await supabase
@@ -238,6 +242,7 @@ async function deleteWwebjsSession(clientId) {
 // ── EXPORTS ───────────────────────────────────────────────────
 
 module.exports = {
+  getSupabase,
   createClient_, getClientByEmail, getClientById, getAllClients, updateClient, getActiveClients,
   getFlows, addFlow, deleteFlow,
   getStatusPosts, addStatusPost, getDueStatusPosts, markStatusPosted, deleteStatusPost,
