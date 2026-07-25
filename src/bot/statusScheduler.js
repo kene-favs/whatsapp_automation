@@ -1,17 +1,13 @@
 // ============================================================
 //  ForgeBot — Status Scheduler
-//  File location: src/bot/statusScheduler.js   (was src/scheduler/)
+//  File location: src/bot/statusScheduler.js
 //
-//  Jobs:
-//    1. Every minute → check & post due status posts  [BUG FIXED]
-//    2. Mon/Wed/Fri/Sat/Sun 8pm → Nigerian business meme
-//    3. 1st of month, 9am → monthly analytics WhatsApp summary
-//    4. Every minute → run client bot errands (auto-outreach tasks)
+//  ROOT CAUSE FIXED:
+//  Old code: const { sessions } = require('../sessions/sessionManager')
+//  → `sessions` is NOT exported from sessionManager → always undefined
+//  → getSock() always returned null → status posts NEVER sent
 //
-//  FIX (Jul 2026):
-//    sessions is NOT exported from sessionManager — getSock() was always
-//    returning null → postStatus() was a no-op on every run.
-//    Changed to sessionManager.getSession(clientId) which IS exported.
+//  Fix: use sessionManager.getSession(clientId) directly
 // ============================================================
 
 'use strict';
@@ -19,9 +15,7 @@
 const cron           = require('node-cron');
 const db             = require('../db/supabase');
 const { getCaption } = require('./captions');
-
-// ── FIX: use the exported getSession(), not the unexported sessions object ──
-const sessionManager = require('../sessions/sessionManager');
+const sessionManager = require('../sessions/sessionManager'); // ✅ FIXED IMPORT
 
 // ── Nigerian Business Memes (rotate by day) ──────────────────
 const MEMES = [
@@ -53,27 +47,31 @@ function getWeeklyMeme() {
 }
 
 // ── Helper: get session sock ──────────────────────────────────
-// FIX: was importing { sessions } which is NOT exported from sessionManager.
-//      getSession(clientId) IS exported and only returns the sock when
-//      the connection is confirmed open — no more "Timed Out" on half-open sockets.
+// ✅ FIXED: was using `sessions` (not exported) → always null
+// Now uses sessionManager.getSession() which returns the live socket
 function getSock(clientId) {
-  return sessionManager.getSession(clientId);
+  var sock = sessionManager.getSession(clientId);
+  if (!sock) {
+    console.log('[StatusScheduler] No active session for client', clientId, '— skipping');
+  }
+  return sock;
 }
 
 // ── Post WhatsApp status for a single client ─────────────────
 async function postStatus(clientId, mediaUrl, caption) {
   const sock = getSock(clientId);
-  if (!sock) {
-    console.log('[StatusScheduler] No active session for client', clientId, '— skipping');
-    return;
-  }
+  if (!sock) return;
   try {
-    if (mediaUrl) {
-      await sock.sendMessage('status@broadcast', { image: { url: mediaUrl }, caption: caption || '' });
+    var mediaToUse = mediaUrl || null;
+    if (mediaToUse) {
+      await sock.sendMessage('status@broadcast', {
+        image:   { url: mediaToUse },
+        caption: caption || ''
+      });
     } else {
-      await sock.sendMessage('status@broadcast', { text: caption });
+      await sock.sendMessage('status@broadcast', { text: caption || '' });
     }
-    console.log('[StatusScheduler] Status posted for client', clientId);
+    console.log('[StatusScheduler] ✅ Status posted for client', clientId);
   } catch (err) {
     console.error('[StatusScheduler] Status post failed for client', clientId + ':', err.message);
   }
@@ -96,11 +94,11 @@ function buildMonthlyReport(client, stats, month) {
     '📊 *ForgeBot Monthly Report — ' + monthLabel + '*\n' +
     '━━━━━━━━━━━━━━━━━━━━━━\n' +
     '*Business:* ' + (client.business_name || 'Your Business') + '\n\n' +
-    '👥 *New Customers:* '         + (stats.new_customers  || 0) + '\n' +
-    '🎯 *Price Inquiries (Leads):* ' + (stats.leads          || 0) + '\n' +
-    '🛒 *Orders Placed:* '         + (stats.orders_placed  || 0) + '\n' +
-    '✅ *Orders Confirmed:* '       + (stats.orders_confirmed || 0) + '\n' +
-    '💰 *Revenue Confirmed:* '      + revenue + '\n' +
+    '👥 *New Customers:* '            + (stats.new_customers   || 0) + '\n' +
+    '🎯 *Price Inquiries (Leads):* '  + (stats.leads           || 0) + '\n' +
+    '🛒 *Orders Placed:* '            + (stats.orders_placed   || 0) + '\n' +
+    '✅ *Orders Confirmed:* '          + (stats.orders_confirmed || 0) + '\n' +
+    '💰 *Revenue Confirmed:* '        + revenue + '\n' +
     '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
     '_View full analytics: ' + (process.env.APP_URL || 'https://forgebot.ng') + '/dashboard_\n\n' +
     'Keep going! 💪 Your ForgeBot is working hard for your business. 🤖'
@@ -127,14 +125,18 @@ function startScheduler() {
       for (const post of duePosts) {
         if (post.last_posted === todayDate) continue;
 
+        // Check day of week
         const scheduledDays = (post.scheduled_days || post.days || '').toLowerCase();
         if (scheduledDays && !scheduledDays.includes(today.toLowerCase())) continue;
 
         const client = post.clients;
         if (!client || client.status !== 'active' || !client.subscription_active) continue;
 
-        const caption = post.caption || getCaption(client.business_type || 'general');
-        await postStatus(client.id, post.media_url || post.mediaUrl, caption);
+        const caption  = post.caption || getCaption(client.business_type || 'general');
+        const mediaUrl = post.media_url || post.mediaUrl || null;
+
+        console.log('[StatusScheduler] Due post found for client', client.id, 'at', timeStr, '— media:', !!mediaUrl);
+        await postStatus(client.id, mediaUrl, caption);
         await db.markStatusPosted(post.id, todayDate);
       }
     } catch (err) {
@@ -277,7 +279,7 @@ function startScheduler() {
     }
   });
 
-  console.log('[StatusScheduler] Started. Status posts: every minute. Memes: Mon/Wed/Fri/Sat/Sun 8pm. Monthly reports: 1st of month 9am. Bot errands: every minute.');
+  console.log('[StatusScheduler] ✅ Started. Status posts: every minute. Memes: Mon/Wed/Fri/Sat/Sun 8pm. Monthly reports: 1st of month 9am. Bot errands: every minute.');
 }
 
 module.exports = { startScheduler };
