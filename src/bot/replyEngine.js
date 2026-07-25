@@ -1,14 +1,6 @@
 // ============================================================
 //  ForgeBot — Reply Engine
-//  File location: src/bot/replyEngine.js
-//
-//  Fix applied:
-//   - db.getFlows() now wrapped in its own try/catch so a DB
-//     error no longer silently kills the reply (was crashing
-//     the outer handler and sending nothing back)
-//   - Null safety on flow.keywords before calling .split()
-//     (a flow with null keywords no longer crashes the loop)
-//   ALL other logic preserved exactly as on GitHub.
+//  ALL EXISTING LOGIC PRESERVED — paymentNotifier v3 API fix
 // ============================================================
 
 'use strict';
@@ -16,7 +8,18 @@
 const db = require('../db/supabase');
 const { matchKeyword } = require('./keywords');
 const { transcribeVoiceNote } = require('./voiceHandler');
-const { isPaymentClaim, notifyOwnerOfPaymentClaim, handleOwnerReply, notifyOwnerHumanRequest } = require('./paymentNotifier');
+
+// ── paymentNotifier v3 API (names changed in v3) ─────────────
+const {
+  isPaymentKeyword,          // was: isPaymentClaim
+  isAwaitingReceipt,         // new in v3
+  handlePaymentClaim,        // new in v3 (replaces notifyOwnerOfPaymentClaim)
+  handleReceiptImage,        // new in v3
+  handleOwnerReply,          // signature changed in v3
+  isOwnerConfirmationReply,  // new in v3
+  hasPendingConfirmation,    // new in v3
+  notifyOwnerOfHandoff       // was: notifyOwnerHumanRequest
+} = require('./paymentNotifier');
 
 // ── Human handoff pause map ────────────────────────────────
 const humanPaused = new Map();
@@ -72,6 +75,7 @@ async function searchListings(clientId, query) {
       });
 
       if (fields[0].includes(lower)) score += 20;
+
       return { listing: listing, score: score };
     });
 
@@ -127,8 +131,10 @@ async function sendListingResults(sock, jid, listings, client) {
     if (pdf) {
       try {
         await sock.sendMessage(jid, {
-          document: { url: pdf.url }, mimetype: 'application/pdf',
-          fileName: l.name + '.pdf', caption: 'Full details for ' + l.name
+          document: { url: pdf.url },
+          mimetype: 'application/pdf',
+          fileName: l.name + '.pdf',
+          caption:  'Full details for ' + l.name
         });
       } catch (e) {}
     }
@@ -136,8 +142,8 @@ async function sendListingResults(sock, jid, listings, client) {
     var intro = '✅ We found *' + listings.length + ' options* for you:\n\n';
     listings.forEach(function(l, i) {
       intro += '*' + (i + 1) + '. ' + l.name + '*\n';
-      if (l.price) intro += '   💰 ' + l.price + '\n';
-      if (l.location) intro += '   📍 ' + l.location + '\n';
+      if (l.price)       intro += '   💰 ' + l.price + '\n';
+      if (l.location)    intro += '   📍 ' + l.location + '\n';
       if (l.description) intro += '   ' + l.description.slice(0, 80) + (l.description.length > 80 ? '...' : '') + '\n';
       intro += '\n';
     });
@@ -149,7 +155,7 @@ async function sendListingResults(sock, jid, listings, client) {
       if (imgs.length) {
         try {
           await sock.sendMessage(jid, {
-            image: { url: imgs[0].url },
+            image:   { url: imgs[0].url },
             caption: '*' + (j + 1) + '.* ' + listings[j].name + (listings[j].price ? ' — ' + listings[j].price : '')
           });
           await new Promise(function(r) { setTimeout(r, 800); });
@@ -168,14 +174,24 @@ async function handleMessage(sock, msg, clientId) {
     if (jid === 'status@broadcast') return;
 
     var msgContent = msg.message;
-    var isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
-    var isAudio = !!(msgContent && msgContent.audioMessage);
+    var isVoice    = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
+    var isAudio    = !!(msgContent && msgContent.audioMessage);
+    var isImage    = !!(msgContent && msgContent.imageMessage);
 
     var text = (msgContent && msgContent.conversation) ||
                (msgContent && msgContent.extendedTextMessage && msgContent.extendedTextMessage.text) ||
                (msgContent && msgContent.imageMessage && msgContent.imageMessage.caption) || '';
 
-    // ── Voice note handling ─────────────────────────────────
+    // ── Receipt image check (must be before text guard) ────────
+    // Customer sending receipt photo after paying
+    if (isImage && !text) {
+      if (isAwaitingReceipt(clientId, jid)) {
+        await handleReceiptImage(sock, msg, clientId, jid);
+        return;
+      }
+    }
+
+    // ── Voice note handling ─────────────────────────────────────
     if (isVoice || isAudio) {
       await sock.sendPresenceUpdate('composing', jid);
       var transcribed = await transcribeVoiceNote(sock, msg);
@@ -192,13 +208,13 @@ async function handleMessage(sock, msg, clientId) {
       });
     }
 
-    if (!text.trim()) return;
+    if (!text || !text.trim()) return;
 
-    // ── Get client ──────────────────────────────────────────
+    // ── Get client ──────────────────────────────────────────────
     var client = await db.getClientById(clientId);
     if (!client || client.status !== 'active' || !client.subscription_active) return;
 
-    // ── Track customer ──────────────────────────────────────
+    // ── Track customer ──────────────────────────────────────────
     try {
       var sb = db.getSupabase();
       await sb.from('customers').upsert({
@@ -209,17 +225,29 @@ async function handleMessage(sock, msg, clientId) {
       }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
     } catch (e) {}
 
-    // ── Owner reply check ───────────────────────────────────
-    var ownerHandled = await handleOwnerReply(sock, jid, text, clientId);
-    if (ownerHandled) return;
+    // ── Owner confirmation reply check (v3 API) ─────────────────
+    // Owner replies 1/2/3 to confirm/deny a payment
+    try {
+      var senderIsOwner = await isOwnerConfirmationReply(clientId, jid);
+      if (senderIsOwner) {
+        var ownerNum = ((client.notification_number || client.whatsapp_number) || '').replace(/\D/g, '');
+        var ownerJid = ownerNum + '@s.whatsapp.net';
+        if (hasPendingConfirmation(clientId, ownerJid)) {
+          var ownerHandled = await handleOwnerReply(sock, msg, clientId, ownerJid, text);
+          if (ownerHandled) return;
+        }
+      }
+    } catch (e) {
+      console.error('[ReplyEngine] ownerReply check error:', e.message);
+    }
 
-    // ── Human pause check ───────────────────────────────────
+    // ── Human pause check ───────────────────────────────────────
     var pauseKey    = clientId + ':' + jid;
     var pausedUntil = humanPaused.get(pauseKey);
     if (pausedUntil && Date.now() < pausedUntil) return;
     if (pausedUntil && Date.now() >= pausedUntil) humanPaused.delete(pauseKey);
 
-    // ── Human handoff detection ─────────────────────────────
+    // ── Human handoff detection ─────────────────────────────────
     if (wantsHuman(text)) {
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
@@ -227,18 +255,24 @@ async function handleMessage(sock, msg, clientId) {
         text: 'Got it! I am connecting you with the owner right now. Please hold on — they will be with you shortly.'
       });
       humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000);
-      await notifyOwnerHumanRequest(sock, clientId, jid);
+      await notifyOwnerOfHandoff(sock, clientId, jid, null, 'customer requested human');
       return;
     }
 
-    // ── Payment claim detection ─────────────────────────────
-    if (isPaymentClaim(text)) {
+    // ── Payment claim detection (v3 API) ────────────────────────
+    // handlePaymentClaim asks customer for receipt THEN notifies owner
+    if (isPaymentKeyword(text)) {
       await sock.sendPresenceUpdate('composing', jid);
+      await handlePaymentClaim(sock, msg, clientId, jid, text);
+      return;
+    }
+
+    // ── Awaiting receipt — remind customer to send photo ────────
+    if (isAwaitingReceipt(clientId, jid)) {
       await humanDelay();
       await sock.sendMessage(jid, {
-        text: 'Thank you! Your payment claim has been received. The owner has been notified and will confirm shortly. We will update you right away!'
+        text: 'Please send a *photo or screenshot* of your payment receipt to confirm. 📸'
       });
-      await notifyOwnerOfPaymentClaim(sock, clientId, jid, text);
       return;
     }
 
@@ -246,7 +280,7 @@ async function handleMessage(sock, msg, clientId) {
     await humanDelay();
     await sock.sendPresenceUpdate('paused', jid);
 
-    // ── Smart listings search ───────────────────────────────
+    // ── Smart listing search (before keyword matching) ───────────
     if (isListingQuery(text)) {
       var matches = await searchListings(clientId, text);
       if (matches.length > 0) {
@@ -255,21 +289,18 @@ async function handleMessage(sock, msg, clientId) {
       }
     }
 
-    // ── Flow keyword matching ───────────────────────────────
-    // FIX: Wrapped in try/catch — a DB error no longer silently kills the reply.
-    //      Also added null check on flow.keywords before .split().
+    // ── Flow keyword matching ────────────────────────────────────
     var flows = [];
     try {
       flows = (await db.getFlows(clientId, true)) || [];
     } catch (e) {
       console.error('[ReplyEngine] getFlows error for client ' + clientId + ':', e.message);
     }
-
     var matched = null;
     for (var i = 0; i < flows.length; i++) {
       var flow = flows[i];
-      if (!flow.keywords) continue; // null safety — skip flows with no keywords
-      var kws      = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
+      if (!flow.keywords) continue;   // null safety
+      var kws       = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
       var textLower = text.toLowerCase();
       if (kws.some(function(kw) { return textLower.includes(kw); })) {
         matched = flow;
@@ -286,7 +317,7 @@ async function handleMessage(sock, msg, clientId) {
       return;
     }
 
-    // ── Broad listing search if no keyword matched ──────────
+    // ── Broader listing search (no keyword match found) ──────────
     if (!isListingQuery(text)) {
       var broadMatches = await searchListings(clientId, text);
       if (broadMatches.length > 0) {
@@ -295,7 +326,7 @@ async function handleMessage(sock, msg, clientId) {
       }
     }
 
-    // ── Fallback ────────────────────────────────────────────
+    // ── Fallback message ─────────────────────────────────────────
     var fallback = client.fallback_message ||
       'Thank you for reaching out! Someone will get back to you shortly.';
     await sock.sendMessage(jid, { text: fallback });
