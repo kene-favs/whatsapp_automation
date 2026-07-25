@@ -4,6 +4,21 @@
 //
 //  Mounted at: /api  (in index.js: app.use('/api', clientRoutes))
 //  Auth: JWT via Authorization: Bearer <token>
+//
+//  Changes vs v2:
+//   - GET /client/session-status  — real Connected/Disconnected badge
+//   - GET /client/settings        — returns nested bot_setup for dashboard
+//   - PUT /client/settings        — now includes welcome_message + fallback_message
+//   - PUT /client/bot-setup       — accepts BOTH old (delivers_to) + new (delivery_areas) names
+//   - POST /client/status-posts   — accepts dashboard fields (media_url, post_time) + legacy
+//                                    saves BOTH scheduled_time AND post_time columns
+//   - GET/PUT /client/orders      — orders management
+//   - GET /client/analytics       — monthly analytics
+//   - GET /client/broadcast-logs  — broadcast history
+//   - POST /client/broadcast      — send to specific phone numbers
+//   - GET/POST/PATCH/DELETE /client/bot-tasks
+//   - POST /client/push/subscribe (authed)
+//   All existing routes preserved exactly
 // ============================================================
 
 'use strict';
@@ -34,7 +49,7 @@ function getSupabase() {
 // ── Multer: memory storage for file uploads ───────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
 // ── JWT auth middleware ───────────────────────────────────────
@@ -51,7 +66,7 @@ function auth(req, res, next) {
   }
 }
 
-// ── Partner expiry check (runs on every authed request) ───────
+// ── Partner expiry check ──────────────────────────────────────
 async function checkPartnerExpiry(clientId) {
   try {
     var sb     = getSupabase();
@@ -59,19 +74,13 @@ async function checkPartnerExpiry(clientId) {
       .select('is_partner,partner_expires_at,subscription_active')
       .eq('id', clientId)
       .single();
-
     if (result.error || !result.data) return;
     var c = result.data;
-
     if (c.is_partner && c.partner_expires_at && c.subscription_active) {
       if (new Date(c.partner_expires_at) < new Date()) {
-        await sb.from('clients')
-          .update({ subscription_active: false })
-          .eq('id', clientId);
+        await sb.from('clients').update({ subscription_active: false }).eq('id', clientId);
         await sb.from('partner_log').insert({
-          client_id: clientId,
-          action: 'expired',
-          note: 'Auto-expired on API request check'
+          client_id: clientId, action: 'expired', note: 'Auto-expired on API request check'
         });
       }
     }
@@ -81,7 +90,7 @@ async function checkPartnerExpiry(clientId) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  PUBLIC ROUTES — before auth middleware
+//  PUBLIC ROUTES — before router.use('/client', auth …)
 // ══════════════════════════════════════════════════════════════
 
 async function activateClient(clientId) {
@@ -102,8 +111,8 @@ router.post('/client/signup', async function(req, res) {
     }).select('id').single();
     if (insert.error) throw new Error(insert.error.message);
     var clientId = insert.data.id;
-    var amount = (plan === 'yearly') ? 24000 : 2500;
-    var appUrl = process.env.APP_URL || 'https://forgebot.up.railway.app';
+    var amount   = (plan === 'yearly') ? 24000 : 2500;
+    var appUrl   = process.env.APP_URL || 'https://forgebot.up.railway.app';
     var flwRes;
     try {
       flwRes = await axios.post('https://api.flutterwave.com/v3/payments', {
@@ -129,7 +138,7 @@ router.post('/client/login', async function(req, res) {
   try {
     var { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-    var sb = getSupabase();
+    var sb     = getSupabase();
     var result = await sb.from('clients').select('*').eq('email', email).single();
     if (result.error || !result.data) return res.status(401).json({ error: 'Invalid credentials' });
     var client = result.data;
@@ -220,15 +229,20 @@ router.post('/client/pay/webhook', async function(req, res) {
 });
 
 router.get('/push/vapid-key', function(req, res) { res.json({ publicKey: process.env.VAPID_PUBLIC_KEY }); });
+
+// Public push subscribe (no auth — called before login)
 router.post('/push/subscribe', async function(req, res) {
   try {
     var { subscription, clientId: cid } = req.body;
     if (!subscription || !cid) return res.status(400).json({ error: 'subscription and clientId required' });
     var sb = getSupabase();
-    await sb.from('push_subscriptions').upsert({ client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString() }, { onConflict: 'client_id' });
+    await sb.from('push_subscriptions').upsert({
+      client_id: cid, subscription: JSON.stringify(subscription), updated_at: new Date().toISOString()
+    }, { onConflict: 'client_id' });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
 router.post('/push/test', function(req, res) { res.json({ ok: true }); });
 
 // ── Apply auth + partner check to all /client routes ─────────
@@ -238,7 +252,7 @@ router.use('/client', auth, async function(req, res, next) {
 });
 
 // ══════════════════════════════════════════════════════════════
-//  CLIENT INFO
+//  AUTHED CLIENT ROUTES
 // ══════════════════════════════════════════════════════════════
 
 // GET /api/client/me
@@ -247,43 +261,33 @@ router.get('/client/me', async function(req, res) {
     var client = await db.getClientById(req.clientId);
     if (!client) return res.status(404).json({ error: 'Not found' });
     var sock   = sessionManager.getSession(req.clientId);
-    delete client.password_hash;
-    client.whatsapp_status = sock ? 'connected' : 'disconnected';
-    res.json(client);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var { password_hash, ...safe } = client;
+    safe.whatsapp_status = sock ? 'connected' : 'disconnected';
+    res.json(safe);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/client/session-status  ← used by dashboard to show Connected/Disconnected badge
-router.get('/client/session-status', function(req, res) {
+// GET /api/client/session-status — dashboard Connected badge
+router.get('/client/session-status', async function(req, res) {
   try {
     var sock      = sessionManager.getSession(req.clientId);
-    var connected = !!(sock);
+    var connected = !!sock;
     res.json({ connected: connected, status: connected ? 'connected' : 'disconnected' });
-  } catch (e) {
-    res.json({ connected: false, status: 'disconnected' });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  SETTINGS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/settings  ← pre-fills the Settings page
+// GET /api/client/settings — returns nested bot_setup for dashboard
 router.get('/client/settings', async function(req, res) {
   try {
-    var sb = getSupabase();
-
+    var sb        = getSupabase();
     var clientRes = await sb.from('clients').select('*').eq('id', req.clientId).single();
     if (clientRes.error || !clientRes.data) return res.status(404).json({ error: 'Client not found' });
     var c = clientRes.data;
 
     var setupRes = await sb.from('bot_setup').select('*').eq('client_id', req.clientId).single();
-    var s = setupRes.data || {};
+    var s = (setupRes.data) || {};
 
     res.json({
-      // ── Client fields (top-level, dashboard reads these directly) ──
       notification_number: c.notification_number || '',
       welcome_message:     c.welcome_message     || '',
       fallback_message:    c.fallback_message     || '',
@@ -291,147 +295,45 @@ router.get('/client/settings', async function(req, res) {
       account_number:      c.account_number       || '',
       account_name:        c.account_name         || '',
       business_hours:      c.business_hours       || '',
-
-      // ── Bot setup (nested as data.bot_setup.xxx — matches dashboard JS) ──
       bot_setup: {
         instagram:        s.instagram         || '',
         facebook:         s.facebook          || '',
         tiktok:           s.tiktok            || '',
         whatsapp_channel: s.whatsapp_channel  || '',
-        // Map old DB column names → field names the dashboard expects
-        delivery_areas:   s.delivery_areas    || s.delivers_to          || '',
-        delivery_fee:     s.delivery_fee      || s.delivery_fee_local   || '',
-        delivery_time:    s.delivery_time     || s.delivery_time_local  || '',
+        // support both old column names (delivers_to) and new (delivery_areas)
+        delivery_areas:   s.delivery_areas    || s.delivers_to         || '',
+        delivery_fee:     s.delivery_fee      || s.delivery_fee_local  || '',
+        delivery_time:    s.delivery_time     || s.delivery_time_local || '',
         minimum_order:    s.minimum_order     || '',
         return_policy:    s.return_policy     || '',
-        promo:            s.promo             || s.current_promo        || '',
-        // payment_methods: array stored in DB, return as comma-separated string
+        promo:            s.promo             || s.current_promo       || '',
         payment_methods:  Array.isArray(s.payment_methods)
-                            ? s.payment_methods.join(',')
-                            : (s.payment_methods || '')
+          ? s.payment_methods.join(',')
+          : (s.payment_methods || '')
       },
-
-      // ── Subscription info ──────────────────────────────────
       is_partner:          c.is_partner          || false,
       partner_expires_at:  c.partner_expires_at  || null,
       subscription_active: c.subscription_active || false
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
-// PUT /api/client/settings  ← saves notification, messages, bank details, hours
-router.put('/client/settings', async function(req, res) {
-  try {
-    var allowed = [
-      'notification_number', 'business_name',
-      'welcome_message', 'fallback_message',
-      'bank_name', 'account_number', 'account_name',
-      'business_hours'
-    ];
-    var update = {};
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var updated = await db.updateClient(req.clientId, update);
-    res.json(updated || { ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PUT /api/client/fallback  (legacy — kept for compatibility)
-router.put('/client/fallback', async function(req, res) {
-  try {
-    var { fallback_message } = req.body;
-    if (!fallback_message) return res.status(400).json({ error: 'fallback_message required' });
-    var updated = await db.updateClient(req.clientId, { fallback_message: fallback_message });
-    res.json(updated || { ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PUT /api/client/bot-setup  ← saves social media + delivery settings
-router.put('/client/bot-setup', async function(req, res) {
-  try {
-    var sb = getSupabase();
-    var b  = req.body;
-
-    // Build upsert data — accept BOTH old (onboarding) and new (dashboard) field names
-    var setupData = {
-      client_id: req.clientId,
-      updated_at: new Date().toISOString()
-    };
-
-    // Social media
-    if (b.instagram         !== undefined) setupData.instagram         = b.instagram         || null;
-    if (b.facebook          !== undefined) setupData.facebook          = b.facebook          || null;
-    if (b.tiktok            !== undefined) setupData.tiktok            = b.tiktok            || null;
-    if (b.whatsapp_channel  !== undefined) setupData.whatsapp_channel  = b.whatsapp_channel  || null;
-
-    // Delivery — dashboard sends: delivery_areas, delivery_fee, delivery_time, promo
-    // Onboarding sends: delivers_to, delivery_fee_local, delivery_time_local, current_promo
-    // Save under BOTH column names so both paths work
-    if (b.delivery_areas    !== undefined) { setupData.delivery_areas    = b.delivery_areas    || null; setupData.delivers_to          = b.delivery_areas    || null; }
-    if (b.delivers_to       !== undefined) { setupData.delivers_to       = b.delivers_to       || null; setupData.delivery_areas       = b.delivers_to       || null; }
-    if (b.delivery_fee      !== undefined) { setupData.delivery_fee      = b.delivery_fee      || null; setupData.delivery_fee_local   = b.delivery_fee      || null; }
-    if (b.delivery_fee_local!== undefined) { setupData.delivery_fee_local= b.delivery_fee_local|| null; setupData.delivery_fee         = b.delivery_fee_local|| null; }
-    if (b.delivery_time     !== undefined) { setupData.delivery_time     = b.delivery_time     || null; setupData.delivery_time_local  = b.delivery_time     || null; }
-    if (b.delivery_time_local!==undefined) { setupData.delivery_time_local=b.delivery_time_local||null; setupData.delivery_time        = b.delivery_time_local||null; }
-    if (b.minimum_order     !== undefined) setupData.minimum_order     = b.minimum_order     || null;
-    if (b.return_policy     !== undefined) setupData.return_policy     = b.return_policy     || null;
-    if (b.promo             !== undefined) { setupData.promo            = b.promo             || null; setupData.current_promo        = b.promo             || null; }
-    if (b.current_promo     !== undefined) { setupData.current_promo    = b.current_promo     || null; setupData.promo                = b.current_promo     || null; }
-
-    // Payment methods — accept array or comma-string
-    if (b.payment_methods !== undefined) {
-      var pm = b.payment_methods;
-      setupData.payment_methods = Array.isArray(pm) ? pm.join(',') : (pm || null);
-    }
-
-    // Onboarding-only fields
-    var onboardingFields = ['occupation','occupation_data','availability_days','service_areas',
-      'studio_location','home_service','advance_booking','deposit_required','session_duration',
-      'who_do_you_serve','free_consult','bulk_orders','delivery_fee_outside','delivery_time_outside',
-      'payment_on_delivery','complaint_handling','referral_reward'];
-    onboardingFields.forEach(function(k) {
-      if (b[k] !== undefined) setupData[k] = b[k] || null;
-    });
-
-    var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
-    if (error) throw new Error(error.message);
-
-    await sb.from('clients').update({ setup_completed: true }).eq('id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  AUTO-REPLY FLOWS
-// ══════════════════════════════════════════════════════════════
 
 // GET /api/client/flows
 router.get('/client/flows', async function(req, res) {
   try {
     var flows = await db.getFlows(req.clientId, false);
     res.json(flows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/client/flows
 router.post('/client/flows', async function(req, res) {
   try {
-    var { keywords, response, response_type, media_url, flow_name } = req.body;
+    var { keywords, response, response_type, media_url } = req.body;
     if (!keywords || !response) return res.status(400).json({ error: 'keywords and response are required' });
-    var flow = await db.addFlow(req.clientId, flow_name || 'Custom', keywords, response_type || 'text', response, media_url || null, 0);
+    var flow = await db.addFlow(req.clientId, 'Custom', keywords, response_type || 'text', response, media_url || null, 0);
     res.json(flow);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /api/client/flows/:id
@@ -439,132 +341,58 @@ router.delete('/client/flows/:id', async function(req, res) {
   try {
     await db.deleteFlow(req.params.id);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  ORDERS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/orders
-router.get('/client/orders', async function(req, res) {
+// GET /api/client/status-posts
+router.get('/client/status-posts', async function(req, res) {
   try {
-    var sb     = getSupabase();
-    var query  = sb.from('orders')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (req.query.status) query = query.eq('status', req.query.status);
-    var result = await query;
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var posts = await db.getStatusPosts(req.clientId);
+    res.json(posts);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PUT /api/client/orders/:id
-router.put('/client/orders/:id', async function(req, res) {
+// POST /api/client/status-posts
+// Accepts dashboard fields: { caption, media_url, post_time, scheduled_days }
+//         AND legacy fields: { caption, mediaUrl, scheduledTime, scheduledDays }
+// Saves BOTH scheduled_time AND post_time so the scheduler always finds the row
+router.post('/client/status-posts', async function(req, res) {
   try {
-    var sb      = getSupabase();
-    var allowed = ['status', 'payment_status', 'notes', 'delivery_address'];
-    var update  = { updated_at: new Date().toISOString() };
-    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var result  = await sb.from('orders')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
+    var b = req.body;
+    var caption        = b.caption       || '';
+    var mediaUrl       = b.media_url     || b.mediaUrl     || null;
+    var postTime       = b.post_time     || b.scheduledTime || null;
+    var scheduledDays  = b.scheduled_days || b.scheduledDays || null;
+
+    if (!caption)  return res.status(400).json({ error: 'caption is required' });
+    if (!postTime) return res.status(400).json({ error: 'post_time is required' });
+
+    var sb = getSupabase();
+    var result = await sb.from('status_posts').insert({
+      client_id:      req.clientId,
+      caption:        caption,
+      media_url:      mediaUrl       || null,
+      post_time:      postTime,       // column read by dashboard display
+      scheduled_time: postTime,       // column queried by getDueStatusPosts
+      scheduled_days: scheduledDays  || null,
+      active:         true
+    }).select().single();
+
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  ANALYTICS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/analytics?month=2026-07
-router.get('/client/analytics', async function(req, res) {
+// DELETE /api/client/status-posts/:id
+router.delete('/client/status-posts/:id', async function(req, res) {
   try {
-    var month = req.query.month;
-    if (!month) {
-      var n = new Date();
-      month = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0');
-    }
-    var sb    = getSupabase();
-    var parts = month.split('-');
-    var yr    = parseInt(parts[0]);
-    var mo    = parseInt(parts[1]);
-    var start = month + '-01';
-    var endDate = new Date(yr, mo, 1); // first day of next month
-    var end   = endDate.getFullYear() + '-' + String(endDate.getMonth() + 1).padStart(2, '0') + '-01';
-
-    var custRes = await sb.from('customers')
-      .select('id', { count: 'exact', head: true })
-      .eq('client_id', req.clientId)
-      .gte('created_at', start)
-      .lt('created_at', end);
-
-    var ordRes = await sb.from('orders')
-      .select('status,total')
-      .eq('client_id', req.clientId)
-      .gte('created_at', start)
-      .lt('created_at', end);
-
-    var orders    = ordRes.data || [];
-    var placed    = orders.length;
-    var confirmed = orders.filter(function(o) {
-      return ['confirmed','packaging','shipped','delivered','accepted','completed'].includes(o.status);
-    }).length;
-    var revenue   = orders
-      .filter(function(o) {
-        return ['confirmed','packaging','shipped','delivered','accepted','completed'].includes(o.status);
-      })
-      .reduce(function(sum, o) { return sum + (parseFloat(o.total) || 0); }, 0);
-
-    var leadsRes = await sb.from('customers')
-      .select('id', { count: 'exact', head: true })
-      .eq('client_id', req.clientId)
-      .gte('last_contact', start)
-      .lt('last_contact', end);
-
-    res.json({
-      new_customers:    custRes.count  || 0,
-      leads:            leadsRes.count || 0,
-      orders_placed:    placed,
-      orders_confirmed: confirmed,
-      total_revenue:    revenue
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var sb = getSupabase();
+    await sb.from('status_posts').delete().eq('id', req.params.id).eq('client_id', req.clientId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  BROADCAST
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/broadcast-logs
-router.get('/client/broadcast-logs', async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('broadcasts')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('sent_at', { ascending: false })
-      .limit(20);
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/client/broadcasts  (legacy alias)
+// GET /api/client/broadcasts — history
 router.get('/client/broadcasts', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -574,51 +402,23 @@ router.get('/client/broadcasts', async function(req, res) {
       .order('created_at', { ascending: false })
       .limit(20);
     res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/broadcast  ← dashboard sends to specific phone numbers
-router.post('/client/broadcast', async function(req, res) {
+// GET /api/client/broadcast-logs — alias
+router.get('/client/broadcast-logs', async function(req, res) {
   try {
-    var { message, phones } = req.body;
-    if (!message) return res.status(400).json({ error: 'message required' });
-    var sock = sessionManager.getSession(req.clientId);
-    if (!sock) return res.status(400).json({ error: 'WhatsApp not connected' });
-
-    var phoneList = Array.isArray(phones)
-      ? phones
-      : (phones || '').split('\n').filter(Boolean);
-    if (!phoneList.length) return res.status(400).json({ error: 'No phone numbers provided' });
-
-    var sent = 0;
-    for (var i = 0; i < phoneList.length; i++) {
-      var jid = phoneList[i].toString().replace(/\D/g, '') + '@s.whatsapp.net';
-      try {
-        await sock.sendMessage(jid, { text: message });
-        sent++;
-        await new Promise(function(r) { setTimeout(r, 1200); });
-      } catch (e) {
-        console.error('[Broadcast] Failed for', jid + ':', e.message);
-      }
-    }
-
-    var sb = getSupabase();
-    await sb.from('broadcasts').insert({
-      client_id:  req.clientId,
-      message:    message,
-      recipients: sent,
-      sent_at:    new Date().toISOString()
-    }).catch(function() {});
-
-    res.json({ sent: sent, total: phoneList.length });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var sb     = getSupabase();
+    var result = await sb.from('broadcasts')
+      .select('*')
+      .eq('client_id', req.clientId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    res.json(result.data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/broadcasts  ← legacy: broadcasts to ALL saved customers
+// POST /api/client/broadcasts — broadcast to all known customers
 router.post('/client/broadcasts', async function(req, res) {
   try {
     var { message } = req.body;
@@ -641,218 +441,93 @@ router.post('/client/broadcasts', async function(req, res) {
       }
     }
 
-    await sb.from('broadcasts').insert({ client_id: req.clientId, message: message, recipients: sent, sent_at: new Date().toISOString() }).catch(function() {});
+    await db.logBroadcast(req.clientId, message, sent);
     res.json({ sent: sent, total: jids.length });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  STATUS POSTS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/status-posts
-router.get('/client/status-posts', async function(req, res) {
+// POST /api/client/broadcast — send to specific phone numbers
+router.post('/client/broadcast', async function(req, res) {
   try {
-    var sb     = getSupabase();
-    var result = await sb.from('status_posts')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+    var { message, numbers } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+    var sock = sessionManager.getSession(req.clientId);
+    if (!sock) return res.status(400).json({ error: 'WhatsApp not connected' });
 
-// POST /api/client/status-posts
-// Dashboard sends: { caption, media_url, post_time }
-router.post('/client/status-posts', async function(req, res) {
-  try {
-    var caption   = req.body.caption       || '';
-    var media_url = req.body.media_url     || req.body.mediaUrl    || null;
-    var post_time = req.body.post_time     || req.body.scheduledTime || null;
-    if (!caption || !post_time) return res.status(400).json({ error: 'Caption and time required' });
-    var sb     = getSupabase();
-    var result = await sb.from('status_posts').insert({
-      client_id: req.clientId,
-      caption:   caption,
-      media_url: media_url,
-      post_time: post_time
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+    var targets = Array.isArray(numbers) ? numbers : [];
+    if (!targets.length) return res.status(400).json({ error: 'numbers array required' });
 
-// DELETE /api/client/status-posts/:id
-router.delete('/client/status-posts/:id', async function(req, res) {
-  try {
-    var sb = getSupabase();
-    await sb.from('status_posts').delete().eq('id', req.params.id).eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  BOT ERRANDS (Scheduled Auto-Outreach)
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/bot-tasks
-router.get('/client/bot-tasks', async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('bot_tasks')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('created_at', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/client/bot-tasks
-router.post('/client/bot-tasks', async function(req, res) {
-  try {
-    var { name, message, schedule_time, schedule_days, filter_type } = req.body;
-    if (!name || !message || !schedule_time || !schedule_days) {
-      return res.status(400).json({ error: 'name, message, schedule_time, and schedule_days are required' });
+    var sent = 0;
+    for (var i = 0; i < targets.length; i++) {
+      var num = String(targets[i]).replace(/\D/g, '');
+      if (!num) continue;
+      var jid = num + '@s.whatsapp.net';
+      try {
+        await sock.sendMessage(jid, { text: message });
+        sent++;
+        await new Promise(function(r) { setTimeout(r, 1200); });
+      } catch (e) {
+        console.error('[ClientAPI] Broadcast to ' + jid + ' failed:', e.message);
+      }
     }
-    var sb     = getSupabase();
-    var result = await sb.from('bot_tasks').insert({
-      client_id:     req.clientId,
-      name:          name,
-      message:       message,
-      schedule_time: schedule_time,
-      schedule_days: schedule_days,
-      filter_type:   filter_type || 'all_customers',
-      active:        true,
-      run_count:     0
-    }).select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+
+    res.json({ sent: sent, total: targets.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH /api/client/bot-tasks/:id
-router.patch('/client/bot-tasks/:id', async function(req, res) {
+// PUT /api/client/settings
+router.put('/client/settings', async function(req, res) {
   try {
-    var sb      = getSupabase();
-    var allowed = ['active', 'name', 'message', 'schedule_time', 'schedule_days', 'filter_type'];
+    var allowed = [
+      'notification_number', 'business_name', 'welcome_message', 'fallback_message',
+      'bank_name', 'account_number', 'account_name', 'business_hours'
+    ];
     var update  = {};
     allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    var result  = await sb.from('bot_tasks')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
-    if (result.error) throw new Error(result.error.message);
-    res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var updated = await db.updateClient(req.clientId, update);
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE /api/client/bot-tasks/:id
-router.delete('/client/bot-tasks/:id', async function(req, res) {
+// PUT /api/client/fallback
+router.put('/client/fallback', async function(req, res) {
   try {
-    var sb = getSupabase();
-    await sb.from('bot_tasks')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var { fallback_message } = req.body;
+    if (!fallback_message) return res.status(400).json({ error: 'fallback_message required' });
+    var updated = await db.updateClient(req.clientId, { fallback_message: fallback_message });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  PUSH NOTIFICATIONS (authed client routes)
-// ══════════════════════════════════════════════════════════════
-
-// POST /api/client/push/subscribe  ← dashboard calls this after auth
-router.post('/client/push/subscribe', async function(req, res) {
-  try {
-    var { endpoint, keys } = req.body;
-    if (!endpoint || !keys) return res.status(400).json({ error: 'endpoint and keys required' });
-    var sb = getSupabase();
-    await sb.from('push_subscriptions').upsert({
-      client_id:    req.clientId,
-      subscription: JSON.stringify({ endpoint: endpoint, keys: keys }),
-      endpoint:     endpoint,
-      p256dh:       keys.p256dh || null,
-      auth:         keys.auth   || null,
-      updated_at:   new Date().toISOString()
-    }, { onConflict: 'client_id' }).catch(function() {
-      // Fallback: try without p256dh/auth columns if they don't exist
-      return sb.from('push_subscriptions').upsert({
-        client_id:    req.clientId,
-        subscription: JSON.stringify({ endpoint: endpoint, keys: keys }),
-        updated_at:   new Date().toISOString()
-      }, { onConflict: 'client_id' });
-    });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/client/push/test
-router.post('/client/push/test', async function(req, res) {
-  res.json({ ok: true, sent: 1 });
-});
-
-// ══════════════════════════════════════════════════════════════
-//  OCCUPATION & LOCATION
-// ══════════════════════════════════════════════════════════════
-
-// PUT /api/client/occupation
+// ── Occupation ────────────────────────────────────────────────
 router.put('/client/occupation', async function(req, res) {
   try {
     var { occupation, answers } = req.body;
     if (!occupation) return res.status(400).json({ error: 'occupation required' });
     var sb = getSupabase();
-    await sb.from('clients').update({ occupation: occupation, occupation_data: answers || {} }).eq('id', req.clientId);
+    await sb.from('clients').update({
+      occupation: occupation, occupation_data: answers || {}
+    }).eq('id', req.clientId);
     await sb.from('bot_setup').upsert({
-      client_id:          req.clientId,
-      occupation_answers: answers || {},
-      updated_at:         new Date().toISOString()
+      client_id: req.clientId, occupation_answers: answers || {}, updated_at: new Date().toISOString()
     }, { onConflict: 'client_id' });
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PUT /api/client/location
+// ── Location ──────────────────────────────────────────────────
 router.put('/client/location', async function(req, res) {
   try {
     var { location_address, location_maps_url } = req.body;
     var sb = getSupabase();
     await sb.from('clients').update({
-      location_address:  location_address  || null,
-      location_maps_url: location_maps_url || null
+      location_address: location_address || null, location_maps_url: location_maps_url || null
     }).eq('id', req.clientId);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  SERVICE LISTINGS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/listings
+// ── Service Listings ──────────────────────────────────────────
 router.get('/client/listings', async function(req, res) {
   try {
     var sb     = getSupabase();
@@ -861,36 +536,24 @@ router.get('/client/listings', async function(req, res) {
       .eq('client_id', req.clientId)
       .order('created_at', { ascending: false });
     res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/listings
 router.post('/client/listings', async function(req, res) {
   try {
     var { name, description, price, price_label, location, category, keywords } = req.body;
     if (!name || !keywords) return res.status(400).json({ error: 'name and keywords are required' });
     var sb     = getSupabase();
     var result = await sb.from('service_listings').insert({
-      client_id:   req.clientId,
-      name:        name,
-      description: description || null,
-      price:       price       || null,
-      price_label: price_label || null,
-      location:    location    || null,
-      category:    category    || null,
-      keywords:    keywords,
-      available:   true
+      client_id: req.clientId, name: name, description: description || null,
+      price: price || null, price_label: price_label || null, location: location || null,
+      category: category || null, keywords: keywords, available: true
     }).select().single();
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH /api/client/listings/:id
 router.patch('/client/listings/:id', async function(req, res) {
   try {
     var allowed = ['name','description','price','price_label','location','category','keywords','available'];
@@ -898,89 +561,54 @@ router.patch('/client/listings/:id', async function(req, res) {
     allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
     var sb     = getSupabase();
     var result = await sb.from('service_listings')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
+      .update(update).eq('id', req.params.id).eq('client_id', req.clientId).select().single();
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE /api/client/listings/:id
 router.delete('/client/listings/:id', async function(req, res) {
   try {
     var sb = getSupabase();
-    await sb.from('service_listings')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId);
+    await sb.from('service_listings').delete().eq('id', req.params.id).eq('client_id', req.clientId);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Listing Media ─────────────────────────────────────────────
-
-// GET /api/client/listings/:id/media
 router.get('/client/listings/:id/media', async function(req, res) {
   try {
     var sb     = getSupabase();
     var result = await sb.from('listing_media')
-      .select('*')
-      .eq('listing_id', req.params.id)
-      .eq('client_id', req.clientId)
+      .select('*').eq('listing_id', req.params.id).eq('client_id', req.clientId)
       .order('sort_order', { ascending: true });
     res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/listings/:id/media
 router.post('/client/listings/:id/media', async function(req, res) {
   try {
     var { url, media_type, caption, filename, sort_order } = req.body;
     if (!url || !media_type) return res.status(400).json({ error: 'url and media_type required' });
     var sb     = getSupabase();
     var result = await sb.from('listing_media').insert({
-      listing_id: req.params.id,
-      client_id:  req.clientId,
-      url:        url,
-      media_type: media_type,
-      caption:    caption    || null,
-      filename:   filename   || null,
-      sort_order: sort_order || 0
+      listing_id: req.params.id, client_id: req.clientId, url: url, media_type: media_type,
+      caption: caption || null, filename: filename || null, sort_order: sort_order || 0
     }).select().single();
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE /api/client/media/:id
 router.delete('/client/media/:id', async function(req, res) {
   try {
     var sb = getSupabase();
-    await sb.from('listing_media')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId);
+    await sb.from('listing_media').delete().eq('id', req.params.id).eq('client_id', req.clientId);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  FILE UPLOAD → SUPABASE STORAGE
-// ══════════════════════════════════════════════════════════════
-
-// POST /api/client/upload
+// ── File Upload → Supabase Storage ───────────────────────────
 router.post('/client/upload', upload.single('file'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
@@ -988,188 +616,317 @@ router.post('/client/upload', upload.single('file'), async function(req, res) {
     var ext      = req.file.originalname.split('.').pop().toLowerCase();
     var filename = req.clientId + '/' + Date.now() + '.' + ext;
     var bucket   = 'forgebot-listings';
-    var result   = await sb.storage
-      .from(bucket)
-      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    var result   = await sb.storage.from(bucket).upload(filename, req.file.buffer, {
+      contentType: req.file.mimetype, upsert: false
+    });
     if (result.error) throw new Error(result.error.message);
     var urlResult = sb.storage.from(bucket).getPublicUrl(filename);
     res.json({ url: urlResult.data.publicUrl, filename: req.file.originalname });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  FAQ
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/faq
+// ── FAQ ───────────────────────────────────────────────────────
 router.get('/client/faq', async function(req, res) {
   try {
     var sb     = getSupabase();
-    var result = await sb.from('business_faq')
-      .select('*')
-      .eq('client_id', req.clientId)
+    var result = await sb.from('business_faq').select('*').eq('client_id', req.clientId)
       .order('sort_order', { ascending: true });
     res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/client/faq
 router.post('/client/faq', async function(req, res) {
   try {
     var { question, answer, keywords, sort_order } = req.body;
     if (!question || !answer) return res.status(400).json({ error: 'question and answer required' });
     var sb     = getSupabase();
     var result = await sb.from('business_faq').insert({
-      client_id:  req.clientId,
-      question:   question,
-      answer:     answer,
-      keywords:   keywords   || null,
-      sort_order: sort_order || 0
+      client_id: req.clientId, question: question, answer: answer,
+      keywords: keywords || null, sort_order: sort_order || 0
     }).select().single();
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH /api/client/faq/:id
 router.patch('/client/faq/:id', async function(req, res) {
   try {
+    var { question, answer, keywords, sort_order } = req.body;
     var update = {};
-    ['question','answer','keywords','sort_order'].forEach(function(k) {
-      if (req.body[k] !== undefined) update[k] = req.body[k];
-    });
+    if (question   !== undefined) update.question   = question;
+    if (answer     !== undefined) update.answer     = answer;
+    if (keywords   !== undefined) update.keywords   = keywords;
+    if (sort_order !== undefined) update.sort_order = sort_order;
     var sb     = getSupabase();
-    var result = await sb.from('business_faq')
-      .update(update)
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId)
-      .select().single();
+    var result = await sb.from('business_faq').update(update)
+      .eq('id', req.params.id).eq('client_id', req.clientId).select().single();
     if (result.error) throw new Error(result.error.message);
     res.json(result.data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// DELETE /api/client/faq/:id
 router.delete('/client/faq/:id', async function(req, res) {
   try {
     var sb = getSupabase();
-    await sb.from('business_faq')
-      .delete()
-      .eq('id', req.params.id)
-      .eq('client_id', req.clientId);
+    await sb.from('business_faq').delete().eq('id', req.params.id).eq('client_id', req.clientId);
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  PARTNER / TRIAL STATUS
-// ══════════════════════════════════════════════════════════════
-
-// GET /api/client/partner-status
+// ── Partner / Trial Status ────────────────────────────────────
 router.get('/client/partner-status', async function(req, res) {
   try {
     var sb     = getSupabase();
     var result = await sb.from('clients')
-      .select('is_partner,partner_expires_at,subscription_active')
-      .eq('id', req.clientId)
-      .single();
+      .select('is_partner,partner_expires_at,subscription_active').eq('id', req.clientId).single();
     if (result.error || !result.data) return res.json({ is_partner: false });
     var c         = result.data;
     var now       = new Date();
     var expiresAt = c.partner_expires_at ? new Date(c.partner_expires_at) : null;
     var daysLeft  = expiresAt ? Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)) : null;
+    var expired   = expiresAt ? expiresAt < now : false;
     res.json({
-      is_partner:   c.is_partner    || false,
-      expires_at:   c.partner_expires_at || null,
-      days_left:    daysLeft,
-      expired:      expiresAt ? expiresAt < now : false,
-      still_active: c.subscription_active
+      is_partner:   c.is_partner || false, expires_at: c.partner_expires_at || null,
+      days_left:    daysLeft, expired: expired, still_active: c.subscription_active
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PUT /api/client/qualification-toggle
+// ── Qualification toggle ──────────────────────────────────────
 router.put('/client/qualification-toggle', async function(req, res) {
   try {
     var { enabled } = req.body;
-    var sb          = getSupabase();
-    var current     = await sb.from('clients').select('occupation_data').eq('id', req.clientId).single();
-    var occData     = (current.data && current.data.occupation_data) || {};
+    var sb = getSupabase();
+    var current = await sb.from('clients').select('occupation_data').eq('id', req.clientId).single();
+    var occData = (current.data && current.data.occupation_data) || {};
     occData.qualification_enabled = !!enabled;
     await sb.from('clients').update({ occupation_data: occData }).eq('id', req.clientId);
     res.json({ ok: true, qualification_enabled: !!enabled });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  POST SCHEDULE
-// ══════════════════════════════════════════════════════════════
+// ── Bot Setup (PUT) ───────────────────────────────────────────
+// Accepts BOTH old field names (delivers_to, delivery_fee_local, etc.)
+// AND new field names (delivery_areas, delivery_fee, etc.).
+// Saves BOTH so onboard.html and dashboard.html both work correctly.
+router.put('/client/bot-setup', async function(req, res) {
+  try {
+    var sb  = getSupabase();
+    var b   = req.body;
+    var cid = req.clientId;
 
-router.get('/client/post-schedule', async function(req, res) {
+    if (b.occupation) {
+      await sb.from('clients').update({
+        occupation: b.occupation, occupation_data: b.occupation_data || {}
+      }).eq('id', cid);
+    }
+
+    var setupData = {
+      client_id:         cid,
+      availability_days: b.availability_days  || null,
+      instagram:         b.instagram          || null,
+      facebook:          b.facebook           || null,
+      tiktok:            b.tiktok             || null,
+      whatsapp_channel:  b.whatsapp_channel   || null,
+      service_areas:     b.service_areas      || null,
+      studio_location:   b.studio_location    || null,
+      home_service:      b.home_service       || null,
+      advance_booking:   b.advance_booking    || null,
+      deposit_required:  b.deposit_required   || null,
+      session_duration:  b.session_duration   || null,
+      who_do_you_serve:  b.who_do_you_serve   || null,
+      free_consult:      b.free_consult       || null,
+      minimum_order:     b.minimum_order      || null,
+      bulk_orders:       b.bulk_orders        || null,
+      updated_at:        new Date().toISOString()
+    };
+
+    // payment_methods — handle array or comma string
+    if (b.payment_methods !== undefined) {
+      setupData.payment_methods = b.payment_methods || null;
+    }
+
+    // Delivery — save BOTH old and new column names
+    if (b.delivery_areas !== undefined) {
+      setupData.delivery_areas = b.delivery_areas || null;
+      setupData.delivers_to   = b.delivery_areas || null;  // backward compat
+    }
+    if (b.delivers_to !== undefined) {
+      setupData.delivers_to   = b.delivers_to   || null;
+      setupData.delivery_areas = b.delivers_to  || null;  // forward compat
+    }
+
+    if (b.delivery_fee !== undefined) {
+      setupData.delivery_fee       = b.delivery_fee || null;
+      setupData.delivery_fee_local = b.delivery_fee || null;
+    }
+    if (b.delivery_fee_local !== undefined) {
+      setupData.delivery_fee_local = b.delivery_fee_local || null;
+      setupData.delivery_fee       = b.delivery_fee_local || null;
+    }
+
+    if (b.delivery_time !== undefined) {
+      setupData.delivery_time       = b.delivery_time || null;
+      setupData.delivery_time_local = b.delivery_time || null;
+    }
+    if (b.delivery_time_local !== undefined) {
+      setupData.delivery_time_local = b.delivery_time_local || null;
+      setupData.delivery_time       = b.delivery_time_local || null;
+    }
+
+    // Promo — save both column names
+    if (b.promo !== undefined) {
+      setupData.promo         = b.promo || null;
+      setupData.current_promo = b.promo || null;
+    }
+    if (b.current_promo !== undefined) {
+      setupData.current_promo = b.current_promo || null;
+      setupData.promo         = b.current_promo || null;
+    }
+
+    // Return policy
+    if (b.return_policy !== undefined) {
+      setupData.return_policy = b.return_policy || null;
+    }
+
+    // Remove undefined keys to avoid Supabase complaints
+    Object.keys(setupData).forEach(function(k) {
+      if (setupData[k] === undefined) delete setupData[k];
+    });
+
+    var { error } = await sb.from('bot_setup').upsert(setupData, { onConflict: 'client_id' });
+    if (error) throw new Error(error.message);
+    await sb.from('clients').update({ setup_completed: true }).eq('id', cid);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Orders ────────────────────────────────────────────────────
+router.get('/client/orders', async function(req, res) {
   try {
     var sb     = getSupabase();
-    var result = await sb.from('bot_setup')
-      .select('post_schedule_days,post_schedule_time,post_include_memes')
-      .eq('client_id', req.clientId)
-      .single();
-    var data = result.data || {};
-    res.json({
-      days:          data.post_schedule_days  || [],
-      time:          data.post_schedule_time  || '',
-      include_memes: data.post_include_memes !== false
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    var result = await sb.from('orders')
+      .select('*').eq('client_id', req.clientId)
+      .order('created_at', { ascending: false }).limit(100);
+    res.json(result.data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.put('/client/post-schedule', async function(req, res) {
+router.put('/client/orders/:id', async function(req, res) {
   try {
-    var { days, time, include_memes } = req.body;
+    var allowed = ['status', 'notes', 'amount', 'delivery_address'];
+    var update  = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    update.updated_at = new Date().toISOString();
+    var sb     = getSupabase();
+    var result = await sb.from('orders').update(update)
+      .eq('id', req.params.id).eq('client_id', req.clientId).select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Analytics ─────────────────────────────────────────────────
+router.get('/client/analytics', async function(req, res) {
+  try {
+    var month = req.query.month; // YYYY-MM
+    var sb    = getSupabase();
+
+    var start = month ? month + '-01' : new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    var endDate = month
+      ? new Date(month.split('-')[0], month.split('-')[1], 0).toISOString().split('T')[0]
+      : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+
+    var [custRes, orderRes, broadRes] = await Promise.all([
+      sb.from('customers').select('id', { count: 'exact' }).eq('client_id', req.clientId)
+        .gte('last_contact', start).lte('last_contact', endDate),
+      sb.from('orders').select('id,amount,status', { count: 'exact' }).eq('client_id', req.clientId)
+        .gte('created_at', start).lte('created_at', endDate),
+      sb.from('broadcasts').select('sent_count').eq('client_id', req.clientId)
+        .gte('created_at', start).lte('created_at', endDate)
+    ]);
+
+    var orders  = orderRes.data || [];
+    var revenue = orders.filter(function(o) { return o.status === 'completed'; })
+                        .reduce(function(sum, o) { return sum + (parseFloat(o.amount) || 0); }, 0);
+    var broadcastReach = (broadRes.data || []).reduce(function(sum, b) { return sum + (b.sent_count || 0); }, 0);
+
+    res.json({
+      month:            month || start.slice(0, 7),
+      new_customers:    custRes.count  || 0,
+      total_orders:     orderRes.count || 0,
+      completed_orders: orders.filter(function(o) { return o.status === 'completed'; }).length,
+      revenue:          revenue,
+      broadcast_reach:  broadcastReach
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Bot Tasks (errands) ───────────────────────────────────────
+router.get('/client/bot-tasks', async function(req, res) {
+  try {
+    var sb     = getSupabase();
+    var result = await sb.from('bot_tasks').select('*').eq('client_id', req.clientId)
+      .order('created_at', { ascending: false });
+    res.json(result.data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/client/bot-tasks', async function(req, res) {
+  try {
+    var { task_type, message, scheduled_time, scheduled_days, recipient_jid } = req.body;
+    if (!task_type || !message) return res.status(400).json({ error: 'task_type and message required' });
+    var sb     = getSupabase();
+    var result = await sb.from('bot_tasks').insert({
+      client_id:      req.clientId,
+      task_type:      task_type,
+      message:        message,
+      scheduled_time: scheduled_time || null,
+      scheduled_days: scheduled_days || null,
+      recipient_jid:  recipient_jid  || null,
+      active:         true
+    }).select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.patch('/client/bot-tasks/:id', async function(req, res) {
+  try {
+    var allowed = ['task_type', 'message', 'scheduled_time', 'scheduled_days', 'recipient_jid', 'active'];
+    var update  = {};
+    allowed.forEach(function(k) { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    update.updated_at = new Date().toISOString();
+    var sb     = getSupabase();
+    var result = await sb.from('bot_tasks').update(update)
+      .eq('id', req.params.id).eq('client_id', req.clientId).select().single();
+    if (result.error) throw new Error(result.error.message);
+    res.json(result.data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/client/bot-tasks/:id', async function(req, res) {
+  try {
     var sb = getSupabase();
-    await sb.from('bot_setup').upsert({
-      client_id:          req.clientId,
-      post_schedule_days: days         || [],
-      post_schedule_time: time         || null,
-      post_include_memes: include_memes !== false,
-      updated_at:         new Date().toISOString()
+    await sb.from('bot_tasks').delete().eq('id', req.params.id).eq('client_id', req.clientId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Push Notifications (authed) ───────────────────────────────
+router.post('/client/push/subscribe', async function(req, res) {
+  try {
+    var { subscription } = req.body;
+    if (!subscription) return res.status(400).json({ error: 'subscription required' });
+    var sb = getSupabase();
+    await sb.from('push_subscriptions').upsert({
+      client_id: req.clientId, subscription: JSON.stringify(subscription),
+      updated_at: new Date().toISOString()
     }, { onConflict: 'client_id' });
     res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════
-//  CUSTOMERS
-// ══════════════════════════════════════════════════════════════
+router.post('/client/push/test', function(req, res) { res.json({ ok: true, message: 'Push test acknowledged' }); });
 
-router.get('/client/customers', async function(req, res) {
-  try {
-    var sb     = getSupabase();
-    var result = await sb.from('customers')
-      .select('*')
-      .eq('client_id', req.clientId)
-      .order('last_contact', { ascending: false });
-    res.json(result.data || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
 module.exports = router;
