@@ -1,15 +1,8 @@
-// ============================================================
-//  ForgeBot — Supabase DB module
-//  File location: src/db/supabase.js
-// ============================================================
-
-'use strict';
-
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 // ── CLIENTS ───────────────────────────────────────────────────
@@ -123,7 +116,7 @@ async function addStatusPost(clientId, caption, mediaUrl, postTime, repeatDaily 
   return data;
 }
 
-// FIX: second param is todayDate (ISO string like "2026-07-25"), NOT a day name like "Sat"
+// FIXED: second param is now ISO date string "2026-07-25", not "Sat"
 async function getDueStatusPosts(currentTime, todayDate) {
   const { data, error } = await supabase
     .from('status_posts')
@@ -200,8 +193,8 @@ async function getBroadcastLogs(clientId) {
 }
 
 // ── WWEBJS SESSION STORAGE ────────────────────────────────────
-// Stores the Chrome session ZIP for whatsapp-web.js in Supabase.
-// Requires: ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS session_data TEXT;
+// Stores the Chrome session ZIP (base64) so Railway restarts don't need re-scan.
+// Run once in Supabase: ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS session_data TEXT;
 
 async function wwebjsSessionExists(clientId) {
   var result = await supabase
