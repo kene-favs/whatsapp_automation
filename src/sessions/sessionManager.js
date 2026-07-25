@@ -1,17 +1,18 @@
 // ============================================================
-//  ForgeBot — sessionManager.js  (Supabase Auth Edition)
+//  ForgeBot — sessionManager.js  (Supabase Auth + @lid fix)
 //  File location: src/sessions/sessionManager.js
 //
-//  ROOT CAUSE FIXED:
-//  - Old version used useMultiFileAuthState → ephemeral Railway filesystem
-//  - Every Railway restart wiped auth files → bot needed QR scan again
-//  - This version stores Baileys auth in Supabase (whatsapp_sessions table)
-//  - One QR scan. Session survives restarts forever.
+//  ROOT CAUSE OF "sent OK but no DM received":
+//  Baileys receives messages from @lid JIDs (WhatsApp Linked Identity).
+//  Replying to @lid silently succeeds at the API level but WhatsApp
+//  never delivers the message — @lid is a receive-only identifier.
+//  You must send to the @s.whatsapp.net (phone-based) JID.
 //
-//  REQUIRES: migration.sql run in Supabase first (adds auth_creds, auth_keys)
+//  FIX: Listen to contacts.upsert to build @lid→phone mapping.
+//       Resolve @lid → @s.whatsapp.net before passing to replyEngine.
 // ============================================================
 
-// ── Crypto polyfill — MUST be first line ──
+// ── Crypto polyfill — MUST be first ──
 if (typeof crypto === 'undefined') {
   global.crypto = require('crypto').webcrypto;
 }
@@ -22,10 +23,11 @@ const pino      = require('pino');
 const { createClient } = require('@supabase/supabase-js');
 const replyEngine = require('../bot/replyEngine');
 
-const sessions  = {};       // clientId → { sock, connected }
-const starting  = new Set();
-const retryInfo = {};
-const latestQR  = {};
+const sessions    = {};    // clientId → { sock, connected }
+const starting    = new Set();
+const retryInfo   = {};
+const latestQR    = {};
+const contactMaps = {};    // clientId → Map<@lid, @s.whatsapp.net>
 
 const logger = pino({ level: 'silent' });
 
@@ -42,7 +44,6 @@ function getSB() {
 }
 
 // ── Buffer-aware JSON helpers ─────────────────────────────────
-// Baileys stores auth data as Node Buffers. We encode as base64 for DB storage.
 function toJSON(obj) {
   try {
     return JSON.stringify(obj, function(key, val) {
@@ -54,10 +55,7 @@ function toJSON(obj) {
       if (val instanceof Uint8Array) return { __buf: Buffer.from(val).toString('base64') };
       return val;
     });
-  } catch (e) {
-    console.error('[SessionManager] toJSON error:', e.message);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function fromJSON(raw) {
@@ -70,10 +68,7 @@ function fromJSON(raw) {
       }
       return val;
     });
-  } catch (e) {
-    console.error('[SessionManager] fromJSON error:', e.message);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 // ── Supabase-backed Baileys auth state ────────────────────────
@@ -83,7 +78,6 @@ async function useSupabaseAuthState(clientId) {
   var initAuthCreds = _baileys.initAuthCreds || (_baileys.default && _baileys.default.initAuthCreds);
   if (!initAuthCreds) initAuthCreds = function() { return {}; };
 
-  // Load from DB
   var row = null;
   try {
     var { data } = await sb
@@ -96,26 +90,21 @@ async function useSupabaseAuthState(clientId) {
     console.warn('[SessionManager] Could not load Supabase auth for', clientId + ':', e.message);
   }
 
-  // Restore or initialise creds
   var creds = null;
-  if (row && row.auth_creds) {
-    creds = fromJSON(row.auth_creds);
-  }
+  if (row && row.auth_creds) creds = fromJSON(row.auth_creds);
   if (!creds || typeof creds !== 'object') {
     creds = initAuthCreds();
-    console.log('[SessionManager] No saved creds for', clientId, '— fresh session (QR required)');
+    console.log('[SessionManager] No saved creds for', clientId, '— QR required');
   } else {
     console.log('[SessionManager] Restored saved creds for', clientId, '— attempting silent reconnect');
   }
 
-  // Restore or initialise key store
   var keysStore = {};
   if (row && row.auth_keys) {
     var parsed = fromJSON(row.auth_keys);
     if (parsed && typeof parsed === 'object') keysStore = parsed;
   }
 
-  // Persist both creds and keys to Supabase
   async function persist() {
     try {
       var credsJSON = toJSON(creds);
@@ -137,8 +126,7 @@ async function useSupabaseAuthState(clientId) {
       var store  = keysStore[type] || {};
       var result = {};
       for (var i = 0; i < ids.length; i++) {
-        var id = ids[i];
-        if (store[id] != null) result[id] = store[id];
+        if (store[ids[i]] != null) result[ids[i]] = store[ids[i]];
       }
       return result;
     },
@@ -159,56 +147,88 @@ async function useSupabaseAuthState(clientId) {
   return { state: { creds: creds, keys: keys }, saveCreds: persist };
 }
 
-// ── Clear Supabase auth (forces new QR on next start) ────────
 async function clearSupabaseAuth(clientId) {
   try {
     await getSB().from('whatsapp_sessions')
       .update({ auth_creds: null, auth_keys: null, updated_at: new Date().toISOString() })
       .eq('client_id', clientId);
     console.log('[SessionManager] Cleared auth for', clientId);
-  } catch (e) {
-    console.error('[SessionManager] Failed to clear auth for', clientId + ':', e.message);
-  }
+  } catch (e) {}
 }
 
-// ── Update whatsapp_connected in clients table ────────────────
 async function setConnected(clientId, val) {
   try {
     await getSB().from('clients')
       .update({ whatsapp_connected: !!val })
       .eq('id', clientId);
-  } catch (e) { /* non-critical */ }
+  } catch (e) {}
 }
 
-// ── Broadcast to all SSE listeners ───────────────────────────
 function broadcast(clientId, event, data) {
   if (!global.qrListeners) return;
   var all = global.qrListeners.get(clientId) || [];
   all.forEach(function(fn) { try { fn(event, data); } catch (e) {} });
 }
 
-// ── Exponential backoff delay ─────────────────────────────────
 function getNextDelay(clientId) {
   if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
   var info  = retryInfo[clientId];
   info.count++;
   var delay = info.delay;
-  info.delay = Math.min(info.delay * 2, 60000); // cap at 60s
+  info.delay = Math.min(info.delay * 2, 60000);
   return delay;
+}
+
+// ── @lid → @s.whatsapp.net resolution ────────────────────────
+function normalizeJid(jid) {
+  if (!jid) return jid;
+  if (!jid.includes('@')) return jid + '@s.whatsapp.net';
+  return jid;
+}
+
+function updateContactMap(clientId, contacts) {
+  if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
+  var map = contactMaps[clientId];
+  var added = 0;
+  contacts.forEach(function(c) {
+    // c.id = @s.whatsapp.net JID, c.lid = @lid JID
+    if (c.id && c.lid) {
+      var phoneJid = normalizeJid(c.id);
+      var lidJid   = c.lid.includes('@') ? c.lid : c.lid + '@lid';
+      if (!phoneJid.endsWith('@s.whatsapp.net')) return; // skip non-phone JIDs
+      map.set(lidJid, phoneJid);
+      added++;
+    }
+  });
+  if (added > 0) console.log('[SessionManager] Contact map updated for', clientId, '— total mapped:', map.size);
+}
+
+function resolveJid(clientId, jid) {
+  if (!jid || !jid.endsWith('@lid')) return jid;
+  var map = contactMaps[clientId];
+  if (!map) return jid;
+  var resolved = map.get(jid);
+  if (resolved) {
+    console.log('[SessionManager] Resolved @lid → phone:', jid, '→', resolved);
+    return resolved;
+  }
+  // @lid not in map yet — will send to @lid (may not deliver)
+  console.log('[SessionManager] ⚠️  @lid not mapped yet, sending as-is:', jid);
+  return jid;
 }
 
 // ── Main: start or reuse session ─────────────────────────────
 async function startSession(clientId) {
-  // Already connected
   if (sessions[clientId] && sessions[clientId].connected) return;
-  // Socket exists but still connecting (not yet open)
   if (sessions[clientId] && sessions[clientId].sock) return;
-  // Mutex — already in startup phase
   if (starting.has(clientId)) {
     console.log('[SessionManager] Already starting for', clientId);
     return;
   }
   starting.add(clientId);
+
+  // Initialise contact map for this client
+  if (!contactMaps[clientId]) contactMaps[clientId] = new Map();
 
   try {
     if (!retryInfo[clientId]) retryInfo[clientId] = { count: 0, delay: 5000 };
@@ -216,7 +236,6 @@ async function startSession(clientId) {
     console.log('[SessionManager] Starting session for', clientId, '(attempt #' + (retry.count + 1) + ')');
     broadcast(clientId, 'status', { status: 'connecting', attempt: retry.count + 1 });
 
-    // Use Supabase auth state (survives Railway restarts)
     var { state, saveCreds } = await useSupabaseAuthState(clientId);
     var { version }          = await fetchLatestBaileysVersion();
 
@@ -230,35 +249,41 @@ async function startSession(clientId) {
       connectTimeoutMs:              30000
     });
 
-    // Mark as starting (not yet connected)
     sessions[clientId] = { sock: sock, connected: false };
-    starting.delete(clientId); // release mutex — socket is created
+    starting.delete(clientId);
 
     sock.ev.on('creds.update', saveCreds);
+
+    // ── Build @lid→phone map from contact sync ────────────────
+    // Fires during initial WhatsApp sync and when new contacts message
+    sock.ev.on('contacts.upsert', function(contacts) {
+      updateContactMap(clientId, contacts);
+    });
+
+    sock.ev.on('contacts.update', function(updates) {
+      updateContactMap(clientId, updates);
+    });
 
     sock.ev.on('connection.update', async function(update) {
       var connection     = update.connection;
       var lastDisconnect = update.lastDisconnect;
       var qr             = update.qr;
 
-      // New QR
       if (qr) {
         latestQR[clientId] = qr;
         console.log('[SessionManager] QR ready for', clientId);
         broadcast(clientId, 'qr', { qr: qr });
       }
 
-      // Connected
       if (connection === 'open') {
         console.log('[SessionManager] ✅ Connected:', clientId);
         if (sessions[clientId]) sessions[clientId].connected = true;
         delete latestQR[clientId];
         retryInfo[clientId] = { count: 0, delay: 5000 };
         broadcast(clientId, 'connected', { status: 'connected' });
-        setConnected(clientId, true); // update DB
+        setConnected(clientId, true);
       }
 
-      // Disconnected
       if (connection === 'close') {
         var code = 0;
         try {
@@ -272,10 +297,9 @@ async function startSession(clientId) {
 
         delete sessions[clientId];
         starting.delete(clientId);
-        setConnected(clientId, false); // update DB
+        setConnected(clientId, false);
 
         if (loggedOut) {
-          // WhatsApp logged out this device — clear saved auth
           clearSupabaseAuth(clientId);
           broadcast(clientId, 'fatal', { reason: 'logged_out' });
           delete retryInfo[clientId];
@@ -286,13 +310,11 @@ async function startSession(clientId) {
         retryInfo[clientId] = info;
 
         if (info.count >= 10) {
-          console.log('[SessionManager] Max retries reached for', clientId);
           broadcast(clientId, 'fatal', { reason: 'max_retries' });
           delete retryInfo[clientId];
           return;
         }
 
-        // Every 3rd consecutive failure → clear saved auth (force fresh QR)
         if (info.count > 0 && info.count % 3 === 0) {
           clearSupabaseAuth(clientId);
         }
@@ -312,14 +334,27 @@ async function startSession(clientId) {
 
       for (var i = 0; i < messages.length; i++) {
         var msg = messages[i];
-        // Skip empty / protocol messages
         if (!msg.message) continue;
-        // Skip messages sent by the bot itself
         if (msg.key.fromMe) continue;
-        // Skip status broadcasts
         if (msg.key.remoteJid === 'status@broadcast') continue;
 
-        console.log('[SessionManager] 📩 Message for', clientId, 'from', msg.key.remoteJid);
+        var originalJid = msg.key.remoteJid;
+
+        // ── KEY FIX: resolve @lid → @s.whatsapp.net ──────────
+        // @lid is WhatsApp's internal Linked Identity. Sending to @lid
+        // succeeds at the API level but is silently dropped by WhatsApp.
+        // We must use the phone-based @s.whatsapp.net JID for sending.
+        var resolvedJid = resolveJid(clientId, originalJid);
+
+        // Rewrite remoteJid in the message so replyEngine sends to the correct JID
+        if (resolvedJid !== originalJid) {
+          msg = Object.assign({}, msg, {
+            key: Object.assign({}, msg.key, { remoteJid: resolvedJid })
+          });
+        }
+
+        console.log('[SessionManager] 📩 Message for', clientId, 'from', originalJid,
+          resolvedJid !== originalJid ? '(resolved to ' + resolvedJid + ')' : '');
 
         try {
           await replyEngine.handleMessage(sock, msg, clientId);
@@ -341,7 +376,6 @@ async function startSession(clientId) {
   }
 }
 
-// ── Stop session ──────────────────────────────────────────────
 async function stopSession(clientId) {
   try {
     if (sessions[clientId] && sessions[clientId].sock) {
@@ -354,13 +388,11 @@ async function stopSession(clientId) {
   delete latestQR[clientId];
 }
 
-// ── Clear session + auth ──────────────────────────────────────
 async function clearSession(clientId) {
   await stopSession(clientId);
   await clearSupabaseAuth(clientId);
 }
 
-// ── Get active socket (only when fully connected) ─────────────
 function getSession(clientId) {
   var s = sessions[clientId];
   return (s && s.sock && s.connected) ? s.sock : null;
@@ -370,7 +402,6 @@ function getAllSessions() {
   return Object.keys(sessions);
 }
 
-// ── Boot all clients on server start ─────────────────────────
 async function bootAllSessions(activeClients) {
   console.log('[SessionManager] Booting ' + activeClients.length + ' session(s)...');
   for (var i = 0; i < activeClients.length; i++) {
@@ -384,13 +415,11 @@ async function bootAllSessions(activeClients) {
   }
 }
 
-// ── SSE listener management ───────────────────────────────────
 function registerQRListener(clientId, fn) {
   if (!global.qrListeners) global.qrListeners = new Map();
   var all = global.qrListeners.get(clientId) || [];
   all.push(fn);
   global.qrListeners.set(clientId, all);
-  // Send cached QR immediately to late-joining connections
   if (latestQR[clientId]) {
     try { fn('qr', { qr: latestQR[clientId] }); } catch (e) {}
   }
