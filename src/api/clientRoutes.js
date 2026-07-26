@@ -52,7 +52,7 @@ function auth(req, res, next) {
   try {
     var header = req.headers.authorization || '';
     var token  = header.replace('Bearer ', '').trim();
-    // SSE fallback: EventSource cannot send custom headers, so token comes via query param
+    // SSE fallback: EventSource cannot send custom headers, so token comes via ?token=
     if (!token) token = req.query.token || '';
     if (!token) return res.status(401).json({ error: 'No token' });
     var decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -88,6 +88,7 @@ async function checkPartnerExpiry(clientId) {
       }
     }
   } catch (e) {
+    // Non-critical — log and continue
     console.error('[ClientAPI] Partner check error:', e.message);
   }
 }
@@ -99,7 +100,7 @@ router.use('/client', auth, async function(req, res, next) {
 });
 
 // ══════════════════════════════════════════════════════════════
-//  EXISTING ROUTES
+//  EXISTING ROUTES (preserved exactly as before)
 // ══════════════════════════════════════════════════════════════
 
 // GET /api/client/me
@@ -252,35 +253,54 @@ router.put('/client/fallback', async function(req, res) {
 });
 
 // GET /api/client/qr-stream (SSE)
-// NOTE: auth middleware above now accepts ?token= query param, so this route
-// receives req.clientId already set — no need for duplicate token parsing here.
+// ─────────────────────────────────────────────────────────────
+//  FIX: auth middleware now passes ?token= through (line ~54),
+//  so req.clientId is already set when we get here.
+//
+//  FIX: when already connected we used to call res.end() right
+//  after sending 'connected'. The browser's EventSource treats
+//  a closed connection as an error → onerror fires → dashboard
+//  shows "Disconnected" immediately. Now we keep the SSE open
+//  and let the client close it once it has processed the event.
+// ─────────────────────────────────────────────────────────────
 router.get('/client/qr-stream', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  var clientId = req.clientId;
+  var clientId = req.clientId; // already set by auth middleware
   if (!global.qrListeners) global.qrListeners = new Map();
 
   function sendEvent(event, data) {
     try { res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n'); } catch(e) {}
   }
 
-  // Already connected — notify immediately and close
-  var existingSock = global.getSock && global.getSock(clientId);
-  if (existingSock) {
-    sendEvent('connected', { status: 'connected' });
-    res.end();
-    return;
-  }
+  // Keep connection alive through proxies / Railway's load balancer
+  var heartbeat = setInterval(function() {
+    try { res.write(': ping\n\n'); } catch(e) { clearInterval(heartbeat); }
+  }, 25000);
 
-  // Register this SSE connection as a listener
+  // Register this SSE connection so it can receive QR, connected, and disconnected events
   var listeners = global.qrListeners.get(clientId) || [];
   listeners.push(sendEvent);
   global.qrListeners.set(clientId, listeners);
 
-  // Start (or attach to) the wwebjs session
+  req.on('close', function() {
+    clearInterval(heartbeat);
+    var all = global.qrListeners.get(clientId) || [];
+    global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
+  });
+
+  // If already connected, fire immediately and STAY OPEN.
+  // (Previously we called res.end() here which caused instant "Disconnected")
+  var existingSock = global.getSock && global.getSock(clientId);
+  if (existingSock) {
+    sendEvent('connected', { status: 'connected' });
+    return; // SSE stays alive; client closes it after updating its UI
+  }
+
+  // Start / attach to an in-progress session
   await sessionManager.startSession(clientId, {
     onQR: function(qr) {
       var all = global.qrListeners.get(clientId) || [];
@@ -294,13 +314,8 @@ router.get('/client/qr-stream', async function(req, res) {
     onDisconnected: function() {
       var all = global.qrListeners.get(clientId) || [];
       all.forEach(function(fn) { try { fn('disconnected', { status: 'disconnected' }); } catch(e) {} });
+      global.qrListeners.delete(clientId);
     }
-  });
-
-  // Clean up listener when browser closes the SSE connection
-  req.on('close', function() {
-    var all = global.qrListeners.get(clientId) || [];
-    global.qrListeners.set(clientId, all.filter(function(fn) { return fn !== sendEvent; }));
   });
 });
 
@@ -308,18 +323,22 @@ router.get('/client/qr-stream', async function(req, res) {
 //  NEW ROUTES v2
 // ══════════════════════════════════════════════════════════════
 
-// PUT /api/client/occupation
+// ── Occupation ────────────────────────────────────────────────
+
+// PUT /api/client/occupation  — save occupation + specific answers
 router.put('/client/occupation', async function(req, res) {
   try {
     var { occupation, answers } = req.body;
     if (!occupation) return res.status(400).json({ error: 'occupation required' });
 
     var sb = getSupabase();
+    // Update clients table
     await sb.from('clients').update({
       occupation:       occupation,
       occupation_data:  answers || {}
     }).eq('id', req.clientId);
 
+    // Upsert into bot_setup
     await sb.from('bot_setup').upsert({
       client_id:           req.clientId,
       occupation_answers:  answers || {},
@@ -331,6 +350,8 @@ router.put('/client/occupation', async function(req, res) {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Location ──────────────────────────────────────────────────
 
 // PUT /api/client/location
 router.put('/client/location', async function(req, res) {
@@ -346,6 +367,8 @@ router.put('/client/location', async function(req, res) {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Service Listings ──────────────────────────────────────────
 
 // GET /api/client/listings
 router.get('/client/listings', async function(req, res) {
@@ -412,6 +435,7 @@ router.patch('/client/listings/:id', async function(req, res) {
 router.delete('/client/listings/:id', async function(req, res) {
   try {
     var sb = getSupabase();
+    // Cascade: listing_media is deleted by DB constraint (ON DELETE CASCADE)
     await sb.from('service_listings')
       .delete()
       .eq('id', req.params.id)
@@ -421,6 +445,8 @@ router.delete('/client/listings/:id', async function(req, res) {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Listing Media ─────────────────────────────────────────────
 
 // GET /api/client/listings/:id/media
 router.get('/client/listings/:id/media', async function(req, res) {
@@ -437,7 +463,7 @@ router.get('/client/listings/:id/media', async function(req, res) {
   }
 });
 
-// POST /api/client/listings/:id/media
+// POST /api/client/listings/:id/media  — add media by URL
 router.post('/client/listings/:id/media', async function(req, res) {
   try {
     var { url, media_type, caption, filename, sort_order } = req.body;
@@ -475,6 +501,7 @@ router.delete('/client/media/:id', async function(req, res) {
   }
 });
 
+// ── File Upload → Supabase Storage ───────────────────────────
 // POST /api/client/upload
 router.post('/client/upload', upload.single('file'), async function(req, res) {
   try {
@@ -500,6 +527,8 @@ router.post('/client/upload', upload.single('file'), async function(req, res) {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── FAQ ───────────────────────────────────────────────────────
 
 // GET /api/client/faq
 router.get('/client/faq', async function(req, res) {
@@ -575,6 +604,8 @@ router.delete('/client/faq/:id', async function(req, res) {
   }
 });
 
+// ── Partner / Trial Status ────────────────────────────────────
+
 // GET /api/client/partner-status
 router.get('/client/partner-status', async function(req, res) {
   try {
@@ -604,12 +635,15 @@ router.get('/client/partner-status', async function(req, res) {
   }
 });
 
+// ── Qualification toggle ──────────────────────────────────────
+
 // PUT /api/client/qualification-toggle
 router.put('/client/qualification-toggle', async function(req, res) {
   try {
     var { enabled } = req.body;
     var sb          = getSupabase();
 
+    // Merge into existing occupation_data JSON
     var current = await sb.from('clients')
       .select('occupation_data')
       .eq('id', req.clientId)
