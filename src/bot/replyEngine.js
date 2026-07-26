@@ -1,17 +1,10 @@
 // ============================================================
-//  ForgeBot — Reply Engine
+//  ForgeBot — replyEngine.js
 //  File location: src/bot/replyEngine.js
-//
-//  FIX: All replies now use { quoted: msg } so WhatsApp routes
-//  them correctly even for @lid JIDs (Linked Identity format).
-//  Without this, sock.sendMessage succeeds silently but the
-//  message never appears in the customer's DM.
 // ============================================================
-
-'use strict';
-
-const db = require('../db/supabase');
-const { transcribeVoiceNote } = require('./voiceHandler');
+const db           = require('../db/supabase');
+const { matchKeyword }           = require('./keywords');
+const { transcribeVoiceNote }    = require('./voiceHandler');
 const {
   isPaymentClaim,
   notifyOwnerOfPaymentClaim,
@@ -19,7 +12,7 @@ const {
   notifyOwnerHumanRequest
 } = require('./paymentNotifier');
 
-// ── Human handoff pause map ────────────────────────────────
+// Tracks customers paused for human handoff: key = clientId:jid, value = timestamp until paused
 const humanPaused = new Map();
 
 function humanDelay() {
@@ -35,302 +28,119 @@ const HUMAN_HANDOFF_KEYWORDS = [
 ];
 
 function wantsHuman(text) {
-  var lower = text.toLowerCase();
+  const lower = text.toLowerCase();
   return HUMAN_HANDOFF_KEYWORDS.some(function(kw) { return lower.includes(kw); });
 }
 
-// ── Smart listings search ──────────────────────────────────
-async function searchListings(clientId, query) {
-  try {
-    var sb = db.getSupabase();
-    var lower = query.toLowerCase();
-
-    var result = await sb
-      .from('service_listings')
-      .select('*, listing_media(url, media_type, sort_order)')
-      .eq('client_id', clientId)
-      .eq('available', true)
-      .order('created_at', { ascending: false });
-
-    if (result.error || !result.data || !result.data.length) return [];
-
-    var scored = result.data.map(function(listing) {
-      var score = 0;
-      var fields = [
-        listing.name        || '',
-        listing.description || '',
-        listing.keywords    || '',
-        listing.category    || '',
-        listing.location    || '',
-        listing.price_label || ''
-      ].map(function(f) { return f.toLowerCase(); });
-
-      var words = lower.split(/\s+/).filter(function(w) { return w.length > 2; });
-      words.forEach(function(word) {
-        fields.forEach(function(field) {
-          if (field.includes(word)) score += word.length;
-        });
-      });
-
-      if (fields[0].includes(lower)) score += 20;
-
-      return { listing: listing, score: score };
-    });
-
-    return scored
-      .filter(function(s) { return s.score > 0; })
-      .sort(function(a, b) { return b.score - a.score; })
-      .slice(0, 3)
-      .map(function(s) { return s.listing; });
-  } catch (e) {
-    console.error('[ReplyEngine] Listing search error:', e.message);
-    return [];
-  }
-}
-
-const LISTING_TRIGGERS = [
-  'do you have', 'do you sell', 'do you offer', 'is it available', 'price of',
-  'how much is', 'how much for', 'what is the price', 'i want to buy', 'i want to order',
-  'i need', 'looking for', 'show me', 'send me', 'any available', 'in stock',
-  'do you do', 'can you do', 'available for', 'services', 'products', 'what do you have',
-  'what do you sell', 'your prices', 'package', 'packages', 'catalogue', 'catalog',
-  'bedroom', 'apartment', 'house', 'land', 'property', 'plot', 'duplex', 'flat',
-  'size', 'colour', 'color', 'style', 'design', 'type', 'model'
-];
-
-function isListingQuery(text) {
-  var lower = text.toLowerCase();
-  return LISTING_TRIGGERS.some(function(t) { return lower.includes(t); });
-}
-
-// ── Send listing results — uses { quoted: msg } for correct @lid delivery ──
-async function sendListingResults(sock, jid, listings, client, msg) {
-  if (!listings.length) return false;
-
-  var opts = msg ? { quoted: msg } : {};
-
-  if (listings.length === 1) {
-    var l = listings[0];
-    var text = '✅ Yes! Here is what we have:\n\n';
-    text += '*' + l.name + '*\n';
-    if (l.price)       text += '💰 *Price:* ' + l.price + '\n';
-    if (l.description) text += '📝 ' + l.description + '\n';
-    if (l.location)    text += '📍 *Location:* ' + l.location + '\n';
-    text += '\nInterested? Reply to place your order! 😊';
-
-    await sock.sendMessage(jid, { text: text }, opts);
-
-    var media = (l.listing_media || []).filter(function(m) { return m.media_type === 'image'; });
-    for (var i = 0; i < Math.min(media.length, 3); i++) {
-      try {
-        await sock.sendMessage(jid, { image: { url: media[i].url }, caption: l.name });
-        await new Promise(function(r) { setTimeout(r, 800); });
-      } catch (e) {}
-    }
-
-    var pdf = (l.listing_media || []).find(function(m) { return m.media_type === 'pdf'; });
-    if (pdf) {
-      try {
-        await sock.sendMessage(jid, {
-          document: { url: pdf.url },
-          mimetype: 'application/pdf',
-          fileName: l.name + '.pdf',
-          caption:  'Full details for ' + l.name
-        });
-      } catch (e) {}
-    }
-  } else {
-    var intro = '✅ We found *' + listings.length + ' options* for you:\n\n';
-    listings.forEach(function(l, i) {
-      intro += '*' + (i + 1) + '. ' + l.name + '*\n';
-      if (l.price)       intro += '   💰 ' + l.price + '\n';
-      if (l.location)    intro += '   📍 ' + l.location + '\n';
-      if (l.description) intro += '   ' + l.description.slice(0, 80) + (l.description.length > 80 ? '...' : '') + '\n';
-      intro += '\n';
-    });
-    intro += 'Reply with the *number* of the one you want more details on! 😊';
-    await sock.sendMessage(jid, { text: intro }, opts);
-
-    for (var j = 0; j < listings.length; j++) {
-      var imgs = (listings[j].listing_media || []).filter(function(m) { return m.media_type === 'image'; });
-      if (imgs.length) {
-        try {
-          await sock.sendMessage(jid, {
-            image:   { url: imgs[0].url },
-            caption: '*' + (j + 1) + '.* ' + listings[j].name + (listings[j].price ? ' — ' + listings[j].price : '')
-          });
-          await new Promise(function(r) { setTimeout(r, 800); });
-        } catch (e) {}
-      }
-    }
-  }
-  return true;
-}
-
-// ── Main message handler ───────────────────────────────────
-
 async function handleMessage(sock, msg, clientId) {
   try {
-    var jid = msg.key.remoteJid;
+    const jid = msg.key.remoteJid;
     if (jid === 'status@broadcast') return;
 
-    // All replies will quote the original message.
-    // This ensures correct delivery even for @lid JIDs —
-    // WhatsApp uses the message context to route the reply.
-    var opts = { quoted: msg };
+    const msgContent = msg.message;
+    const isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
+    const isAudio = !!(msgContent && msgContent.audioMessage);
 
-    var msgContent = msg.message;
-    var isVoice = !!(msgContent && msgContent.audioMessage && msgContent.audioMessage.ptt);
-    var isAudio = !!(msgContent && msgContent.audioMessage);
-
-    var text = (msgContent && msgContent.conversation) ||
+    let text = (msgContent && msgContent.conversation) ||
                (msgContent && msgContent.extendedTextMessage && msgContent.extendedTextMessage.text) ||
                (msgContent && msgContent.imageMessage && msgContent.imageMessage.caption) || '';
 
-    console.log('[ReplyEngine] 📨 Message from', jid, 'client', clientId, '| text:', text.slice(0, 60) || '[voice/media]');
-
-    // ── Voice note handling ─────────────────────────────────
+    // ── Voice note handling ─────────────────────────────────────────────────
     if (isVoice || isAudio) {
       await sock.sendPresenceUpdate('composing', jid);
-      var transcribed = await transcribeVoiceNote(sock, msg);
+      const transcribed = await transcribeVoiceNote(sock, msg);
       if (!transcribed) {
         await humanDelay();
         await sock.sendMessage(jid, {
           text: 'I received your voice note! Could you please type your message so I can help you faster?'
-        }, opts);
+        });
         return;
       }
       text = transcribed;
       await sock.sendMessage(jid, {
         text: 'I heard: _"' + transcribed + '"_\n\nLet me help you with that...'
-      }, opts);
+      });
     }
 
-    if (!text.trim()) {
-      console.log('[ReplyEngine] Empty text — skipping');
-      return;
-    }
+    if (!text.trim()) return;
 
-    // ── Get client ──────────────────────────────────────────
-    var client = await db.getClientById(clientId);
+    // ── Get client ──────────────────────────────────────────────────────────
+    const client = await db.getClientById(clientId);
+
+    // PATCHED: log why we skip instead of silently returning
     if (!client) {
-      console.log('[ReplyEngine] ❌ Client', clientId, 'not found in DB');
+      console.warn('[ReplyEngine] Client not found in DB: ' + clientId + ' — skipping message');
       return;
     }
     if (client.status !== 'active') {
-      console.log('[ReplyEngine] ❌ Client status:', client.status, '— skipping');
+      console.warn('[ReplyEngine] Client status is "' + client.status + '" (not "active") for ' + clientId + ' — skipping. Fix: UPDATE clients SET status=\'active\' WHERE id=\'' + clientId + '\'');
       return;
     }
     if (!client.subscription_active) {
-      console.log('[ReplyEngine] ❌ subscription_active false — skipping');
+      console.warn('[ReplyEngine] subscription_active is false for ' + clientId + ' — skipping. Fix: UPDATE clients SET subscription_active=true WHERE id=\'' + clientId + '\'');
       return;
     }
 
-    // ── Track customer ──────────────────────────────────────
-    try {
-      var sb = db.getSupabase();
-      await sb.from('customers').upsert({
-        client_id:    clientId,
-        jid:          jid,
-        last_contact: new Date().toISOString(),
-        last_seen:    new Date().toISOString()
-      }, { onConflict: 'client_id,jid', ignoreDuplicates: false });
-    } catch (e) {}
+    // ── Check if this is the owner replying to a payment alert ─────────────
+    const ownerHandled = await handleOwnerReply(sock, jid, text, clientId);
+    if (ownerHandled) return;
 
-    // ── Owner reply check ───────────────────────────────────
-    var ownerHandled = await handleOwnerReply(sock, jid, text, clientId);
-    if (ownerHandled) {
-      console.log('[ReplyEngine] Owner reply handled');
-      return;
-    }
-
-    // ── Human pause check ───────────────────────────────────
-    var pauseKey    = clientId + ':' + jid;
-    var pausedUntil = humanPaused.get(pauseKey);
-    if (pausedUntil && Date.now() < pausedUntil) {
-      console.log('[ReplyEngine] Human handoff active — suppressing bot');
-      return;
-    }
+    // ── Check if customer is paused (owner is handling them) ───────────────
+    const pauseKey = clientId + ':' + jid;
+    const pausedUntil = humanPaused.get(pauseKey);
+    if (pausedUntil && Date.now() < pausedUntil) return;
     if (pausedUntil && Date.now() >= pausedUntil) humanPaused.delete(pauseKey);
 
-    // ── Human handoff detection ─────────────────────────────
+    // ── Human handoff detection ─────────────────────────────────────────────
     if (wantsHuman(text)) {
-      console.log('[ReplyEngine] Human handoff requested by', jid);
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
       await sock.sendMessage(jid, {
-        text: 'Got it! I am connecting you with the owner right now. Please hold on — they will be with you shortly.'
-      }, opts);
-      humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000);
+        text: 'Got it! I am connecting you with the owner right now. Please hold on -- they will be with you shortly.'
+      });
+      humanPaused.set(pauseKey, Date.now() + 30 * 60 * 1000); // pause 30 minutes
       await notifyOwnerHumanRequest(sock, clientId, jid);
       return;
     }
 
-    // ── Payment claim detection ─────────────────────────────
+    // ── Payment claim detection ─────────────────────────────────────────────
     if (isPaymentClaim(text)) {
-      console.log('[ReplyEngine] Payment claim from', jid);
       await sock.sendPresenceUpdate('composing', jid);
       await humanDelay();
       await sock.sendMessage(jid, {
         text: 'Thank you! Your payment claim has been received. The owner has been notified and will confirm shortly. We will update you right away!'
-      }, opts);
+      });
       await notifyOwnerOfPaymentClaim(sock, clientId, jid, text);
       return;
     }
 
-    await sock.sendPresenceUpdate('composing', jid);
-    await humanDelay();
-    await sock.sendPresenceUpdate('paused', jid);
-
-    // ── Smart listings search ───────────────────────────────
-    if (isListingQuery(text)) {
-      console.log('[ReplyEngine] Listing query:', text.slice(0, 50));
-      var matches = await searchListings(clientId, text);
-      if (matches.length > 0) {
-        console.log('[ReplyEngine] Found', matches.length, 'listing(s) — sending');
-        var sent = await sendListingResults(sock, jid, matches, client, msg);
-        if (sent) return;
-      }
-    }
-
-    // ── Keyword flow matching ───────────────────────────────
-    var flows = await db.getFlows(clientId, true);
-    var matched = null;
-    for (var i = 0; i < flows.length; i++) {
-      var flow = flows[i];
-      var kws  = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
-      var textLower = text.toLowerCase();
+    // ── Flow keyword matching ───────────────────────────────────────────────
+    const flows = await db.getFlows(clientId, true);
+    let matched = null;
+    for (const flow of flows) {
+      const kws = flow.keywords.split(',').map(function(k) { return k.trim().toLowerCase(); });
+      const textLower = text.toLowerCase();
       if (kws.some(function(kw) { return textLower.includes(kw); })) {
         matched = flow;
         break;
       }
     }
 
+    await sock.sendPresenceUpdate('composing', jid);
+    await humanDelay();
+    await sock.sendPresenceUpdate('paused', jid);
+
     if (matched) {
-      console.log('[ReplyEngine] Keyword match:', matched.keywords.slice(0, 40));
       if (matched.response_type === 'image' && matched.media_url) {
-        await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response }, opts);
+        await sock.sendMessage(jid, { image: { url: matched.media_url }, caption: matched.response });
       } else {
-        await sock.sendMessage(jid, { text: matched.response }, opts);
+        await sock.sendMessage(jid, { text: matched.response });
       }
-      return;
+    } else {
+      const fallback = client.fallback_message ||
+        'Thank you for reaching out! Someone will get back to you shortly.';
+      await sock.sendMessage(jid, { text: fallback });
     }
-
-    // ── Broad listing search ────────────────────────────────
-    if (!isListingQuery(text)) {
-      var broadMatches = await searchListings(clientId, text);
-      if (broadMatches.length > 0) {
-        var broadSent = await sendListingResults(sock, jid, broadMatches, client, msg);
-        if (broadSent) return;
-      }
-    }
-
-    // ── Fallback ────────────────────────────────────────────
-    var fallback = client.fallback_message ||
-      'Thank you for reaching out! Someone will get back to you shortly.';
-    console.log('[ReplyEngine] Sending fallback to', jid);
-    await sock.sendMessage(jid, { text: fallback }, opts);
-    console.log('[ReplyEngine] ✅ Fallback sent OK to', jid);
 
   } catch (err) {
     console.error('[ReplyEngine] Error for client ' + clientId + ':', err.message);
